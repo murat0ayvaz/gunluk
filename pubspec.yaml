@@ -1,7 +1,7 @@
 name: gunluk
-description: Günlük aktivite kayıt uygulaması
+description: Günlük rutin, hedef, yapılacaklar ve günlük (not) uygulaması
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.2.0+3
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -9,7 +9,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  shared_preferences: ^2.2.0
+  flutter_localizations:   # Türkçe / English tarih seçici ve düğme metinleri için
+    sdk: flutter
+  intl: any                # flutter_localizations bunu ister
+  shared_preferences: ^2.2.0   # Verileri telefonda yerel olarak saklar
 
 flutter:
   uses-material-design: true
