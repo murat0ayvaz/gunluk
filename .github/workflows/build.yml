@@ -3,7 +3,7 @@ name: Build APK
 on:
   push:
     branches: [main, master]
-  workflow_dispatch:
+  workflow_dispatch:   # Actions sekmesinden elle de başlatılabilir
 
 jobs:
   build:
@@ -21,11 +21,20 @@ jobs:
           channel: stable
           cache: true
 
+      # android/ klasörünü otomatik üretir (repoda tutmaya gerek yok)
       - name: Android klasörünü oluştur
         run: flutter create --platforms=android --project-name gunluk .
 
+      # Uygulama adını "Günlük" yap
       - name: Uygulama adı
         run: sed -i 's/android:label="[^"]*"/android:label="Günlük"/' android/app/src/main/AndroidManifest.xml
+
+      # Her derlemede AYNI imza anahtarı kullanılsın: böylece yeni APK,
+      # eskisinin ÜSTÜNE kurulur ve verilerin silinmez.
+      - name: Sabit imza anahtarı
+        run: |
+          mkdir -p ~/.android
+          if [ -f debug.keystore ]; then cp debug.keystore ~/.android/debug.keystore; fi
 
       - run: flutter pub get
       - run: flutter build apk --release
