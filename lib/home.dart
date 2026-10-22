@@ -5,6 +5,7 @@ import 'drawer.dart';
 import 'notes.dart';
 import 'strings.dart';
 import 'theme.dart';
+import 'todos.dart';
 import 'ui.dart';
 
 // ---------------------------------------------------------------
@@ -33,6 +34,7 @@ class _RowData {
 class _HomePageState extends State<HomePage> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   DateTime day = dayOnly(DateTime.now());
+  bool _fabOpen = false; // DR düğmesi menüsü açık mı
 
   void _shift(int n) =>
       setState(() => day = DateTime(day.year, day.month, day.day + n));
@@ -172,6 +174,11 @@ class _HomePageState extends State<HomePage> {
             );
 
         final children = <Widget>[
+          if (routines.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+              child: Text('Routine', style: TextStyle(color: p.soft)),
+            ),
           for (final r in routines) rowOf(r),
           if (routines.isNotEmpty && others.isNotEmpty)
             Padding(
@@ -185,12 +192,20 @@ class _HomePageState extends State<HomePage> {
           key: _scaffoldKey,
           drawer: AppDrawer(
             onToday: () => setState(() => day = dayOnly(DateTime.now())),
+            onNote: _openNote,
           ),
           appBar: AppBar(
             backgroundColor: p.bg,
             elevation: 0,
             scrolledUnderElevation: 0,
             centerTitle: false,
+            actions: [
+              IconButton(
+                tooltip: tx('Günün notu'),
+                icon: const Icon(Icons.edit_note_rounded),
+                onPressed: _openNote,
+              ),
+            ],
             leading: IconButton(
               icon: const Icon(Icons.menu_rounded),
               onPressed: () => _scaffoldKey.currentState?.openDrawer(),
@@ -199,7 +214,7 @@ class _HomePageState extends State<HomePage> {
             title: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () => _scaffoldKey.currentState?.openDrawer(),
-              child: Text(tx('Günlük'),
+              child: Text('Daily',
                   style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
@@ -249,33 +264,36 @@ class _HomePageState extends State<HomePage> {
                         child: Padding(
                           padding: const EdgeInsets.all(32),
                           child: Text(
-                            tx('Bu gün için kayıt yok.\nAşağıdaki Ekle düğmesiyle rutin veya kayıt ekleyebilirsin.'),
+                            tx('Bu gün için kayıt yok.\nSağ alttaki DR düğmesine dokunup Ekle’yi seçerek rutin veya kayıt ekleyebilirsin.'),
                             textAlign: TextAlign.center,
                             style: TextStyle(color: p.soft, height: 1.4),
                           ),
                         ),
                       )
                     : ListView(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
                         children: children,
                       ),
               ),
             ],
           ),
-          // ----- Altta Ekle butonu -----
-          bottomNavigationBar: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: SizedBox(
-                height: 52,
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: _openAdd,
-                  icon: const Icon(Icons.add_rounded),
-                  label: Text(tx('Ekle')),
-                ),
-              ),
-            ),
+          // ----- DR düğmesi: dokununca Ekle / Günün notu / Yapılacaklar açılır -----
+          floatingActionButton: _DrFab(
+            open: _fabOpen,
+            onToggle: () => setState(() => _fabOpen = !_fabOpen),
+            onAdd: () {
+              setState(() => _fabOpen = false);
+              _openAdd();
+            },
+            onNote: () {
+              setState(() => _fabOpen = false);
+              _openNote();
+            },
+            onTodos: () {
+              setState(() => _fabOpen = false);
+              Navigator.of(context).push(MaterialPageRoute<void>(
+                  builder: (_) => const TodosPage()));
+            },
           ),
         );
       },
@@ -472,6 +490,69 @@ class _DayRowState extends State<_DayRow> {
           child: content,
         ),
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------
+// DR DÜĞMESİ (Daily Routine): sağ altta kısa yazılı düğme.
+// Dokununca yukarı doğru yazılı seçenekler açılır:
+//   Ekle  |  Günün notu  |  Yapılacaklar
+// ---------------------------------------------------------------
+class _DrFab extends StatelessWidget {
+  final bool open;
+  final VoidCallback onToggle;
+  final VoidCallback onAdd;
+  final VoidCallback onNote;
+  final VoidCallback onTodos;
+
+  const _DrFab({
+    required this.open,
+    required this.onToggle,
+    required this.onAdd,
+    required this.onNote,
+    required this.onTodos,
+  });
+
+  // Açılan menüdeki tek seçenek
+  Widget _action(Pal p, IconData icon, String label, VoidCallback onTap) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: FloatingActionButton.extended(
+          heroTag: null, // birden çok düğme olduğu için hero animasyonu kapalı
+          onPressed: onTap,
+          backgroundColor: p.card,
+          foregroundColor: p.ink,
+          elevation: 2,
+          icon: Icon(icon),
+          label: Text(label),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palOf(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        if (open) ...[
+          _action(p, Icons.add_rounded, tx('Ekle'), onAdd),
+          _action(p, Icons.edit_note_rounded, tx('Günün notu'), onNote),
+          _action(p, Icons.task_alt_rounded, tx('Yapılacaklar'), onTodos),
+        ],
+        FloatingActionButton.extended(
+          heroTag: null,
+          onPressed: onToggle,
+          backgroundColor: p.accent,
+          foregroundColor: p.onAccent,
+          icon: open ? const Icon(Icons.close_rounded) : null,
+          label: Text(
+            open ? tx('Kapat') : 'DR',
+            style: const TextStyle(fontWeight: FontWeight.w700, letterSpacing: 1),
+          ),
+        ),
+      ],
     );
   }
 }

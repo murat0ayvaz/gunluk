@@ -33,14 +33,18 @@ class SplashPage extends StatelessWidget {
                 child: Icon(Icons.checklist_rounded, size: 52, color: p.onAccent),
               ),
               const SizedBox(height: 20),
-              Text(
-                tx('Günlük'),
-                style: TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5,
-                  color: p.ink,
+              Text.rich(
+                TextSpan(
+                  children: [
+                    const TextSpan(
+                        text: 'Daily ',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
+                    const TextSpan(
+                        text: 'Routine',
+                        style: TextStyle(fontWeight: FontWeight.w300)),
+                  ],
                 ),
+                style: TextStyle(fontSize: 32, letterSpacing: 0.5, color: p.ink),
               ),
               const SizedBox(height: 6),
               Text(tx('Rutinlerin, hedeflerin, günlerin'),
@@ -73,12 +77,12 @@ List<_Pg> _pages() => [
       _Pg(
         Icons.flag_rounded,
         tx('Rutin oluştur, hedef koy'),
-        tx('Ekle düğmesiyle kategori ve alt kategori seç, “Rutin olsun” anahtarını aç ve günlük hedefini yaz. Hedefe ulaşınca satır yeşile döner. Satırı sola kaydırarak o günün verisini sil, sağa kaydırarak düzenle.'),
+        tx('Sağ alttaki DR düğmesine dokunup Ekle’yi seç; kategori ve alt kategori seç, “Rutin olsun” anahtarını aç ve günlük hedefini yaz. Hedefe ulaşınca satır yeşile döner. Satırı sola kaydırarak o günün verisini sil, sağa kaydırarak düzenle.'),
       ),
       _Pg(
         Icons.bar_chart_rounded,
         tx('İstatistikler soldaki menüde'),
-        tx('Üstteki “Günlük” yazısına dokun, menüden bir alt kategori seç: günlük, haftalık ve aylık toplamlarını gör. Yapılacaklar listesi ve ayarlar da aynı menüde. Tüm verilerin sadece telefonunda saklanır.'),
+        tx('Üstteki “Daily” yazısına dokun, menüden bir alt kategori seç: günlük, haftalık ve aylık toplamlarını gör. Yapılacaklar listesi ve ayarlar da aynı menüde. Tüm verilerin sadece telefonunda saklanır.'),
       ),
     ];
 

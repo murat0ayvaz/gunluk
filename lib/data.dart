@@ -1,11 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'strings.dart';
 import 'theme.dart';
 
 // ---------------------------------------------------------------
-// VERİ KATMANI: modeller + telefona kayıt (SharedPreferences)
+// VERİ KATMANI: modeller + telefona kayıt (eklentisiz, dosyaya JSON)
 // Kayıtlar isme değil KİMLİK (id) numarasına bağlıdır; bu yüzden
 // kategori / alt kategori adı değişse bile geçmiş veri bozulmaz.
 // ---------------------------------------------------------------
@@ -262,7 +262,9 @@ class AppStore extends ChangeNotifier {
   /// Kayıt alanı açılamazsa ekranda uyarı olarak gösterilir
   String? storageError;
 
-  SharedPreferences? _prefs;
+  File? _file; // telefondaki veri dosyası
+  bool _writing = false;
+  bool _dirty = false;
   int _seq = 0;
 
   String newId() => '${DateTime.now().microsecondsSinceEpoch}_${_seq++}';
@@ -274,54 +276,103 @@ class AppStore extends ChangeNotifier {
     appLang = lang;
   }
 
+  /// Hata mesajını ekrana sığacak kadar kısaltır
+  String _short(Object e) {
+    final s = e.toString().replaceAll('\n', ' ');
+    return s.length > 120 ? '${s.substring(0, 120)}…' : s;
+  }
+
+  /// Uygulamaya özel kalıcı klasörü bulur. EKLENTİ KULLANMAZ (önceki sürümlerde
+  /// kayıt eklentisi yayın sürümünde çöktüğü için): Android'de önbellek klasörünün
+  /// (.../cache) yanındaki "files" klasörü sadece bu uygulamaya aittir.
+  Future<Directory> _baseDir() async {
+    final t = Directory.systemTemp.path;
+    if (t.startsWith('/data/') && t.endsWith('/cache')) {
+      return Directory('${t.substring(0, t.length - '/cache'.length)}/files');
+    }
+    // Olmazsa süreç adından paket adını bul
+    try {
+      final raw = await File('/proc/self/cmdline').readAsBytes();
+      final end = raw.indexOf(0);
+      final pkg =
+          String.fromCharCodes(end < 0 ? raw : raw.sublist(0, end)).trim();
+      if (pkg.isNotEmpty) return Directory('/data/data/$pkg/files');
+    } catch (_) {}
+    return Directory.systemTemp;
+  }
+
+  Future<File> _dataFile() async {
+    final dir = await _baseDir();
+    if (!await dir.exists()) await dir.create(recursive: true);
+    return File('${dir.path}/gunluk_data.json');
+  }
+
+  /// Dosyadaki veriyi belleğe yükler (eski sürümde olmayan alanlar boş başlar)
+  void _load(Map<String, dynamic> j) {
+    cats = ((j['cats'] as List?) ?? [])
+        .map((e) => Category.fromJson(e as Map<String, dynamic>))
+        .toList();
+    entries = ((j['entries'] as List?) ?? [])
+        .map((e) => Entry.fromJson(e as Map<String, dynamic>))
+        .toList();
+    todos = ((j['todos'] as List?) ?? [])
+        .map((e) => Todo.fromJson(e as Map<String, dynamic>))
+        .toList();
+    notes = ((j['notes'] as Map?) ?? {})
+        .map((k, v) => MapEntry(k as String, v as String));
+
+    final s = (j['settings'] as Map?) ?? {};
+    final l = s['lang'];
+    if (l == 'tr' || l == 'en') {
+      lang = l as String;
+      appLang = lang;
+    }
+    themeMode = ThemeMode
+        .values[((s['themeMode'] as int?) ?? 0).clamp(0, 2).toInt()];
+    accent = ((s['accent'] as int?) ?? 0)
+        .clamp(0, accentColors.length - 1)
+        .toInt();
+    seenIntro = (s['seenIntro'] as bool?) ?? false;
+  }
+
   /// Açılışta veriyi okur. Ne olursa olsun TAMAMLANIR (takılıp kalmaz):
-  /// okuma 5 sn içinde bitmezse uygulama geçici bellekle çalışır.
+  /// okuma olmazsa uygulama geçici bellekle çalışır ve uyarı gösterir.
   Future<void> init() async {
     prepareLang(); // kayıtlı dil varsa aşağıda üzerine yazılır
+    File? f;
     try {
-      final p = await SharedPreferences.getInstance()
-          .timeout(const Duration(seconds: 5));
-      _prefs = p;
-
-      final savedLang = p.getString('lang');
-      if (savedLang != null && (savedLang == 'tr' || savedLang == 'en')) {
-        lang = savedLang;
-        appLang = savedLang;
-      } else {
-        p.setString('lang', lang); // ilk kurulum dili
-      }
-
-      final raw = p.getString('data_v2');
-      if (raw != null) {
-        final j = jsonDecode(raw) as Map<String, dynamic>;
-        cats = (j['cats'] as List)
-            .map((e) => Category.fromJson(e as Map<String, dynamic>))
-            .toList();
-        entries = (j['entries'] as List)
-            .map((e) => Entry.fromJson(e as Map<String, dynamic>))
-            .toList();
-        // Eski sürümlerde yoktu: eksikse boş başlar
-        todos = ((j['todos'] as List?) ?? [])
-            .map((e) => Todo.fromJson(e as Map<String, dynamic>))
-            .toList();
-        notes = ((j['notes'] as Map?) ?? {})
-            .map((k, v) => MapEntry(k as String, v as String));
-      } else {
-        cats = _defaults();
-        _persist();
-      }
-
-      themeMode =
-          ThemeMode.values[(p.getInt('themeMode') ?? 0).clamp(0, 2).toInt()];
-      accent = (p.getInt('accent') ?? 0)
-          .clamp(0, accentColors.length - 1)
-          .toInt();
-      seenIntro = p.getBool('seenIntro') ?? false;
+      f = await _dataFile().timeout(const Duration(seconds: 5));
+      _file = f;
     } catch (e) {
       storageError = tx(
           'Kayıt alanı açılamadı; veriler şimdilik sadece bu oturumda tutulacak. ({0})',
-          [e]);
-      if (cats.isEmpty) cats = _defaults();
+          [_short(e)]);
+    }
+
+    if (f != null) {
+      try {
+        if (await f.exists()) {
+          final j = jsonDecode(await f.readAsString()) as Map<String, dynamic>;
+          _load(j);
+        } else {
+          cats = _defaults();
+          _persist(); // ilk kurulum: dosya oluşturulur
+        }
+      } catch (e) {
+        // Dosya okunamadıysa üzerine yazmadan önce yedeğini al
+        try {
+          await f.copy('${f.path}.bak');
+        } catch (_) {}
+        cats = _defaults();
+        entries = [];
+        todos = [];
+        notes = {};
+        storageError = tx(
+            'Kayıt dosyası okunamadı; eski dosya yedeklendi ve yeni liste açıldı. ({0})',
+            [_short(e)]);
+      }
+    } else if (cats.isEmpty) {
+      cats = _defaults();
     }
     notifyListeners();
   }
@@ -350,16 +401,48 @@ class AppStore extends ChangeNotifier {
     ];
   }
 
+  /// Kaydedilecek tüm veri (tek JSON dosyası)
+  Map<String, dynamic> _snapshot() => {
+        'v': 3,
+        'cats': cats.map((c) => c.toJson()).toList(),
+        'entries': entries.map((e) => e.toJson()).toList(),
+        'todos': todos.map((t) => t.toJson()).toList(),
+        'notes': notes,
+        'settings': {
+          'lang': lang,
+          'themeMode': themeMode.index,
+          'accent': accent,
+          'seenIntro': seenIntro,
+        },
+      };
+
+  /// Veriyi dosyaya yazar. Art arda çağrılar birleştirilir; yazma önce
+  /// geçici dosyaya yapılıp sonra yerine taşınır (yarım kalan yazma veriyi bozmaz).
   void _persist() {
-    final p = _prefs;
-    if (p == null) return;
-    final data = jsonEncode({
-      'cats': cats.map((c) => c.toJson()).toList(),
-      'entries': entries.map((e) => e.toJson()).toList(),
-      'todos': todos.map((t) => t.toJson()).toList(),
-      'notes': notes,
-    });
-    p.setString('data_v2', data).catchError((Object _) => false);
+    _dirty = true;
+    if (!_writing) _flush();
+  }
+
+  Future<void> _flush() async {
+    _writing = true;
+    try {
+      while (_dirty) {
+        _dirty = false;
+        final f = _file;
+        if (f == null) break;
+        final data = jsonEncode(_snapshot());
+        final tmp = File('${f.path}.tmp');
+        await tmp.writeAsString(data, flush: true);
+        await tmp.rename(f.path);
+      }
+    } catch (e) {
+      storageError = tx(
+          'Kayıt alanı açılamadı; veriler şimdilik sadece bu oturumda tutulacak. ({0})',
+          [_short(e)]);
+      notifyListeners();
+    } finally {
+      _writing = false;
+    }
   }
 
   void _commit() {
@@ -570,14 +653,12 @@ class AppStore extends ChangeNotifier {
 
   void setThemeMode(ThemeMode m) {
     themeMode = m;
-    _prefs?.setInt('themeMode', m.index);
-    notifyListeners();
+    _commit();
   }
 
   void setAccent(int i) {
     accent = i;
-    _prefs?.setInt('accent', i);
-    notifyListeners();
+    _commit();
   }
 
   /// Dili değiştirir. Adı değiştirilmemiş hazır öğeler yeni dile çevrilir.
@@ -601,13 +682,11 @@ class AppStore extends ChangeNotifier {
     }
     lang = l;
     appLang = l;
-    _prefs?.setString('lang', l);
     _commit();
   }
 
   void markIntroSeen() {
     seenIntro = true;
-    _prefs?.setBool('seenIntro', true);
-    notifyListeners();
+    _commit();
   }
 }

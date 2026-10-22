@@ -7,7 +7,7 @@ import 'strings.dart';
 import 'theme.dart';
 
 // ---------------------------------------------------------------
-// GÜNLÜK - günlük rutin, hedef, yapılacaklar ve günlük (not) uygulaması
+// DAILY ROUTINE - günlük rutin, hedef, yapılacaklar ve günlük (not) uygulaması
 // Dosyalar:
 //   main.dart      uygulama girişi, tema, dil, açılış akışı
 //   strings.dart   çeviriler (Türkçe / English), gün ve ay adları
@@ -39,7 +39,7 @@ class GunlukApp extends StatelessWidget {
     return ListenableBuilder(
       listenable: store,
       builder: (context, _) => MaterialApp(
-        title: tx('Günlük'),
+        title: 'Daily Routine',
         debugShowCheckedModeBanner: false,
         theme: buildTheme(Brightness.light, store.accent),
         darkTheme: buildTheme(Brightness.dark, store.accent),

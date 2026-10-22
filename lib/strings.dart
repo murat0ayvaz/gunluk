@@ -118,8 +118,6 @@ const _en = <String, String>{
       'Save',
   'Kayıt alanı açılamadı; veriler şimdilik sadece bu oturumda tutulacak. ({0})':
       'Storage could not be opened; data will only be kept for this session. ({0})',
-  'Günlük':
-      'Daily',
   'Bugün':
       'Today',
   'Yapılacaklar':
@@ -150,8 +148,6 @@ const _en = <String, String>{
       'Write a note for this day…',
   'Diğer kayıtlar':
       'Other entries',
-  'Bu gün için kayıt yok.\nAşağıdaki Ekle düğmesiyle rutin veya kayıt ekleyebilirsin.':
-      'No entries for this day.\nUse the Add button below to add a routine or an entry.',
   'Geçerli bir sayı gir':
       'Enter a valid number',
   'hedef':
@@ -172,12 +168,8 @@ const _en = <String, String>{
       'Water, steps, solved questions, products sold... Record everything you want to track, every day. You can also add entries for past days and write a note for the day.',
   'Rutin oluştur, hedef koy':
       'Create routines, set goals',
-  'Ekle düğmesiyle kategori ve alt kategori seç, “Rutin olsun” anahtarını aç ve günlük hedefini yaz. Hedefe ulaşınca satır yeşile döner. Satırı sola kaydırarak o günün verisini sil, sağa kaydırarak düzenle.':
-      'Use the Add button to pick a category and subcategory, turn on “Make it a routine” and enter your daily goal. The row turns green when you reach it. Swipe a row left to delete the entry for that day, right to edit it.',
   'İstatistikler soldaki menüde':
       'Statistics are in the left menu',
-  'Üstteki “Günlük” yazısına dokun, menüden bir alt kategori seç: günlük, haftalık ve aylık toplamlarını gör. Yapılacaklar listesi ve ayarlar da aynı menüde. Tüm verilerin sadece telefonunda saklanır.':
-      'Tap “Daily” at the top, then pick a subcategory from the menu to see your daily, weekly and monthly totals. The to-do list and settings are in the same menu. All your data is stored only on your phone.',
   'Atla':
       'Skip',
   'Başla':
@@ -344,4 +336,16 @@ const _en = <String, String>{
       'Pink',
   'Şeftali':
       'Peach',
+  'Sağ alttaki DR düğmesine dokunup Ekle’yi seç; kategori ve alt kategori seç, “Rutin olsun” anahtarını aç ve günlük hedefini yaz. Hedefe ulaşınca satır yeşile döner. Satırı sola kaydırarak o günün verisini sil, sağa kaydırarak düzenle.':
+      'Tap the DR button at the bottom right and choose Add; pick a category and subcategory, turn on “Make it a routine” and enter your daily goal. The row turns green when you reach it. Swipe a row left to delete the entry for that day, right to edit it.',
+  'Üstteki “Daily” yazısına dokun, menüden bir alt kategori seç: günlük, haftalık ve aylık toplamlarını gör. Yapılacaklar listesi ve ayarlar da aynı menüde. Tüm verilerin sadece telefonunda saklanır.':
+      'Tap “Daily” at the top, then pick a subcategory from the menu to see your daily, weekly and monthly totals. The to-do list and settings are in the same menu. All your data is stored only on your phone.',
+  'Bu gün için kayıt yok.\nSağ alttaki DR düğmesine dokunup Ekle’yi seçerek rutin veya kayıt ekleyebilirsin.':
+      'No entries for this day.\nTap the DR button at the bottom right and choose Add to add a routine or an entry.',
+  'Günün notu':
+      'Day note',
+  'Kapat':
+      'Close',
+  'Kayıt dosyası okunamadı; eski dosya yedeklendi ve yeni liste açıldı. ({0})':
+      'The data file could not be read; the old file was backed up and a fresh list was opened. ({0})',
 };

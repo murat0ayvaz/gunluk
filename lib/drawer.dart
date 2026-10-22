@@ -15,7 +15,8 @@ import 'ui.dart';
 // ---------------------------------------------------------------
 class AppDrawer extends StatelessWidget {
   final VoidCallback onToday;
-  const AppDrawer({super.key, required this.onToday});
+  final VoidCallback onNote; // günün notunu açar
+  const AppDrawer({super.key, required this.onToday, required this.onNote});
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +43,7 @@ class AppDrawer extends StatelessWidget {
                         child: Icon(Icons.checklist_rounded, color: p.onAccent),
                       ),
                       const SizedBox(width: 12),
-                      Text(tx('Günlük'),
+                      Text('Daily Routine',
                           style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.w700,
@@ -69,6 +70,14 @@ class AppDrawer extends StatelessWidget {
                           nav.pop();
                           nav.push(MaterialPageRoute<void>(
                               builder: (_) => const TodosPage()));
+                        },
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.edit_note_rounded),
+                        title: Text(tx('Günün notu')),
+                        onTap: () {
+                          nav.pop();
+                          onNote();
                         },
                       ),
                       Divider(color: p.line),
