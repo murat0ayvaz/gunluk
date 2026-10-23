@@ -334,12 +334,8 @@ const _en = <String, String>{
       'Pink',
   'Şeftali':
       'Peach',
-  'Sağ alttaki DR düğmesine dokunup Ekle’yi seç; kategori ve alt kategori seç, “Rutin olsun” anahtarını aç ve günlük hedefini yaz. Hedefe ulaşınca satır yeşile döner. Satırı sola kaydırarak o günün verisini sil, sağa kaydırarak düzenle.':
-      'Tap the DR button at the bottom right and choose Add; pick a category and subcategory, turn on “Make it a routine” and enter your daily goal. The row turns green when you reach it. Swipe a row left to delete the entry for that day, right to edit it.',
   'Üstteki “Daily” yazısına dokun, menüden bir alt kategori seç: günlük, haftalık ve aylık toplamlarını gör. Yapılacaklar listesi ve ayarlar da aynı menüde. Tüm verilerin sadece telefonunda saklanır.':
       'Tap “Daily” at the top, then pick a subcategory from the menu to see your daily, weekly and monthly totals. The to-do list and settings are in the same menu. All your data is stored only on your phone.',
-  'Bu gün için kayıt yok.\nSağ alttaki DR düğmesine dokunup Ekle’yi seçerek rutin veya kayıt ekleyebilirsin.':
-      'No entries for this day.\nTap the DR button at the bottom right and choose Add to add a routine or an entry.',
   'Kapat':
       'Close',
   'Kayıt dosyası okunamadı; eski dosya yedeklendi ve yeni liste açıldı. ({0})':
@@ -386,4 +382,8 @@ const _en = <String, String>{
       'You have no quotes of your own yet. You can add one above.',
   'Ayet ve hadisler kısa meâl / anlam özetleridir; kaynak numaraları baskıya göre değişebilir. Önemli bir yerde kullanmadan önce kaynağından doğrulamanı öneririz.':
       'Ayahs and hadiths are short translations / summaries of the meaning; source numbers may differ between editions. We recommend checking the original source before using them anywhere important.',
+  'Sağ alttaki DR düğmesine dokun; kategori ve alt kategori seç, “Rutin olsun” anahtarını aç ve günlük hedefini yaz. Hedefe ulaşınca satır yeşile döner. Satırı sola kaydırarak o günün verisini sil, sağa kaydırarak düzenle; 2 saniye basılı tutarak sırala. Boş yere sağa veya sola kaydırarak günler arasında geçebilirsin.':
+      'Tap the DR button at the bottom right; pick a category and subcategory, turn on “Make it a routine” and enter your daily goal. The row turns green when you reach it. Swipe a row left to delete the entry for that day, right to edit it; press and hold for 2 seconds to reorder. Swipe left or right on an empty spot to move between days.',
+  'Bu gün için kayıt yok.\nSağ alttaki DR düğmesine dokunarak rutin veya kayıt ekleyebilirsin.':
+      'No entries for this day.\nTap the DR button at the bottom right to add a routine or an entry.',
 };

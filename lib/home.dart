@@ -19,7 +19,9 @@ import 'ui.dart';
 //  - Satıra 2 saniye basılı tut: sıralama modu (sürükleyip bırak, "Bitti")
 //  - En altta "Yapılacaklar" ve "Günlük" başlıkları: dokununca yukarı doğru
 //    tüm ekrana açılır (aşağı çekince ya da geri tuşuyla kapanır)
-//  - Sağ altta DR düğmesi: Ekle / Sırala
+//  - Sağ altta DR düğmesi: dokununca Ekle açılır
+//  - Sağ üstteki ok simgesi: sıralama modu (2 sn basılı tutmaya alternatif)
+//  - Boş yere sağa / sola kaydır: önceki / sonraki gün
 // ---------------------------------------------------------------
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -39,7 +41,6 @@ class _RowData {
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   DateTime day = dayOnly(DateTime.now());
-  bool _fabOpen = false; // DR menüsü açık mı
   bool _reorder = false; // sıralama modu
   String? _panel; // null: kapalı, 'todo' veya 'note'
   String _lastTab = 'todo'; // kapanırken içerik kaybolmasın diye
@@ -106,7 +107,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     setState(() {
       _panel = tab;
       _lastTab = tab;
-      _fabOpen = false;
     });
   }
 
@@ -150,7 +150,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     HapticFeedback.mediumImpact();
     setState(() {
       _reorder = true;
-      _fabOpen = false;
     });
   }
 
@@ -328,7 +327,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               },
             );
 
-        final body = Column(
+        final bodyColumn = Column(
           children: [
             if (store.storageError != null)
               Container(
@@ -391,7 +390,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         child: Padding(
                           padding: const EdgeInsets.all(32),
                           child: Text(
-                            tx('Bu gün için kayıt yok.\nSağ alttaki DR düğmesine dokunup Ekle’yi seçerek rutin veya kayıt ekleyebilirsin.'),
+                            tx('Bu gün için kayıt yok.\nSağ alttaki DR düğmesine dokunarak rutin veya kayıt ekleyebilirsin.'),
                             textAlign: TextAlign.center,
                             style: TextStyle(color: p.soft, height: 1.4),
                           ),
@@ -404,6 +403,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
             ],
           ],
+        );
+
+        // Sayfanın boş yerinde sola kaydır: ertesi gün, sağa kaydır: önceki gün.
+        // Satırların üzerindeki kaydırma (düzenle / sil) öncelikli kalır.
+        final body = GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onHorizontalDragEnd: _reorder
+              ? null
+              : (d) {
+                  final v = d.primaryVelocity ?? 0;
+                  if (v < -250) {
+                    _shift(1);
+                  } else if (v > 250) {
+                    _shift(-1);
+                  }
+                },
+          child: bodyColumn,
         );
 
         final scaffold = Scaffold(
@@ -419,10 +435,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             scrolledUnderElevation: 0,
             centerTitle: false,
             actions: [
+              // Sıralama modunu açar / kapatır (2 sn basılı tutmanın alternatifi)
               IconButton(
-                tooltip: tx('Günlük'),
-                icon: const Icon(Icons.edit_note_rounded),
-                onPressed: () => _openPanel('note'),
+                tooltip: tx('Sırala'),
+                icon: Icon(_reorder
+                    ? Icons.check_rounded
+                    : Icons.swap_vert_rounded),
+                onPressed: () {
+                  if (_reorder) {
+                    setState(() => _reorder = false);
+                  } else {
+                    _startReorder();
+                  }
+                },
               ),
             ],
             leading: IconButton(
@@ -448,31 +473,21 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             onOpen: _openPanel,
             onSwipeUp: () => _openPanel(_lastTab),
           ),
-          // ----- DR düğmesi (sıralama modunda gizlenir) -----
+          // ----- DR düğmesi: dokununca Ekle açılır (sıralama modunda gizlenir) -----
           floatingActionButton: _reorder
               ? null
-              : _DrFab(
-                  open: _fabOpen,
-                  onToggle: () => setState(() => _fabOpen = !_fabOpen),
-                  onAdd: () {
-                    setState(() => _fabOpen = false);
-                    _openAdd();
-                  },
-                  onReorder: _startReorder,
-                ),
+              : _DrFab(onAdd: _openAdd),
         );
 
         // Geri tuşu: önce panel, sonra sıralama modu, sonra DR menüsü kapanır
         return PopScope(
-          canPop: _panel == null && !_reorder && !_fabOpen,
+          canPop: _panel == null && !_reorder,
           onPopInvokedWithResult: (didPop, result) {
             if (didPop) return;
             if (_panel != null) {
               _closePanel();
             } else if (_reorder) {
               setState(() => _reorder = false);
-            } else if (_fabOpen) {
-              setState(() => _fabOpen = false);
             }
           },
           child: Stack(
@@ -916,59 +931,25 @@ class _DayRowState extends State<_DayRow> {
 
 // ---------------------------------------------------------------
 // DR DÜĞMESİ (Daily Routine): sağ altta kısa yazılı düğme.
-// Dokununca yukarı doğru yazılı seçenekler açılır: Ekle | Sırala
+// Dokununca "Ekle" ekranı açılır.
 // ---------------------------------------------------------------
 class _DrFab extends StatelessWidget {
-  final bool open;
-  final VoidCallback onToggle;
   final VoidCallback onAdd;
-  final VoidCallback onReorder;
-
-  const _DrFab({
-    required this.open,
-    required this.onToggle,
-    required this.onAdd,
-    required this.onReorder,
-  });
-
-  // Açılan menüdeki tek seçenek
-  Widget _action(Pal p, IconData icon, String label, VoidCallback onTap) =>
-      Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: FloatingActionButton.extended(
-          heroTag: null, // birden çok düğme olduğu için hero animasyonu kapalı
-          onPressed: onTap,
-          backgroundColor: p.card,
-          foregroundColor: p.ink,
-          elevation: 2,
-          icon: Icon(icon),
-          label: Text(label),
-        ),
-      );
+  const _DrFab({required this.onAdd});
 
   @override
   Widget build(BuildContext context) {
     final p = palOf(context);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        if (open) ...[
-          _action(p, Icons.add_rounded, tx('Ekle'), onAdd),
-          _action(p, Icons.swap_vert_rounded, tx('Sırala'), onReorder),
-        ],
-        FloatingActionButton.extended(
-          heroTag: null,
-          onPressed: onToggle,
-          backgroundColor: p.accent,
-          foregroundColor: p.onAccent,
-          icon: open ? const Icon(Icons.close_rounded) : null,
-          label: Text(
-            open ? tx('Kapat') : 'DR',
-            style: const TextStyle(fontWeight: FontWeight.w700, letterSpacing: 1),
-          ),
-        ),
-      ],
+    return FloatingActionButton.extended(
+      heroTag: null,
+      onPressed: onAdd,
+      backgroundColor: p.accent,
+      foregroundColor: p.onAccent,
+      icon: const Icon(Icons.add_rounded),
+      label: const Text(
+        'DR',
+        style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: 1),
+      ),
     );
   }
 }

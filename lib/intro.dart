@@ -96,7 +96,7 @@ List<_Pg> _pages() => [
       _Pg(
         Icons.flag_rounded,
         tx('Rutin oluştur, hedef koy'),
-        tx('Sağ alttaki DR düğmesine dokunup Ekle’yi seç; kategori ve alt kategori seç, “Rutin olsun” anahtarını aç ve günlük hedefini yaz. Hedefe ulaşınca satır yeşile döner. Satırı sola kaydırarak o günün verisini sil, sağa kaydırarak düzenle.'),
+        tx('Sağ alttaki DR düğmesine dokun; kategori ve alt kategori seç, “Rutin olsun” anahtarını aç ve günlük hedefini yaz. Hedefe ulaşınca satır yeşile döner. Satırı sola kaydırarak o günün verisini sil, sağa kaydırarak düzenle; 2 saniye basılı tutarak sırala. Boş yere sağa veya sola kaydırarak günler arasında geçebilirsin.'),
       ),
       _Pg(
         Icons.bar_chart_rounded,
