@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'strings.dart';
+import 'theme.dart';
 import 'ui.dart';
 
 // ---------------------------------------------------------------
@@ -7,6 +8,33 @@ import 'ui.dart';
 // ---------------------------------------------------------------
 class SplashPage extends StatelessWidget {
   const SplashPage({super.key});
+
+  // Görsel bulunamazsa gösterilecek eski sade logo
+  Widget _fallback(Pal p) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 96,
+            height: 96,
+            decoration: BoxDecoration(color: p.accent, shape: BoxShape.circle),
+            child: Icon(Icons.checklist_rounded, size: 52, color: p.onAccent),
+          ),
+          const SizedBox(height: 20),
+          Text.rich(
+            const TextSpan(
+              children: [
+                TextSpan(
+                    text: 'Daily ',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+                TextSpan(
+                    text: 'Routine',
+                    style: TextStyle(fontWeight: FontWeight.w300)),
+              ],
+            ),
+            style: TextStyle(fontSize: 32, letterSpacing: 0.5, color: p.ink),
+          ),
+        ],
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -20,36 +48,27 @@ class SplashPage extends StatelessWidget {
           curve: Curves.easeOut,
           builder: (context, t, child) => Opacity(
             opacity: t,
-            child: Transform.scale(scale: 0.9 + 0.1 * t, child: child),
+            child: Transform.scale(scale: 0.96 + 0.04 * t, child: child),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 96,
-                height: 96,
-                decoration:
-                    BoxDecoration(color: p.accent, shape: BoxShape.circle),
-                child: Icon(Icons.checklist_rounded, size: 52, color: p.onAccent),
-              ),
-              const SizedBox(height: 20),
-              Text.rich(
-                TextSpan(
-                  children: [
-                    const TextSpan(
-                        text: 'Daily ',
-                        style: TextStyle(fontWeight: FontWeight.w700)),
-                    const TextSpan(
-                        text: 'Routine',
-                        style: TextStyle(fontWeight: FontWeight.w300)),
-                  ],
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Açılış görseli (Daily Routine)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(22),
+                  child: Image.asset(
+                    'assets/splash.jpg',
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stack) => _fallback(p),
+                  ),
                 ),
-                style: TextStyle(fontSize: 32, letterSpacing: 0.5, color: p.ink),
-              ),
-              const SizedBox(height: 6),
-              Text(tx('Rutinlerin, hedeflerin, günlerin'),
-                  style: TextStyle(color: p.soft)),
-            ],
+                const SizedBox(height: 18),
+                Text(tx('Rutinlerin, hedeflerin, günlerin'),
+                    style: TextStyle(color: p.soft)),
+              ],
+            ),
           ),
         ),
       ),

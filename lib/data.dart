@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'quotes.dart';
 import 'strings.dart';
 import 'theme.dart';
 
@@ -259,6 +260,18 @@ class AppStore extends ChangeNotifier {
   String lang = 'tr'; // 'tr' veya 'en'
   bool seenIntro = false;
 
+  // Ana ekrandaki satır sırası (alt kategori kimlikleri; kullanıcı sürükleyerek değiştirir)
+  List<String> homeOrder = [];
+
+  // Özlü sözler ayarları
+  bool quotesOn = true;
+  Set<String> quoteKinds = {'motivation'}; // motivation, ayet, hadis, custom
+  int quoteHours = 24; // 0 = her açılışta yeni söz, 24 = günde bir ...
+  List<String> customQuotes = [];
+  int _quoteBump = 0; // "sonraki söz" için
+  int _hiddenSlot = -1; // kartı kapatınca o dilim boyunca gizlenir
+  final int _openSeed = DateTime.now().millisecondsSinceEpoch;
+
   /// Kayıt alanı açılamazsa ekranda uyarı olarak gösterilir
   String? storageError;
 
@@ -333,6 +346,17 @@ class AppStore extends ChangeNotifier {
         .clamp(0, accentColors.length - 1)
         .toInt();
     seenIntro = (s['seenIntro'] as bool?) ?? false;
+
+    homeOrder = ((j['order'] as List?) ?? []).map((e) => e as String).toList();
+
+    final q = (j['quotes'] as Map?) ?? {};
+    quotesOn = (q['on'] as bool?) ?? true;
+    quoteKinds = ((q['kinds'] as List?) ?? ['motivation'])
+        .map((e) => e as String)
+        .toSet();
+    quoteHours = (q['hours'] as int?) ?? 24;
+    customQuotes =
+        ((q['custom'] as List?) ?? []).map((e) => e as String).toList();
   }
 
   /// Açılışta veriyi okur. Ne olursa olsun TAMAMLANIR (takılıp kalmaz):
@@ -408,6 +432,13 @@ class AppStore extends ChangeNotifier {
         'entries': entries.map((e) => e.toJson()).toList(),
         'todos': todos.map((t) => t.toJson()).toList(),
         'notes': notes,
+        'order': homeOrder,
+        'quotes': {
+          'on': quotesOn,
+          'kinds': quoteKinds.toList(),
+          'hours': quoteHours,
+          'custom': customQuotes,
+        },
         'settings': {
           'lang': lang,
           'themeMode': themeMode.index,
@@ -682,6 +713,115 @@ class AppStore extends ChangeNotifier {
     }
     lang = l;
     appLang = l;
+    _commit();
+  }
+
+  // ----- Ana ekran satır sırası -----
+
+  /// Sıralama sırasında kullanılır: küçük sayı = daha üstte
+  int rankOf(String subId) {
+    final i = homeOrder.indexOf(subId);
+    return i < 0 ? 1 << 30 : i;
+  }
+
+  /// Ekranda görünen satırların yeni sırasını kaydeder. Görünmeyen
+  /// alt kategorilerin yerleri korunur (sadece görünenler kendi aralarında
+  /// yer değiştirir).
+  void setHomeOrder(List<String> visibleNew) {
+    final exists = <String>{
+      for (final c in cats)
+        for (final s in c.subs) s.id,
+    };
+    final all = homeOrder.where(exists.contains).toList();
+    for (final c in cats) {
+      for (final s in c.subs) {
+        if (!all.contains(s.id)) all.add(s.id);
+      }
+    }
+    final vis = visibleNew.toSet();
+    final slots = <int>[
+      for (var i = 0; i < all.length; i++)
+        if (vis.contains(all[i])) i,
+    ];
+    for (var k = 0; k < slots.length && k < visibleNew.length; k++) {
+      all[slots[k]] = visibleNew[k];
+    }
+    homeOrder = all;
+    _commit();
+  }
+
+  // ----- Özlü sözler -----
+
+  /// Seçili türlerdeki sözlerin birleşik listesi
+  List<QuoteItem> quotePool() {
+    final out = <QuoteItem>[];
+    for (final k in ['motivation', 'ayet', 'hadis']) {
+      if (quoteKinds.contains(k)) out.addAll(builtInQuotes(k, lang));
+    }
+    if (quoteKinds.contains('custom')) {
+      out.addAll(customQuotes.map((t) => QuoteItem(t, '')));
+    }
+    return out;
+  }
+
+  /// Zaman dilimi numarası: söz bu dilim boyunca aynı kalır
+  int quoteSlot() => quoteHours == 0
+      ? 0
+      : DateTime.now().millisecondsSinceEpoch ~/ (quoteHours * 3600000);
+
+  /// Şu an gösterilecek söz (kapalı / gizli / liste boşsa null)
+  QuoteItem? currentQuote() {
+    if (!quotesOn) return null;
+    if (_hiddenSlot == quoteSlot()) return null;
+    final pool = quotePool();
+    if (pool.isEmpty) return null;
+    final base = (quoteHours == 0 ? _openSeed : quoteSlot()) + _quoteBump;
+    final idx = ((base * 1103515245 + 12345) & 0x7fffffff) % pool.length;
+    return pool[idx];
+  }
+
+  void nextQuote() {
+    _quoteBump++;
+    notifyListeners();
+  }
+
+  void hideQuote() {
+    _hiddenSlot = quoteSlot();
+    notifyListeners();
+  }
+
+  void setQuotesOn(bool v) {
+    quotesOn = v;
+    _hiddenSlot = -1;
+    _commit();
+  }
+
+  void toggleQuoteKind(String kind) {
+    if (quoteKinds.contains(kind)) {
+      quoteKinds.remove(kind);
+    } else {
+      quoteKinds.add(kind);
+    }
+    _hiddenSlot = -1;
+    _commit();
+  }
+
+  void setQuoteHours(int h) {
+    quoteHours = h;
+    _hiddenSlot = -1;
+    _commit();
+  }
+
+  void addCustomQuote(String text) {
+    final t = text.trim();
+    if (t.isEmpty) return;
+    customQuotes.add(t);
+    _commit();
+  }
+
+  void deleteCustomQuote(int index) {
+    if (index < 0 || index >= customQuotes.length) return;
+    customQuotes.removeAt(index);
     _commit();
   }
 

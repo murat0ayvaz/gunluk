@@ -144,8 +144,6 @@ const _en = <String, String>{
       '{0} entry deleted',
   'Geri al':
       'Undo',
-  'Bu günün notunu yaz…':
-      'Write a note for this day…',
   'Diğer kayıtlar':
       'Other entries',
   'Geçerli bir sayı gir':
@@ -342,10 +340,50 @@ const _en = <String, String>{
       'Tap “Daily” at the top, then pick a subcategory from the menu to see your daily, weekly and monthly totals. The to-do list and settings are in the same menu. All your data is stored only on your phone.',
   'Bu gün için kayıt yok.\nSağ alttaki DR düğmesine dokunup Ekle’yi seçerek rutin veya kayıt ekleyebilirsin.':
       'No entries for this day.\nTap the DR button at the bottom right and choose Add to add a routine or an entry.',
-  'Günün notu':
-      'Day note',
   'Kapat':
       'Close',
   'Kayıt dosyası okunamadı; eski dosya yedeklendi ve yeni liste açıldı. ({0})':
       'The data file could not be read; the old file was backed up and a fresh list was opened. ({0})',
+  'Günlük':
+      'Diary',
+  'Sırala':
+      'Reorder',
+  'Sıralamak için tutamacı sürükle':
+      'Drag the handle to reorder',
+  'Özlü sözler':
+      'Quotes',
+  'Ana ekranda özlü söz göster':
+      'Show a quote on the home screen',
+  'Türler':
+      'Types',
+  'Motivasyon':
+      'Motivation',
+  'Ayet':
+      'Ayah',
+  'Hadis':
+      'Hadith',
+  'Kendi sözlerim':
+      'My own quotes',
+  'Ne sıklıkla değişsin?':
+      'How often should it change?',
+  'Her açılışta':
+      'Every time I open',
+  'Saatte bir':
+      'Every hour',
+  '3 saatte bir':
+      'Every 3 hours',
+  '6 saatte bir':
+      'Every 6 hours',
+  '12 saatte bir':
+      'Every 12 hours',
+  'Günde bir':
+      'Once a day',
+  'Kendi sözlerimi yönet':
+      'Manage my quotes',
+  'Yeni söz yaz':
+      'Write a new quote',
+  'Henüz kendi sözün yok. Yukarıdan ekleyebilirsin.':
+      'You have no quotes of your own yet. You can add one above.',
+  'Ayet ve hadisler kısa meâl / anlam özetleridir; kaynak numaraları baskıya göre değişebilir. Önemli bir yerde kullanmadan önce kaynağından doğrulamanı öneririz.':
+      'Ayahs and hadiths are short translations / summaries of the meaning; source numbers may differ between editions. We recommend checking the original source before using them anywhere important.',
 };

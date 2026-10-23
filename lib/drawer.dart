@@ -4,7 +4,6 @@ import 'manage.dart';
 import 'settings.dart';
 import 'stats.dart';
 import 'strings.dart';
-import 'todos.dart';
 import 'ui.dart';
 
 // ---------------------------------------------------------------
@@ -15,8 +14,14 @@ import 'ui.dart';
 // ---------------------------------------------------------------
 class AppDrawer extends StatelessWidget {
   final VoidCallback onToday;
-  final VoidCallback onNote; // günün notunu açar
-  const AppDrawer({super.key, required this.onToday, required this.onNote});
+  final VoidCallback onNote; // alt paneli "Günlük" sekmesinde açar
+  final VoidCallback onTodos; // alt paneli "Yapılacaklar" sekmesinde açar
+  const AppDrawer({
+    super.key,
+    required this.onToday,
+    required this.onNote,
+    required this.onTodos,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -68,13 +73,12 @@ class AppDrawer extends StatelessWidget {
                         title: Text(tx('Yapılacaklar')),
                         onTap: () {
                           nav.pop();
-                          nav.push(MaterialPageRoute<void>(
-                              builder: (_) => const TodosPage()));
+                          onTodos();
                         },
                       ),
                       ListTile(
                         leading: const Icon(Icons.edit_note_rounded),
-                        title: Text(tx('Günün notu')),
+                        title: Text(tx('Günlük')),
                         onTap: () {
                           nav.pop();
                           onNote();
