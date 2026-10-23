@@ -386,4 +386,32 @@ const _en = <String, String>{
       'Tap the DR button at the bottom right; pick a category and subcategory, turn on “Make it a routine” and enter your daily goal. The row turns green when you reach it. Swipe a row left to delete the entry for that day, right to edit it; press and hold for 2 seconds to reorder. Swipe left or right on an empty spot to move between days.',
   'Bu gün için kayıt yok.\nSağ alttaki DR düğmesine dokunarak rutin veya kayıt ekleyebilirsin.':
       'No entries for this day.\nTap the DR button at the bottom right to add a routine or an entry.',
+  'Bu bir Daily Routine yedeği gibi görünmüyor.':
+      'This does not look like a Daily Routine backup.',
+  'Yedek okunamadı: {0}':
+      'The backup could not be read: {0}',
+  'Yedek panoya kopyalandı. Güvenli bir yere yapıştırıp sakla.':
+      'The backup was copied to the clipboard. Paste it somewhere safe and keep it.',
+  'Geri yüklensin mi?':
+      'Restore the backup?',
+  'Mevcut verilerin yedekteki verilerle değiştirilecek. Devam edilsin mi?':
+      'Your current data will be replaced with the data in the backup. Continue?',
+  'Geri yükle':
+      'Restore',
+  'Yedek geri yüklendi.':
+      'The backup was restored.',
+  'Yedek':
+      'Backup',
+  'Uygulamayı kaldırırsan tüm verilerin silinir. Kaldırmadan önce yedek al: yedek metin olarak panoya kopyalanır; bir not uygulamasına ya da kendine mesaj olarak yapıştırıp sakla. Yedek, günlük notların dahil tüm verini içerir; sakladığın yeri başkalarıyla paylaşma.':
+      'If you uninstall the app, all your data is deleted. Back up before uninstalling: the backup is copied to the clipboard as text; paste it into a notes app or a message to yourself and keep it. The backup includes all your data, diary notes too; do not share the place where you keep it.',
+  'Yedeği kopyala':
+      'Copy backup',
+  'Yedeği geri yükle':
+      'Restore backup',
+  'Yedek metni boş':
+      'The backup text is empty',
+  'Yedek metnini buraya yapıştır':
+      'Paste the backup text here',
+  'Panodan yapıştır':
+      'Paste from clipboard',
 };

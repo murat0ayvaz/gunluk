@@ -825,6 +825,33 @@ class AppStore extends ChangeNotifier {
     _commit();
   }
 
+  // ----- Yedek (panoya kopyala / yapıştırarak geri yükle) -----
+
+  /// Tüm veriyi (kategoriler, kayıtlar, yapılacaklar, günlük notları, ayarlar)
+  /// tek bir metin olarak verir
+  String exportBackup() => jsonEncode(_snapshot());
+
+  /// Yedek metnini yükler. Başarılıysa null, değilse hata mesajı döner.
+  /// Hata olursa mevcut veri korunur.
+  String? importBackup(String text) {
+    final before = _snapshot();
+    try {
+      final j = jsonDecode(text.trim());
+      if (j is! Map<String, dynamic> ||
+          (j['cats'] == null && j['entries'] == null)) {
+        return tx('Bu bir Daily Routine yedeği gibi görünmüyor.');
+      }
+      _load(j);
+      _commit();
+      return null;
+    } catch (e) {
+      try {
+        _load(before); // yarım kalan yüklemeyi geri al
+      } catch (_) {}
+      return tx('Yedek okunamadı: {0}', [_short(e)]);
+    }
+  }
+
   void markIntroSeen() {
     seenIntro = true;
     _commit();

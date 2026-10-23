@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'data.dart';
 import 'intro.dart';
 import 'strings.dart';
@@ -12,6 +13,43 @@ import 'ui.dart';
 // ---------------------------------------------------------------
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
+
+  void _snack(BuildContext context, String msg) {
+    final m = ScaffoldMessenger.of(context);
+    m.clearSnackBars();
+    m.showSnackBar(SnackBar(
+      content: Text(msg),
+      duration: const Duration(seconds: 5),
+      persist: false,
+    ));
+  }
+
+  /// Tüm veriyi metin olarak panoya kopyalar
+  Future<void> _copyBackup(BuildContext context) async {
+    await Clipboard.setData(ClipboardData(text: store.exportBackup()));
+    if (!context.mounted) return;
+    _snack(context,
+        tx('Yedek panoya kopyalandı. Güvenli bir yere yapıştırıp sakla.'));
+  }
+
+  /// Yapıştırılan yedek metniyle tüm veriyi değiştirir
+  Future<void> _restore(BuildContext context) async {
+    final text = await showDialog<String>(
+      context: context,
+      builder: (_) => const _RestoreDialog(),
+    );
+    if (text == null || !context.mounted) return;
+    final ok = await confirmDialog(
+      context,
+      tx('Geri yüklensin mi?'),
+      tx('Mevcut verilerin yedekteki verilerle değiştirilecek. Devam edilsin mi?'),
+      okLabel: tx('Geri yükle'),
+    );
+    if (!ok || !context.mounted) return;
+    final err = store.importBackup(text);
+    if (!context.mounted) return;
+    _snack(context, err ?? tx('Yedek geri yüklendi.'));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -177,6 +215,26 @@ class SettingsPage extends StatelessWidget {
                 ),
               ],
 
+              // ----- Yedek -----
+              title(tx('Yedek')),
+              Text(
+                tx('Uygulamayı kaldırırsan tüm verilerin silinir. Kaldırmadan önce yedek al: yedek metin olarak panoya kopyalanır; bir not uygulamasına ya da kendine mesaj olarak yapıştırıp sakla. Yedek, günlük notların dahil tüm verini içerir; sakladığın yeri başkalarıyla paylaşma.'),
+                style: TextStyle(fontSize: 12.5, color: p.soft, height: 1.4),
+              ),
+              const SizedBox(height: 10),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                FilledButton.icon(
+                  onPressed: () => _copyBackup(context),
+                  icon: const Icon(Icons.copy_rounded),
+                  label: Text(tx('Yedeği kopyala')),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => _restore(context),
+                  icon: const Icon(Icons.restore_rounded),
+                  label: Text(tx('Yedeği geri yükle')),
+                ),
+              ]),
+
               // ----- Tanıtım -----
               title(tx('Tanıtım')),
               ListTile(
@@ -319,6 +377,81 @@ class _CustomQuotesPageState extends State<CustomQuotesPage> {
           ),
         );
       },
+    );
+  }
+}
+
+// ---------------------------------------------------------------
+// YEDEĞİ GERİ YÜKLE penceresi: yedek metni buraya yapıştırılır
+// ---------------------------------------------------------------
+class _RestoreDialog extends StatefulWidget {
+  const _RestoreDialog();
+
+  @override
+  State<_RestoreDialog> createState() => _RestoreDialogState();
+}
+
+class _RestoreDialogState extends State<_RestoreDialog> {
+  final _c = TextEditingController();
+  String? _err;
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  Future<void> _paste() async {
+    final d = await Clipboard.getData(Clipboard.kTextPlain);
+    if (d?.text != null && mounted) {
+      setState(() {
+        _c.text = d!.text!;
+        _err = null;
+      });
+    }
+  }
+
+  void _ok() {
+    final t = _c.text.trim();
+    if (t.isEmpty) {
+      setState(() => _err = tx('Yedek metni boş'));
+      return;
+    }
+    Navigator.pop(context, t);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(tx('Yedeği geri yükle')),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _c,
+            minLines: 4,
+            maxLines: 6,
+            decoration: InputDecoration(
+              hintText: tx('Yedek metnini buraya yapıştır'),
+              errorText: _err,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: _paste,
+            icon: const Icon(Icons.content_paste_rounded),
+            label: Text(tx('Panodan yapıştır')),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(tx('Vazgeç'))),
+        FilledButton(onPressed: _ok, child: Text(tx('Geri yükle'))),
+      ],
     );
   }
 }
