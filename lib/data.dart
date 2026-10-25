@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'quotes.dart';
 import 'strings.dart';
 import 'theme.dart';
+import 'version.dart';
 
 // ---------------------------------------------------------------
 // VERİ KATMANI: modeller + telefona kayıt (eklentisiz, dosyaya JSON)
@@ -116,6 +117,7 @@ class SubCat {
   double? goal; // günlük hedef (toplanmayanlarda: hedef değer)
   bool isMax; // true: hedef üst sınırdır (ör. kalori)
   bool summable; // false: toplam anlamsız (ör. kilo)
+  Set<int> days; // rutinin görüneceği günler (1 = pazartesi ... 7 = pazar)
 
   SubCat({
     required this.id,
@@ -126,7 +128,8 @@ class SubCat {
     this.goal,
     this.isMax = false,
     this.summable = true,
-  });
+    Set<int>? days,
+  }) : days = days ?? {1, 2, 3, 4, 5, 6, 7};
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -137,6 +140,7 @@ class SubCat {
         'goal': goal,
         'isMax': isMax,
         'summable': summable,
+        'days': days.toList()..sort(),
       };
 
   factory SubCat.fromJson(Map<String, dynamic> j) => SubCat(
@@ -148,6 +152,9 @@ class SubCat {
         goal: (j['goal'] as num?)?.toDouble(),
         isMax: (j['isMax'] ?? false) as bool,
         summable: (j['summable'] ?? true) as bool,
+        days: ((j['days'] as List?) ?? [1, 2, 3, 4, 5, 6, 7])
+            .map((e) => e as int)
+            .toSet(),
       );
 }
 
@@ -229,6 +236,7 @@ class SubDraft {
   double? goal;
   bool isMax;
   bool summable;
+  Set<int> days;
   SubDraft({
     this.name = '',
     this.unit = '',
@@ -236,7 +244,8 @@ class SubDraft {
     this.goal,
     this.isMax = false,
     this.summable = true,
-  });
+    Set<int>? days,
+  }) : days = days ?? {1, 2, 3, 4, 5, 6, 7};
 
   factory SubDraft.from(SubCat s) => SubDraft(
         name: s.name,
@@ -245,6 +254,7 @@ class SubDraft {
         goal: s.goal,
         isMax: s.isMax,
         summable: s.summable,
+        days: Set<int>.from(s.days),
       );
 }
 
@@ -259,6 +269,8 @@ class AppStore extends ChangeNotifier {
   int accent = 0;
   String lang = 'tr'; // 'tr' veya 'en'
   bool seenIntro = false;
+  int lastBuild = 0; // en son açılan sürüm numarası (güncelleme tespiti için)
+  bool _updateNotice = false; // bu açılışta "güncellendi" penceresi gösterilsin mi
 
   // Ana ekrandaki satır sırası (alt kategori kimlikleri; kullanıcı sürükleyerek değiştirir)
   List<String> homeOrder = [];
@@ -346,6 +358,7 @@ class AppStore extends ChangeNotifier {
         .clamp(0, accentColors.length - 1)
         .toInt();
     seenIntro = (s['seenIntro'] as bool?) ?? false;
+    lastBuild = (s['lastBuild'] as int?) ?? 0;
 
     homeOrder = ((j['order'] as List?) ?? []).map((e) => e as String).toList();
 
@@ -398,7 +411,21 @@ class AppStore extends ChangeNotifier {
     } else if (cats.isEmpty) {
       cats = _defaults();
     }
+
+    // Sürüm numarası değiştiyse uygulama güncellenmiştir (ilk kurulumda değil)
+    if (_file != null && lastBuild != appBuild) {
+      _updateNotice = seenIntro;
+      lastBuild = appBuild;
+      _persist();
+    }
     notifyListeners();
+  }
+
+  /// "Güncellendi" penceresi gösterilecekse true döner (bir kez)
+  bool takeUpdateNotice() {
+    final v = _updateNotice;
+    _updateNotice = false;
+    return v;
   }
 
   /// İlk açılışta gelen hazır liste (hepsi sonradan eklenebilir/silinebilir).
@@ -444,6 +471,7 @@ class AppStore extends ChangeNotifier {
           'themeMode': themeMode.index,
           'accent': accent,
           'seenIntro': seenIntro,
+          'lastBuild': lastBuild,
         },
       };
 
@@ -571,6 +599,7 @@ class AppStore extends ChangeNotifier {
       goal: d.goal,
       isMax: d.isMax,
       summable: d.summable,
+      days: Set<int>.from(d.days),
     );
     c.subs.add(ns);
     _commit();
@@ -586,6 +615,7 @@ class AppStore extends ChangeNotifier {
     s.goal = d.goal;
     s.isMax = d.isMax;
     s.summable = d.summable;
+    s.days = d.days.isEmpty ? {1, 2, 3, 4, 5, 6, 7} : Set<int>.from(d.days);
     _commit();
   }
 
@@ -842,6 +872,7 @@ class AppStore extends ChangeNotifier {
         return tx('Bu bir Daily Routine yedeği gibi görünmüyor.');
       }
       _load(j);
+      lastBuild = appBuild; // yedekten gelen eski sürüm numarası pencereyi tetiklemesin
       _commit();
       return null;
     } catch (e) {

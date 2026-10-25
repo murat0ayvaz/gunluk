@@ -150,7 +150,7 @@ class _NumberDialogState extends State<_NumberDialog> {
 // ---------- Onay penceresi ----------
 
 Future<bool> confirmDialog(BuildContext context, String title, String message,
-    {String? okLabel}) async {
+    {String? okLabel, String? cancelLabel}) async {
   final r = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
@@ -159,7 +159,7 @@ Future<bool> confirmDialog(BuildContext context, String title, String message,
       actions: [
         TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text(tx('Vazgeç'))),
+            child: Text(cancelLabel ?? tx('Vazgeç'))),
         FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: Text(okLabel ?? tx('Evet'))),
@@ -167,6 +167,35 @@ Future<bool> confirmDialog(BuildContext context, String title, String message,
     ),
   );
   return r ?? false;
+}
+
+// ---------- Rutin günleri seçici (Pzt ... Paz) ----------
+// En az bir gün her zaman seçili kalır.
+class WeekdayChips extends StatelessWidget {
+  final Set<int> selected;
+  final void Function(Set<int>) onChanged;
+  const WeekdayChips({super.key, required this.selected, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(spacing: 6, runSpacing: 4, children: [
+      for (var d = 1; d <= 7; d++)
+        FilterChip(
+          label: Text(wdShort(d)),
+          selected: selected.contains(d),
+          visualDensity: VisualDensity.compact,
+          onSelected: (on) {
+            final next = Set<int>.from(selected);
+            if (on) {
+              next.add(d);
+            } else if (next.length > 1) {
+              next.remove(d);
+            }
+            onChanged(next);
+          },
+        ),
+    ]);
+  }
 }
 
 // ---------- Alt kategori oluştur / düzenle penceresi ----------
@@ -199,6 +228,7 @@ class _SubDialogState extends State<_SubDialog> {
   late bool _routine;
   late bool _isMax;
   late bool _summable;
+  late Set<int> _days;
   String? _err;
 
   @override
@@ -212,6 +242,7 @@ class _SubDialogState extends State<_SubDialog> {
     _routine = s?.routine ?? false;
     _isMax = s?.isMax ?? false;
     _summable = s?.summable ?? true;
+    _days = Set<int>.from(s?.days ?? {1, 2, 3, 4, 5, 6, 7});
   }
 
   @override
@@ -248,6 +279,7 @@ class _SubDialogState extends State<_SubDialog> {
         goal: goal,
         isMax: _showGoal && _routine && _summable && _isMax,
         summable: widget.simple ? true : _summable,
+        days: _days,
       ),
     );
   }
@@ -282,6 +314,18 @@ class _SubDialogState extends State<_SubDialog> {
                 value: _routine,
                 onChanged: (v) => setState(() => _routine = v),
               ),
+              if (_routine) ...[
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, bottom: 6),
+                  child: Text(tx('Hangi günler?'),
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                ),
+                WeekdayChips(
+                  selected: _days,
+                  onChanged: (v) => setState(() => _days = v),
+                ),
+                const SizedBox(height: 8),
+              ],
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(tx('Değerler toplanır')),

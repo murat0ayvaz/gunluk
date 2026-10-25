@@ -67,6 +67,13 @@ const _monEn = [
 String wdName(int weekday) =>
     (appLang == 'en' ? _wdEn : _wdTr)[weekday - 1];
 
+const _wdShortTr = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+const _wdShortEn = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+/// Kısa gün adı (1 = pazartesi ... 7 = pazar)
+String wdShort(int weekday) =>
+    (appLang == 'en' ? _wdShortEn : _wdShortTr)[weekday - 1];
+
 /// Ay adı (1 = ocak ... 12 = aralık)
 String monName(int month) => (appLang == 'en' ? _monEn : _monTr)[month - 1];
 
@@ -334,8 +341,6 @@ const _en = <String, String>{
       'Pink',
   'Şeftali':
       'Peach',
-  'Üstteki “Daily” yazısına dokun, menüden bir alt kategori seç: günlük, haftalık ve aylık toplamlarını gör. Yapılacaklar listesi ve ayarlar da aynı menüde. Tüm verilerin sadece telefonunda saklanır.':
-      'Tap “Daily” at the top, then pick a subcategory from the menu to see your daily, weekly and monthly totals. The to-do list and settings are in the same menu. All your data is stored only on your phone.',
   'Kapat':
       'Close',
   'Kayıt dosyası okunamadı; eski dosya yedeklendi ve yeni liste açıldı. ({0})':
@@ -414,4 +419,60 @@ const _en = <String, String>{
       'Paste the backup text here',
   'Panodan yapıştır':
       'Paste from clipboard',
+  'Uygulama güncellendi':
+      'App updated',
+  'Yenilikler':
+      'What’s new',
+  'Sürüm {0}':
+      'Version {0}',
+  'Sürüm':
+      'Version',
+  'Hakkında':
+      'About',
+  'Verilerin korundu.':
+      'Your data was kept.',
+  'Ekle için sağ alttaki DR düğmesine dokun.':
+      'Tap the DR button at the bottom right to add.',
+  'Bir satırı sağa kaydırınca düzenlenir, sola kaydırınca o günün verisi silinir.':
+      'Swipe a row right to edit it, swipe left to delete that day’s entry.',
+  'Satıra 2 saniye basılı tutarak rutinlerini sıralayabilirsin.':
+      'Press and hold a row for 2 seconds to reorder your routines.',
+  'Boş yere sağa veya sola kaydırarak günler arasında geçebilirsin.':
+      'Swipe left or right on an empty spot to move between days.',
+  'En alttaki Günlük başlığına dokunup günün notunu yazabilirsin.':
+      'Tap the Diary title at the bottom to write the note of the day.',
+  'Yapılacaklar listesi ekranın altında; dokununca yukarı doğru tüm ekrana açılır.':
+      'The to-do list is at the bottom of the screen; tap it to open it to full screen.',
+  'Soldaki menüden kategorilerin istatistiklerine ulaşabilirsin.':
+      'Use the left menu to see statistics for your categories.',
+  'Soldaki menüde Günlük’e dokunarak notlarını takvimden görebilirsin.':
+      'Tap Diary in the left menu to see your notes on a calendar.',
+  'Rutin oluştururken hangi günlerde görüneceğini seçebilirsin.':
+      'When you create a routine you can choose the days it appears on.',
+  'Ayarlar’dan tema, dil ve özlü sözleri değiştirebilirsin.':
+      'You can change the theme, language and quotes in Settings.',
+  'Uygulamayı kaldırmadan önce Ayarlar’dan yedek almayı unutma.':
+      'Do not forget to make a backup in Settings before uninstalling the app.',
+  'İpucu':
+      'Tip',
+  'Çıkış':
+      'Exit',
+  'Programdan çıkmak istediğinize emin misiniz?':
+      'Are you sure you want to exit?',
+  'Hayır':
+      'No',
+  'Hangi günler?':
+      'Which days?',
+  'Bu gün için not yok':
+      'No note for this day',
+  'Not yaz':
+      'Write a note',
+  'Rutinler artık sadece seçtiğin günlerde görünebilir (örneğin yalnızca Salı ve Perşembe).':
+      'Routines can now appear only on the days you choose (for example only Tuesday and Thursday).',
+  'Soldaki menüde Günlük: notu olan günler takvimde işaretli, tarihe basınca o günün notu görünür.':
+      'Diary in the left menu: days with a note are marked on the calendar; tap a date to see that day’s note.',
+  'Yeni açılış ekranı ve kurulum sayfaları; geri tuşunda çıkış onayı.':
+      'New launch screen and intro pages; exit confirmation on the back button.',
+  'Üstteki “Daily” yazısına dokun: soldaki menüde kategori istatistiklerini ve notu olan günlerin takvimini (Günlük) görürsün. Yapılacaklar ve Günlük ekranın altında; ayarlar menünün içinde. Tüm verilerin sadece telefonunda saklanır.':
+      'Tap “Daily” at the top: in the left menu you will find your category statistics and a calendar of the days that have a note (Diary). To-do and Diary are at the bottom of the screen; settings are inside the menu. All your data is stored only on your phone.',
 };

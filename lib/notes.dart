@@ -72,3 +72,32 @@ class _NoteBodyState extends State<NoteBody> {
     );
   }
 }
+
+// ---------------------------------------------------------------
+// Takvimden bir günün notunu düzenleme sayfası (tam ekran)
+// ---------------------------------------------------------------
+class NoteEditPage extends StatelessWidget {
+  final String date; // yyyy-MM-dd
+  final String title; // örn. "23 Ekim Cuma 2026"
+  const NoteEditPage({super.key, required this.date, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palOf(context);
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: p.bg,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        title: Text(tx('Günlük')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(tx('Bitti')),
+          ),
+        ],
+      ),
+      body: NoteBody(date: date, title: title),
+    );
+  }
+}

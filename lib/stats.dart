@@ -142,7 +142,12 @@ class _StatsPageState extends State<StatsPage> {
             ]),
           ]);
           if (g != null) {
-            final target = g * days.length;
+            // Rutin belirli günlerde ise hedef sadece planlı günler üzerinden hesaplanır
+            var planned = sub.routine
+                ? days.where((d) => sub.days.contains(d.weekday)).length
+                : days.length;
+            if (planned == 0) planned = days.length;
+            final target = g * planned;
             final diff = target - total;
             final String remain;
             if (sub.isMax) {

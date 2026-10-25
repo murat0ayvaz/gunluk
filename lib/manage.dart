@@ -86,7 +86,13 @@ class ManagePage extends StatelessWidget {
   String _info(SubCat s) {
     final parts = <String>[];
     if (s.unit.isNotEmpty) parts.add(s.unit);
-    if (s.routine) parts.add(tx('rutin'));
+    if (s.routine) {
+      parts.add(tx('rutin'));
+      if (s.days.length < 7) {
+        final ds = (s.days.toList()..sort()).map(wdShort).join(', ');
+        parts.add(ds);
+      }
+    }
     final g = s.goal;
     if (g != null) {
       if (!s.summable) {

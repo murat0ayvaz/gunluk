@@ -76,11 +76,11 @@ class _GateState extends State<Gate> {
   }
 
   Future<void> _boot() async {
-    // Veri okuma ile en az 1,6 sn açılış ekranı birlikte beklenir.
+    // Veri okuma ile en az 3 sn açılış ekranı birlikte beklenir.
     // store.init() hata olsa da takılmaz (içinde zaman aşımı var).
     await Future.wait([
       store.init(),
-      Future<void>.delayed(const Duration(milliseconds: 1600)),
+      Future<void>.delayed(const Duration(milliseconds: 3000)),
     ]);
     if (mounted) setState(() => _ready = true);
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'about.dart';
 import 'add_sheet.dart';
 import 'data.dart';
 import 'drawer.dart';
@@ -49,6 +50,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Güncelleme sonrası ilk açılışta "Uygulama güncellendi" penceresi
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && store.takeUpdateNotice()) {
+        showWhatsNew(context, updated: true);
+      }
+    });
   }
 
   @override
@@ -232,7 +239,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         for (final c in store.cats) {
           for (final s in c.subs) {
             final e = store.entryFor(s.id, date);
-            if (s.routine) {
+            // Rutin sadece seçili günlerde listelenir; seçili olmayan günde
+            // verisi varsa yine de "Diğer kayıtlar" altında görünür
+            final scheduled = s.routine && s.days.contains(day.weekday);
+            if (scheduled) {
               routines.add(_RowData(c, s, e, nat++));
             } else if (e != null) {
               others.add(_RowData(c, s, e, nat++));
@@ -381,6 +391,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   IconButton(
                       onPressed: () => _shift(1),
                       icon: const Icon(Icons.chevron_right_rounded)),
+                  // Başka bir günde bakıyorsan tek dokunuşla bugüne dön
+                  if (date != dKey(DateTime.now()))
+                    IconButton(
+                      tooltip: tx('Bugün'),
+                      onPressed: () =>
+                          setState(() => day = dayOnly(DateTime.now())),
+                      icon: const Icon(Icons.today_rounded),
+                    ),
                 ],
               ),
               _quoteCard(p),
@@ -424,11 +442,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
         final scaffold = Scaffold(
           key: _scaffoldKey,
-          drawer: AppDrawer(
-            onToday: () => setState(() => day = dayOnly(DateTime.now())),
-            onNote: () => _openPanel('note'),
-            onTodos: () => _openPanel('todo'),
-          ),
+          drawer: const AppDrawer(),
           appBar: AppBar(
             backgroundColor: p.bg,
             elevation: 0,
@@ -481,13 +495,25 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
         // Geri tuşu: önce panel, sonra sıralama modu, sonra DR menüsü kapanır
         return PopScope(
-          canPop: _panel == null && !_reorder,
-          onPopInvokedWithResult: (didPop, result) {
+          canPop: false,
+          onPopInvokedWithResult: (didPop, result) async {
             if (didPop) return;
-            if (_panel != null) {
+            if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
+              _scaffoldKey.currentState?.closeDrawer();
+            } else if (_panel != null) {
               _closePanel();
             } else if (_reorder) {
               setState(() => _reorder = false);
+            } else {
+              // Ana ekranda geri tuşu: çıkış onayı
+              final ok = await confirmDialog(
+                context,
+                tx('Çıkış'),
+                tx('Programdan çıkmak istediğinize emin misiniz?'),
+                okLabel: tx('Evet'),
+                cancelLabel: tx('Hayır'),
+              );
+              if (ok) SystemNavigator.pop();
             }
           },
           child: Stack(

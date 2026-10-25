@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'data.dart';
+import 'about.dart';
 import 'intro.dart';
 import 'strings.dart';
 import 'theme.dart';
 import 'ui.dart';
+import 'version.dart';
 
 // ---------------------------------------------------------------
 // AYARLAR: dil (Türkçe / English), tema (görünüm + vurgu rengi),
@@ -247,6 +249,22 @@ class SettingsPage extends StatelessWidget {
                         IntroPage(onDone: () => Navigator.pop(ctx)),
                   ));
                 },
+              ),
+
+              // ----- Hakkında -----
+              title(tx('Hakkında')),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.new_releases_outlined),
+                title: Text(tx('Yenilikler')),
+                onTap: () => showWhatsNew(context),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.info_outline_rounded),
+                title: Text(tx('Sürüm')),
+                trailing: Text('$appVersion ($appBuild)',
+                    style: TextStyle(color: p.soft)),
               ),
             ],
           ),

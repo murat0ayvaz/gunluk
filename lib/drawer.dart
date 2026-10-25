@@ -1,27 +1,22 @@
 import 'package:flutter/material.dart';
 import 'data.dart';
+import 'diary.dart';
 import 'manage.dart';
 import 'settings.dart';
 import 'stats.dart';
 import 'strings.dart';
 import 'ui.dart';
+import 'version.dart';
 
 // ---------------------------------------------------------------
-// SOLDAKİ MENÜ ("Günlük" yazısına dokununca açılır)
-//  - Bugün, Yapılacaklar
+// SOLDAKİ MENÜ (Your Book): verileri topluca görmek için
+//  - Günlük: notu olan günlerin işaretli olduğu takvim
 //  - Kategoriler -> alt kategoriye dokununca istatistik ekranı
-//  - Kategorileri düzenle / Ayarlar (tema + dil)
+//  - Kategorileri düzenle / Ayarlar
+//  - En altta sürüm bilgisi
 // ---------------------------------------------------------------
 class AppDrawer extends StatelessWidget {
-  final VoidCallback onToday;
-  final VoidCallback onNote; // alt paneli "Günlük" sekmesinde açar
-  final VoidCallback onTodos; // alt paneli "Yapılacaklar" sekmesinde açar
-  const AppDrawer({
-    super.key,
-    required this.onToday,
-    required this.onNote,
-    required this.onTodos,
-  });
+  const AppDrawer({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -45,10 +40,11 @@ class AppDrawer extends StatelessWidget {
                         height: 44,
                         decoration: BoxDecoration(
                             color: p.accent, shape: BoxShape.circle),
-                        child: Icon(Icons.checklist_rounded, color: p.onAccent),
+                        child: Icon(Icons.auto_stories_rounded,
+                            color: p.onAccent),
                       ),
                       const SizedBox(width: 12),
-                      Text('Daily Routine',
+                      Text('Your Book',
                           style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.w700,
@@ -61,27 +57,12 @@ class AppDrawer extends StatelessWidget {
                     padding: EdgeInsets.zero,
                     children: [
                       ListTile(
-                        leading: const Icon(Icons.today_rounded),
-                        title: Text(tx('Bugün')),
-                        onTap: () {
-                          nav.pop();
-                          onToday();
-                        },
-                      ),
-                      ListTile(
-                        leading: const Icon(Icons.task_alt_rounded),
-                        title: Text(tx('Yapılacaklar')),
-                        onTap: () {
-                          nav.pop();
-                          onTodos();
-                        },
-                      ),
-                      ListTile(
-                        leading: const Icon(Icons.edit_note_rounded),
+                        leading: const Icon(Icons.menu_book_rounded),
                         title: Text(tx('Günlük')),
                         onTap: () {
                           nav.pop();
-                          onNote();
+                          nav.push(MaterialPageRoute<void>(
+                              builder: (_) => const DiaryCalendarPage()));
                         },
                       ),
                       Divider(color: p.line),
@@ -148,7 +129,11 @@ class AppDrawer extends StatelessWidget {
                         builder: (_) => const SettingsPage()));
                   },
                 ),
-                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, bottom: 10),
+                  child: Text('Your Book • v$appVersion',
+                      style: TextStyle(fontSize: 12, color: p.soft)),
+                ),
               ],
             ),
           ),

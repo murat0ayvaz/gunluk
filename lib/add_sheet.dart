@@ -21,6 +21,7 @@ class _AddSheetState extends State<AddSheet> {
   String? catId;
   String? subId;
   bool routine = false;
+  Set<int> days = {1, 2, 3, 4, 5, 6, 7}; // rutinin görüneceği günler
   final _value = TextEditingController();
   final _goal = TextEditingController();
 
@@ -36,6 +37,7 @@ class _AddSheetState extends State<AddSheet> {
     setState(() {
       subId = s.id;
       routine = s.routine;
+      days = Set<int>.from(s.days);
       _goal.text = s.goal == null ? '' : plain(s.goal!);
     });
   }
@@ -69,10 +71,14 @@ class _AddSheetState extends State<AddSheet> {
     final v = parseNum(_value.text);
 
     // 1) Rutin ayarı değiştiyse alt kategoriyi güncelle
-    if (routine != sub.routine || (routine && goal != sub.goal)) {
+    final daysChanged = routine && !(days.length == sub.days.length && days.containsAll(sub.days));
+    if (routine != sub.routine || (routine && goal != sub.goal) || daysChanged) {
       final d = SubDraft.from(sub);
       d.routine = routine;
-      if (routine) d.goal = goal;
+      if (routine) {
+        d.goal = goal;
+        d.days = Set<int>.from(days);
+      }
       store.updateSub(sub.id, d);
     }
 
@@ -199,6 +205,16 @@ class _AddSheetState extends State<AddSheet> {
                     onChanged: (v) => setState(() => routine = v),
                   ),
                   if (routine) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text(tx('Hangi günler?'),
+                          style: TextStyle(color: p.soft)),
+                    ),
+                    WeekdayChips(
+                      selected: days,
+                      onChanged: (v) => setState(() => days = v),
+                    ),
+                    const SizedBox(height: 12),
                     TextField(
                       controller: _goal,
                       keyboardType: numberKeyboard,
