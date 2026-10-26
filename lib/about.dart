@@ -10,9 +10,8 @@ import 'version.dart';
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
       tx('Verilerin korundu.'),
-      tx('Rutinler artık sadece seçtiğin günlerde görünebilir (örneğin yalnızca Salı ve Perşembe).'),
-      tx('Soldaki menüde Günlük: notu olan günler takvimde işaretli, tarihe basınca o günün notu görünür.'),
-      tx('Yeni açılış ekranı ve kurulum sayfaları; geri tuşunda çıkış onayı.'),
+      tx('Uygulama kilidi: Ayarlar’dan kendi şifreni belirleyebilirsin; uygulama açılırken ve arka plandan dönünce sorulur.'),
+      tx('Açılış ve kurulum görselleri artık ekrana tam sığıyor.'),
     ];
 
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {

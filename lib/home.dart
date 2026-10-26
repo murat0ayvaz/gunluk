@@ -498,6 +498,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           canPop: false,
           onPopInvokedWithResult: (didPop, result) async {
             if (didPop) return;
+            if (store.locked) return; // kilit ekranı açıkken alttaki sayfa işlem yapmasın
             if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
               _scaffoldKey.currentState?.closeDrawer();
             } else if (_panel != null) {

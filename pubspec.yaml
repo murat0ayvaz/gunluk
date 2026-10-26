@@ -1,7 +1,7 @@
 name: gunluk
 description: Daily Routine - günlük rutin, hedef, yapılacaklar ve günlük (not) uygulaması
 publish_to: 'none'
-version: 1.6.0+9
+version: 1.7.0+10
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -12,6 +12,7 @@ dependencies:
   flutter_localizations:   # Türkçe / English tarih seçici ve düğme metinleri için
     sdk: flutter
   intl: any                # flutter_localizations bunu ister
+  crypto: ^3.0.3           # şifre özeti (SHA-256) için; saf Dart paketi, eklenti değil
 
 flutter:
   uses-material-design: true

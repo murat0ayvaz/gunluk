@@ -449,8 +449,6 @@ const _en = <String, String>{
       'Tap Diary in the left menu to see your notes on a calendar.',
   'Rutin oluştururken hangi günlerde görüneceğini seçebilirsin.':
       'When you create a routine you can choose the days it appears on.',
-  'Ayarlar’dan tema, dil ve özlü sözleri değiştirebilirsin.':
-      'You can change the theme, language and quotes in Settings.',
   'Uygulamayı kaldırmadan önce Ayarlar’dan yedek almayı unutma.':
       'Do not forget to make a backup in Settings before uninstalling the app.',
   'İpucu':
@@ -467,12 +465,56 @@ const _en = <String, String>{
       'No note for this day',
   'Not yaz':
       'Write a note',
-  'Rutinler artık sadece seçtiğin günlerde görünebilir (örneğin yalnızca Salı ve Perşembe).':
-      'Routines can now appear only on the days you choose (for example only Tuesday and Thursday).',
-  'Soldaki menüde Günlük: notu olan günler takvimde işaretli, tarihe basınca o günün notu görünür.':
-      'Diary in the left menu: days with a note are marked on the calendar; tap a date to see that day’s note.',
-  'Yeni açılış ekranı ve kurulum sayfaları; geri tuşunda çıkış onayı.':
-      'New launch screen and intro pages; exit confirmation on the back button.',
   'Üstteki “Daily” yazısına dokun: soldaki menüde kategori istatistiklerini ve notu olan günlerin takvimini (Günlük) görürsün. Yapılacaklar ve Günlük ekranın altında; ayarlar menünün içinde. Tüm verilerin sadece telefonunda saklanır.':
       'Tap “Daily” at the top: in the left menu you will find your category statistics and a calendar of the days that have a note (Diary). To-do and Diary are at the bottom of the screen; settings are inside the menu. All your data is stored only on your phone.',
+  'Ayarlar’dan tema, dil, özlü sözler ve uygulama kilidini ayarlayabilirsin.':
+      'You can set the theme, language, quotes and app lock in Settings.',
+  'Uygulama kilidi: Ayarlar’dan kendi şifreni belirleyebilirsin; uygulama açılırken ve arka plandan dönünce sorulur.':
+      'App lock: you can set your own password in Settings; it is asked when the app opens and when you return from the background.',
+  'Açılış ve kurulum görselleri artık ekrana tam sığıyor.':
+      'The launch and intro images now fit the screen completely.',
+  'Güvenlik':
+      'Security',
+  'Uygulama kilidi':
+      'App lock',
+  'Açıkken uygulama açılırken ve arka plandan 5 saniyeden uzun kaldıktan sonra dönünce şifre sorulur.':
+      'When on, a password is asked when the app opens and when you return after more than 5 seconds in the background.',
+  'Şifreyi değiştir':
+      'Change password',
+  'Bu kilit uygulamanın ekranını korur. Veri telefonda şifrelenmeden durur; “son uygulamalar” ekranındaki önizleme ve Ayarlar’daki yedek metni de korunmaz.':
+      'This lock protects the app screen. Data is stored unencrypted on the phone; the preview in the recent apps screen and the backup text from Settings are not protected either.',
+  'Uygulama kilidi açıldı.':
+      'App lock turned on.',
+  'Uygulama kilidi kapatıldı.':
+      'App lock turned off.',
+  'Şifre değiştirildi.':
+      'Password changed.',
+  'Şifre yanlış':
+      'Wrong password',
+  'Uygulama kilitli':
+      'The app is locked',
+  'Şifre':
+      'Password',
+  'İpucu: {0}':
+      'Hint: {0}',
+  'Aç':
+      'Unlock',
+  '{0} sn bekle':
+      'Wait {0} s',
+  'Şifreni belirle':
+      'Set your password',
+  'Yeni şifre':
+      'New password',
+  'Şifreyi tekrar yaz':
+      'Repeat the password',
+  'Şifre ipucu (isteğe bağlı)':
+      'Password hint (optional)',
+  'Şifre en az 4 karakter olmalı':
+      'The password must be at least 4 characters',
+  'Şifreler aynı değil':
+      'The passwords do not match',
+  'Şifreni unutursan sıfırlamanın tek yolu uygulamayı kaldırıp yeniden kurmaktır; bu da tüm verilerini siler. Önce Ayarlar’dan yedek al.':
+      'If you forget your password, the only way to reset it is to uninstall and reinstall the app, which deletes all your data. Back up from Settings first.',
+  'Mevcut şifre':
+      'Current password',
 };

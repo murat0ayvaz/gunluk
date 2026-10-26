@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'data.dart';
 import 'about.dart';
 import 'intro.dart';
+import 'lock.dart';
 import 'strings.dart';
 import 'theme.dart';
 import 'ui.dart';
@@ -24,6 +25,30 @@ class SettingsPage extends StatelessWidget {
       duration: const Duration(seconds: 5),
       persist: false,
     ));
+  }
+
+  /// Uygulama kilidini açar (şifre belirletir) ya da kapatır (mevcut şifreyi sorar)
+  Future<void> _toggleLock(BuildContext context, bool on) async {
+    if (on) {
+      final r = await askNewPassword(context);
+      if (r == null || !context.mounted) return;
+      store.setPassword(r.password, r.hint);
+      _snack(context, tx('Uygulama kilidi açıldı.'));
+    } else {
+      final ok = await askCurrentPassword(context);
+      if (!ok || !context.mounted) return;
+      store.removePassword();
+      _snack(context, tx('Uygulama kilidi kapatıldı.'));
+    }
+  }
+
+  Future<void> _changePassword(BuildContext context) async {
+    final ok = await askCurrentPassword(context);
+    if (!ok || !context.mounted) return;
+    final r = await askNewPassword(context);
+    if (r == null || !context.mounted) return;
+    store.setPassword(r.password, r.hint);
+    _snack(context, tx('Şifre değiştirildi.'));
   }
 
   /// Tüm veriyi metin olarak panoya kopyalar
@@ -216,6 +241,28 @@ class SettingsPage extends StatelessWidget {
                   style: TextStyle(fontSize: 12.5, color: p.soft, height: 1.4),
                 ),
               ],
+
+              // ----- Güvenlik: uygulama kilidi -----
+              title(tx('Güvenlik')),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(tx('Uygulama kilidi')),
+                subtitle: Text(tx(
+                    'Açıkken uygulama açılırken ve arka plandan 5 saniyeden uzun kaldıktan sonra dönünce şifre sorulur.')),
+                value: store.lockEnabled,
+                onChanged: (v) => _toggleLock(context, v),
+              ),
+              if (store.lockEnabled)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.key_rounded),
+                  title: Text(tx('Şifreyi değiştir')),
+                  onTap: () => _changePassword(context),
+                ),
+              Text(
+                tx('Bu kilit uygulamanın ekranını korur. Veri telefonda şifrelenmeden durur; “son uygulamalar” ekranındaki önizleme ve Ayarlar’daki yedek metni de korunmaz.'),
+                style: TextStyle(fontSize: 12.5, color: p.soft, height: 1.4),
+              ),
 
               // ----- Yedek -----
               title(tx('Yedek')),

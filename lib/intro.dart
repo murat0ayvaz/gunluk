@@ -4,43 +4,35 @@ import 'strings.dart';
 import 'ui.dart';
 
 // ---------------------------------------------------------------
-// ORTAK: tam ekran arka plan görseli + alttan koyulaşan gölge
-// (görselin alt kısmı açık renkte olduğu için beyaz yazılar okunsun diye)
+// ORTAK: açılış / kurulum görseli
+// Görsel TAM GENİŞLİKTE ve KIRPILMADAN üstte durur (altı beyaza soluyor);
+// altındaki alan beyazdır ve yazılar bu beyaz alana koyu renkte yazılır.
+// Ekran çok kısaysa görselin sadece alt kısmı (beyaz soluma) kırpılır.
 // ---------------------------------------------------------------
-class _BookBackground extends StatelessWidget {
-  final double shadeFrom; // gölgenin başladığı yükseklik oranı (0-1)
-  const _BookBackground({this.shadeFrom = 0.45});
+const _ink = Color(0xFF2E3238); // beyaz zeminde koyu yazı
+const _soft = Color(0xFF6B7078);
+const _gold = Color(0xFF9A7B3D);
+const _imgRatio = 1200 / 896; // görselin yükseklik / genişlik oranı
 
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        Image.asset(
-          'assets/splash.jpg',
-          fit: BoxFit.cover,
-          alignment: Alignment.topCenter,
-          errorBuilder: (context, error, stack) =>
-              const ColoredBox(color: Color(0xFF1F2125)),
-        ),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: const [
-                Colors.transparent,
-                Colors.transparent,
-                Color(0xE6000000),
-              ],
-              stops: [0, shadeFrom, 1],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+/// Verilen genişlikte görselin ekranda kaplayacağı yükseklik
+double _imageHeight(double w, double maxH, double reserve) {
+  final natural = w * _imgRatio;
+  final room = maxH - reserve;
+  if (natural <= room) return natural;
+  return room < 200 ? 200 : room;
 }
+
+Widget _bookImage(double h) => SizedBox(
+      width: double.infinity,
+      height: h,
+      child: Image.asset(
+        'assets/splash.jpg',
+        fit: BoxFit.cover,
+        alignment: Alignment.topCenter,
+        errorBuilder: (context, error, stack) =>
+            const ColoredBox(color: Colors.white),
+      ),
+    );
 
 // ---------------------------------------------------------------
 // AÇILIŞ EKRANI: her açılışta 3 saniye görünür; altta kısa bir
@@ -56,7 +48,7 @@ List<String> _tips() => [
       tx('Soldaki menüden kategorilerin istatistiklerine ulaşabilirsin.'),
       tx('Soldaki menüde Günlük’e dokunarak notlarını takvimden görebilirsin.'),
       tx('Rutin oluştururken hangi günlerde görüneceğini seçebilirsin.'),
-      tx('Ayarlar’dan tema, dil ve özlü sözleri değiştirebilirsin.'),
+      tx('Ayarlar’dan tema, dil, özlü sözler ve uygulama kilidini ayarlayabilirsin.'),
       tx('Uygulamayı kaldırmadan önce Ayarlar’dan yedek almayı unutma.'),
     ];
 
@@ -76,61 +68,61 @@ class _SplashPageState extends State<SplashPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1F2125),
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          const _BookBackground(shadeFrom: 0.6),
-          Positioned(
-            left: 24,
-            right: 24,
-            bottom: 0,
-            child: SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 28),
-                child: TweenAnimationBuilder<double>(
-                  tween: Tween<double>(begin: 0, end: 1),
-                  duration: const Duration(milliseconds: 700),
-                  curve: Curves.easeOut,
-                  builder: (context, t, child) => Opacity(
-                    opacity: t,
-                    child: Transform.translate(
-                        offset: Offset(0, 10 * (1 - t)), child: child),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+      backgroundColor: Colors.white,
+      body: LayoutBuilder(
+        builder: (context, c) {
+          final imgH = _imageHeight(c.maxWidth, c.maxHeight, 170);
+          return Stack(
+            children: [
+              Positioned(top: 0, left: 0, right: 0, child: _bookImage(imgH)),
+              Positioned(
+                left: 24,
+                right: 24,
+                bottom: 0,
+                child: SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 28),
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween<double>(begin: 0, end: 1),
+                      duration: const Duration(milliseconds: 700),
+                      curve: Curves.easeOut,
+                      builder: (context, t, child) => Opacity(
+                        opacity: t,
+                        child: Transform.translate(
+                            offset: Offset(0, 10 * (1 - t)), child: child),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.lightbulb_outline_rounded,
-                              color: Colors.white, size: 18),
-                          const SizedBox(width: 6),
-                          Text(tx('İpucu'),
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700)),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.lightbulb_outline_rounded,
+                                  color: _gold, size: 18),
+                              const SizedBox(width: 6),
+                              Text(tx('İpucu'),
+                                  style: const TextStyle(
+                                      color: _gold,
+                                      fontWeight: FontWeight.w700)),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            _tip,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                                color: _ink, fontSize: 15, height: 1.4),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        _tip,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          height: 1.4,
-                          shadows: [Shadow(blurRadius: 8, color: Colors.black54)],
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -138,7 +130,7 @@ class _SplashPageState extends State<SplashPage> {
 
 // ---------------------------------------------------------------
 // TANITIM SAYFALARI: ilk kurulumda 3 kaydırmalı sayfa.
-// Her sayfada aynı görsel arka planda durur, yazılar beyaz ve altta.
+// Her sayfada aynı görsel üstte, yazılar altındaki beyaz alanda.
 // (Ayarlar'dan "Tanıtımı göster" ile tekrar açılabilir)
 // ---------------------------------------------------------------
 class _Pg {
@@ -161,8 +153,6 @@ List<_Pg> _pages() => [
         tx('Üstteki “Daily” yazısına dokun: soldaki menüde kategori istatistiklerini ve notu olan günlerin takvimini (Günlük) görürsün. Yapılacaklar ve Günlük ekranın altında; ayarlar menünün içinde. Tüm verilerin sadece telefonunda saklanır.'),
       ),
     ];
-
-const _shadow = [Shadow(blurRadius: 10, color: Colors.black87)];
 
 class IntroPage extends StatefulWidget {
   final VoidCallback onDone;
@@ -197,100 +187,113 @@ class _IntroPageState extends State<IntroPage> {
     final pages = _pages();
     final last = _i == pages.length - 1;
     return Scaffold(
-      backgroundColor: const Color(0xFF1F2125),
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          const _BookBackground(shadeFrom: 0.28),
-          SafeArea(
-            child: Column(
-              children: [
-                Align(
-                  alignment: Alignment.centerRight,
+      backgroundColor: Colors.white,
+      body: LayoutBuilder(
+        builder: (context, c) {
+          final imgH = _imageHeight(c.maxWidth, c.maxHeight, 380);
+          return Stack(
+            children: [
+              Positioned(top: 0, left: 0, right: 0, child: _bookImage(imgH)),
+              // Atla düğmesi (görselin üstünde, okunsun diye koyu yarı saydam zemin)
+              Positioned(
+                top: 0,
+                right: 0,
+                child: SafeArea(
                   child: Padding(
-                    padding: const EdgeInsets.only(right: 8, top: 4),
-                    child: TextButton(
-                      style: TextButton.styleFrom(foregroundColor: Colors.white),
-                      onPressed: last ? null : widget.onDone,
-                      child: Text(last ? '' : tx('Atla'),
-                          style: const TextStyle(shadows: _shadow)),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: PageView.builder(
-                    controller: _ctrl,
-                    itemCount: pages.length,
-                    onPageChanged: (v) => setState(() => _i = v),
-                    itemBuilder: (_, i) {
-                      final pg = pages[i];
-                      // Yazılar sayfanın ALT kısmında ve beyaz
-                      return Align(
-                        alignment: Alignment.bottomCenter,
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(28, 0, 28, 16),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                pg.title,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                  shadows: _shadow,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                pg.text,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  height: 1.45,
-                                  color: Colors.white,
-                                  shadows: _shadow,
-                                ),
-                              ),
-                            ],
+                    padding: const EdgeInsets.all(8),
+                    child: last
+                        ? const SizedBox.shrink()
+                        : TextButton(
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              backgroundColor: Colors.black38,
+                            ),
+                            onPressed: widget.onDone,
+                            child: Text(tx('Atla')),
                           ),
-                        ),
-                      );
-                    },
                   ),
                 ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    for (var i = 0; i < pages.length; i++)
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        width: i == _i ? 22 : 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: i == _i ? p.accent : Colors.white54,
-                          borderRadius: BorderRadius.circular(4),
+              ),
+              // Görselin altındaki beyaz alan: sayfa yazıları, noktalar, düğme
+              Positioned(
+                top: imgH,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: SafeArea(
+                  top: false,
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: PageView.builder(
+                          controller: _ctrl,
+                          itemCount: pages.length,
+                          onPageChanged: (v) => setState(() => _i = v),
+                          itemBuilder: (_, i) {
+                            final pg = pages[i];
+                            return SingleChildScrollView(
+                              padding: const EdgeInsets.fromLTRB(28, 4, 28, 8),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    pg.title,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.w700,
+                                        color: _ink),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    pg.text,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                        fontSize: 15.5,
+                                        height: 1.45,
+                                        color: _soft),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
                         ),
                       ),
-                  ],
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: FilledButton(
-                      onPressed: () => _next(pages.length),
-                      child: Text(last ? tx('Başla') : tx('İleri')),
-                    ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          for (var i = 0; i < pages.length; i++)
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              width: i == _i ? 22 : 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: i == _i
+                                    ? p.accent
+                                    : const Color(0xFFD5D7DB),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                        ],
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 14, 24, 20),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: FilledButton(
+                            onPressed: () => _next(pages.length),
+                            child: Text(last ? tx('Başla') : tx('İleri')),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ),
-        ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }

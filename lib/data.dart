@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'quotes.dart';
 import 'strings.dart';
@@ -66,6 +68,21 @@ String fmt(double v) {
 String plain(double v) {
   if (v == v.roundToDouble()) return v.toInt().toString();
   return v.toString().replaceAll('.', ',');
+}
+
+/// Şifreyi tuzla birlikte 5000 tur SHA-256 ile özetler (düz şifre saklanmaz)
+String hashPassword(String pw, String salt) {
+  final saltBytes = utf8.encode(salt);
+  List<int> bytes = utf8.encode('$salt:$pw');
+  for (var i = 0; i < 5000; i++) {
+    bytes = sha256.convert([...bytes, ...saltBytes]).bytes;
+  }
+  return base64Encode(bytes);
+}
+
+String _randomSalt() {
+  final r = Random.secure();
+  return base64Encode(List<int>.generate(16, (_) => r.nextInt(256)));
 }
 
 /// Hedefe ulaşıldı mı? (toplanan veriler için; en fazla = üst sınır)
@@ -275,6 +292,12 @@ class AppStore extends ChangeNotifier {
   // Ana ekrandaki satır sırası (alt kategori kimlikleri; kullanıcı sürükleyerek değiştirir)
   List<String> homeOrder = [];
 
+  // Uygulama kilidi (şifre): sadece tuzlu özet saklanır
+  String? lockSalt;
+  String? lockHash;
+  String lockHint = '';
+  bool locked = false; // çalışma anında: şu an kilitli mi
+
   // Özlü sözler ayarları
   bool quotesOn = true;
   Set<String> quoteKinds = {'motivation'}; // motivation, ayet, hadis, custom
@@ -361,6 +384,14 @@ class AppStore extends ChangeNotifier {
     lastBuild = (s['lastBuild'] as int?) ?? 0;
 
     homeOrder = ((j['order'] as List?) ?? []).map((e) => e as String).toList();
+
+    // Kilit bilgisi yedekte yoktur; yedek yüklenince mevcut kilit korunur
+    final lk = j['lock'];
+    if (lk is Map) {
+      lockSalt = lk['salt'] as String?;
+      lockHash = lk['hash'] as String?;
+      lockHint = (lk['hint'] ?? '') as String;
+    }
 
     final q = (j['quotes'] as Map?) ?? {};
     quotesOn = (q['on'] as bool?) ?? true;
@@ -460,6 +491,9 @@ class AppStore extends ChangeNotifier {
         'todos': todos.map((t) => t.toJson()).toList(),
         'notes': notes,
         'order': homeOrder,
+        'lock': lockHash == null
+            ? null
+            : {'salt': lockSalt, 'hash': lockHash, 'hint': lockHint},
         'quotes': {
           'on': quotesOn,
           'kinds': quoteKinds.toList(),
@@ -710,6 +744,49 @@ class AppStore extends ChangeNotifier {
     }
   }
 
+  // ----- Uygulama kilidi -----
+
+  bool get lockEnabled => lockHash != null;
+
+  /// Kilidi devreye sokar (kilit ekranı açılır)
+  void lock() {
+    if (lockEnabled && !locked) {
+      locked = true;
+      notifyListeners();
+    }
+  }
+
+  void unlock() {
+    if (locked) {
+      locked = false;
+      notifyListeners();
+    }
+  }
+
+  /// Yeni şifre belirler (eskisi varsa değiştirir)
+  void setPassword(String pw, String hint) {
+    lockSalt = _randomSalt();
+    lockHash = hashPassword(pw, lockSalt!);
+    lockHint = hint.trim();
+    _commit();
+  }
+
+  bool checkPassword(String pw) {
+    final s = lockSalt;
+    final h = lockHash;
+    if (s == null || h == null) return true;
+    return hashPassword(pw, s) == h;
+  }
+
+  /// Kilidi tamamen kaldırır
+  void removePassword() {
+    lockSalt = null;
+    lockHash = null;
+    lockHint = '';
+    locked = false;
+    _commit();
+  }
+
   // ----- Ayarlar -----
 
   void setThemeMode(ThemeMode m) {
@@ -859,7 +936,11 @@ class AppStore extends ChangeNotifier {
 
   /// Tüm veriyi (kategoriler, kayıtlar, yapılacaklar, günlük notları, ayarlar)
   /// tek bir metin olarak verir
-  String exportBackup() => jsonEncode(_snapshot());
+  String exportBackup() {
+    final m = _snapshot();
+    m.remove('lock'); // şifre özeti yedek metnine girmez
+    return jsonEncode(m);
+  }
 
   /// Yedek metnini yükler. Başarılıysa null, değilse hata mesajı döner.
   /// Hata olursa mevcut veri korunur.
