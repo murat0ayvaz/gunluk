@@ -6,7 +6,7 @@ import 'strings.dart';
 // ---------------------------------------------------------------
 // KUTLAMA: tüm hedefler tamamlanınca ~5,5 saniye oynar.
 // Havai fişek (iz bırakan parçacıklar) + konfeti yağmuru +
-// ortada büyüyen "Tebrikler!" yazısı + hafif titreşim.
+// ortada sade "Tebrikler" yazısı ve gaz verici bir cümle + hafif titreşim.
 // Dokunuşları engellemez. Eklenti kullanmaz (kendi çizimi).
 // ---------------------------------------------------------------
 class _Spark {
@@ -53,6 +53,15 @@ class _FireworksOverlayState extends State<FireworksOverlay>
   late final List<_Burst> _bursts = _make();
   late final List<_Confetti> _conf = _makeConfetti();
 
+  static const _cheers = [
+    'Bugünün hedeflerini bitirdin. Sen durdurulamazsın!',
+    'Söz verdin, tuttun. İşte bu!',
+    'Küçük adımlar büyük farkı yaratır. Bugün hepsini attın.',
+    'Bugün kendine kazandırdın. Devam!',
+    'Disiplin sende. Yarın da aynısı.',
+  ];
+  late final String _cheer = _cheers[Random().nextInt(_cheers.length)];
+
   static const _colors = [
     Color(0xFFFFC857),
     Color(0xFFFF6B6B),
@@ -85,7 +94,7 @@ class _FireworksOverlayState extends State<FireworksOverlay>
   List<_Confetti> _makeConfetti() {
     final r = Random();
     return List.generate(
-        90,
+        24,
         (i) => _Confetti(
               r.nextDouble(),
               r.nextDouble() * 0.45,
@@ -138,26 +147,44 @@ class _FireworksOverlayState extends State<FireworksOverlay>
                   child: Opacity(
                     opacity: fade,
                     child: Transform.scale(
-                      scale: 0.3 + 0.7 * grow,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text('🎉', style: TextStyle(fontSize: 64)),
-                          Text(
-                            tx('Tebrikler!'),
-                            style: const TextStyle(
-                              fontSize: 40,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                              decoration: TextDecoration.none,
-                              shadows: [
-                                Shadow(blurRadius: 14, color: Color(0xCC000000)),
-                                Shadow(
-                                    blurRadius: 30, color: Color(0x99FFC857)),
-                              ],
+                      scale: 0.85 + 0.15 * grow,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 36),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              tx('Tebrikler'),
+                              style: const TextStyle(
+                                fontSize: 30,
+                                fontWeight: FontWeight.w300,
+                                letterSpacing: 2,
+                                color: Colors.white,
+                                decoration: TextDecoration.none,
+                                shadows: [
+                                  Shadow(
+                                      blurRadius: 14, color: Color(0xCC000000)),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 10),
+                            Text(
+                              tx(_cheer),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 17,
+                                height: 1.35,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white,
+                                decoration: TextDecoration.none,
+                                shadows: [
+                                  Shadow(
+                                      blurRadius: 12, color: Color(0xCC000000)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),

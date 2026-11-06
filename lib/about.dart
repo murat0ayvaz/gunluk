@@ -10,9 +10,9 @@ import 'version.dart';
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
       tx('Verilerin korundu.'),
-      tx('Yapılacaklar, Günlük ve Hatırlatıcı artık ana ekranda rutinlerin altında açılır başlıklar.'),
-      tx('Yapılacaklar güne özel: sağa az kaydır düzenle, tam kaydır yarına gönder, sola kaydır sil. Bitmeyenler her gün bugüne taşınır.'),
-      tx('Sağ altta yuvarlak DR düğmesi; Ekle paneli düğmeden büyüyerek açılır.'),
+      tx('Meditasyon: nefes sesleri, gong, oynatıcı, online müzik, kayıt listesi ve notlar.'),
+      tx('Ana ekranda tek "Rutinler" başlığı; aşağı çekince ekran ilk haline döner.'),
+      tx('Tebrikler ekranı daha sade; "Geri al" bildirimi kendiliğinden kapanır.'),
     ];
 
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {

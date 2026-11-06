@@ -243,6 +243,24 @@ class Song {
 }
 
 /// Oynatma listesi (içindeki şarkıların sırası listenin sırasıdır)
+/// Yapılan bir meditasyon seansı (Meditasyon sayfasındaki kayıt listesi)
+class MedSession {
+  final String id;
+  final int ms; // seansın bittiği zaman
+  final double minutes; // süre (dakika)
+  String note;
+  MedSession(this.id, this.ms, this.minutes, [this.note = '']);
+
+  Map<String, dynamic> toJson() =>
+      {'id': id, 'ms': ms, 'm': minutes, 'n': note};
+
+  factory MedSession.fromJson(Map<String, dynamic> j) => MedSession(
+      (j['id'] ?? '').toString(),
+      (j['ms'] ?? 0) as int,
+      ((j['m'] ?? 0) as num).toDouble(),
+      (j['n'] ?? '').toString());
+}
+
 /// Online müzik parçası (Jamendo / Audius)
 class OnTrack {
   final String id; // 'jam:123' / 'aud:abc'
@@ -854,6 +872,49 @@ class AppStore extends ChangeNotifier {
     } else {
       onFavs.insert(0, t);
     }
+    _commit();
+  }
+
+  // ----- Meditasyon -----
+  List<MedSession> medLog = [];
+  bool medSound = true; // nefes sesleri ve gong
+  bool medVibe = false; // nefeste titreşim
+
+  MedSession addMed(double minutes, {String note = ''}) {
+    final m = MedSession(
+        newId(), DateTime.now().millisecondsSinceEpoch, minutes, note);
+    medLog.insert(0, m);
+    _commit();
+    return m;
+  }
+
+  void setMedNote(String id, String note) {
+    for (final m in medLog) {
+      if (m.id == id) m.note = note.trim();
+    }
+    _commit();
+  }
+
+  void deleteMed(String id) {
+    medLog.removeWhere((m) => m.id == id);
+    _commit();
+  }
+
+  void restoreMed(MedSession m) {
+    if (medLog.every((x) => x.id != m.id)) {
+      medLog.add(m);
+      medLog.sort((a, b) => b.ms.compareTo(a.ms));
+      _commit();
+    }
+  }
+
+  void setMedSound(bool v) {
+    medSound = v;
+    _commit();
+  }
+
+  void setMedVibe(bool v) {
+    medVibe = v;
     _commit();
   }
 
@@ -1533,6 +1594,11 @@ class AppStore extends ChangeNotifier {
       ];
     }
     jamendoKey = (j['jamkey'] as String?) ?? '';
+    if (j['medlog'] is List) {
+      medLog = (j['medlog'] as List)
+          .map((e) => MedSession.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+    }
     if (j['onfavs'] is List) {
       onFavs = (j['onfavs'] as List)
           .map((e) => OnTrack.fromJson(Map<String, dynamic>.from(e as Map)))
@@ -1546,6 +1612,8 @@ class AppStore extends ChangeNotifier {
       zikirTarget = (tl['zt'] as num?)?.toInt() ?? 33;
       sleepStart = (tl['sleep'] as num?)?.toInt() ?? 0;
       glassMl = (tl['glass'] as num?)?.toInt() ?? 250;
+      medSound = (tl['msnd'] as bool?) ?? true;
+      medVibe = (tl['mvib'] as bool?) ?? false;
     }
     if (j['newscats'] is List) {
       newsCats = (j['newscats'] as List)
@@ -1720,6 +1788,7 @@ class AppStore extends ChangeNotifier {
         'podcats': podCats.map((c) => c.toJson()).toList(),
         'newscats': newsCats.map((c) => c.toJson()).toList(),
         'jamkey': jamendoKey,
+        'medlog': medLog.map((m) => m.toJson()).toList(),
         'onfavs': onFavs.map((t) => t.toJson()).toList(),
         'tools': {
           'links': toolLinks,
@@ -1727,6 +1796,8 @@ class AppStore extends ChangeNotifier {
           'zt': zikirTarget,
           'sleep': sleepStart,
           'glass': glassMl,
+          'msnd': medSound,
+          'mvib': medVibe,
         },
         'eppos': epPos,
         'epdone': epDone.toList(),

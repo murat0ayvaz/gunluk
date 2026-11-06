@@ -572,13 +572,31 @@ class SwipeRow extends StatelessWidget {
 
 /// Altta kısa süre "Geri al" düğmeli bildirim gösterir
 void showUndo(BuildContext context, String message, VoidCallback onUndo) {
-  ScaffoldMessenger.of(context)
-    ..clearSnackBars()
-    ..showSnackBar(SnackBar(
-      duration: const Duration(seconds: 5),
-      content: Text(message),
-      action: SnackBarAction(label: tx('Geri al'), onPressed: onUndo),
-    ));
+  final m = ScaffoldMessenger.of(context);
+  m.clearSnackBars();
+  m.showSnackBar(SnackBar(
+    duration: const Duration(seconds: 5),
+    persist: false, // "Geri al" olsa da 5 saniye sonra kapansın
+    // "Geri al" solda: sağ alttaki DR düğmesiyle çakışmasın
+    content: Row(
+      children: [
+        TextButton(
+          style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              minimumSize: const Size(0, 36),
+              foregroundColor: const Color(0xFFA6D4B0)),
+          onPressed: () {
+            m.hideCurrentSnackBar();
+            onUndo();
+          },
+          child: Text(tx('Geri al'),
+              style: const TextStyle(fontWeight: FontWeight.w700)),
+        ),
+        const SizedBox(width: 8),
+        Expanded(child: Text(message)),
+      ],
+    ),
+  ));
 }
 
 // ---------------------------------------------------------------

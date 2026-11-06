@@ -1,10 +1,11 @@
-DAILY ROUTINE v25 (1.21.0) - TAM PAKET (önceki güncellemeleri yüklemediysen bunu yükle)
+DAILY ROUTINE v26 (1.22.0) - TAM PAKET
 
 Bu zipte projenin TAMAMI var: .github, assets, lib, debug.keystore, pubspec.yaml.
 1) Zipi çıkar. GitHub'da "gunluk" reposunun ANA sayfasında: Add file > Upload files.
 2) Çıkan klasörlerin ve dosyaların HEPSİNİ (.github, assets, lib, debug.keystore, pubspec.yaml) sürükle-bırak > Commit changes.
-   (Aynı isimli dosyalar üzerine yazılır. Repoda artık kullanılmayan eski dosya kalırsa zararı olmaz.)
+   (assets/sounds klasörü de gelmeli: meditasyon sesleri orada.)
 3) Actions > yeşil tik > Artifacts > gunluk-apk indir, telefona kur (veriler kalır).
 
-Bu pakette v22, v23, v24 ve v25'in hepsi var (açılış ekranı + havai fişek, Araçlar, kaydırma/sıralama,
-açılır listeler, MGM düzeltmesi, Meditasyon, Online müzik, ana ekran açılır başlıklar, DR düğmesi, günlük yapılacaklar).
+v26 yenilikleri: Rutinler tek açılır başlık, aşağı çekince ekran sıfırlanır, Meditasyonda oynatıcı (10 sn ileri/geri),
+nefes al/ver sesleri + gong (titreşim isteğe bağlı), online müzik, meditasyon kayıtları + not, sade Tebrikler,
+"Geri al" kendiliğinden kapanır ve DR ile çakışmaz.

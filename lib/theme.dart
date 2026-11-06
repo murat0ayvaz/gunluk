@@ -74,6 +74,11 @@ ThemeData buildTheme(Brightness b, int accent) {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     ),
+    // Alt bildirimler: sağ alttaki DR düğmesinin üstüne binmesin
+    snackBarTheme: const SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      insetPadding: EdgeInsets.fromLTRB(12, 0, 84, 12),
+    ),
     chipTheme: ChipThemeData(
       backgroundColor: pal.card,
       selectedColor: pal.accent,

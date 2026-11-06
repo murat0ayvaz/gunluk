@@ -104,11 +104,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     entry = OverlayEntry(
         builder: (_) => FireworksOverlay(onDone: () => entry.remove()));
     overlay.insert(entry);
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(
-          duration: const Duration(seconds: 3),
-          content: Text(tx('Tebrikler! Bugünkü tüm hedeflerine ulaştın.'))));
   }
 
   // Uygulamaya geri dönülünce (özlü söz zamanı geçmiş olabilir) yeniden çiz
@@ -269,33 +264,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       if (!ok) return;
       await Notifier.cancelSub(sub);
       store.setRoutineOff(sub.id);
-      messenger.clearSnackBars();
-      messenger.showSnackBar(SnackBar(
-        content: Text(tx('{0} rutini kaldırıldı', [sub.name])),
-        duration: const Duration(seconds: 5),
-        persist: false,
-        action: SnackBarAction(
-            label: tx('Geri al'),
-            onPressed: () {
-              store.setRoutineOn(sub.id);
-              Notifier.syncSub(sub);
-            }),
-      ));
+      showUndo(context, tx('{0} rutini kaldırıldı', [sub.name]), () {
+        store.setRoutineOn(sub.id);
+        Notifier.syncSub(sub);
+      });
     } else {
       store.skipDay(sub.id, date);
       Notifier.syncSub(sub);
-      messenger.clearSnackBars();
-      messenger.showSnackBar(SnackBar(
-        content: Text(tx('{0} bu gün için kaldırıldı', [sub.name])),
-        duration: const Duration(seconds: 5),
-        persist: false,
-        action: SnackBarAction(
-            label: tx('Geri al'),
-            onPressed: () {
-              store.unskipDay(sub.id, date);
-              Notifier.syncSub(sub);
-            }),
-      ));
+      showUndo(context, tx('{0} bu gün için kaldırıldı', [sub.name]), () {
+        store.unskipDay(sub.id, date);
+        Notifier.syncSub(sub);
+      });
     }
   }
 
@@ -321,21 +300,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   /// Serbest satırı sil (sola kaydır); "Geri al" 5 saniye durur
   void _deleteFree(FreeRow f) {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.clearSnackBars();
     store.deleteFree(f.id);
     Notifier.cancelFree(f);
-    messenger.showSnackBar(SnackBar(
-      content: Text(tx('Satır silindi')),
-      duration: const Duration(seconds: 5),
-      persist: false,
-      action: SnackBarAction(
-          label: tx('Geri al'),
-          onPressed: () {
-            store.restoreFree(f);
-            Notifier.syncFree(f);
-          }),
-    ));
+    showUndo(context, tx('Satır silindi'), () {
+      store.restoreFree(f);
+      Notifier.syncFree(f);
+    });
   }
 
   // ----- Özlü söz kartı -----
@@ -456,6 +426,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 catsToday.any((c) => c.id == _catFilter))
             ? _catFilter
             : null; // seçili kategorinin o gün satırı yoksa hepsi görünür
+        // Başlıktaki sayılar süzgeçten bağımsız (günün tamamı)
+        final routinesTotal = routines.length;
+        final routinesMet = routines.where((r) => r.met).length;
+        final othersTotal = others.length;
         if (filterId != null) {
           routines.removeWhere((r) => r.cat?.id != filterId);
           others.removeWhere((r) => r.cat?.id != filterId);
@@ -501,40 +475,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               itemBuilder: (_, i) => rowOf(list[i], i),
             );
 
-        final children = <Widget>[
-          if (routines.isNotEmpty) ...[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
-              child: Text('Routine', style: TextStyle(color: p.soft)),
-            ),
-            section(routines),
-          ],
-          if (others.isNotEmpty) ...[
-            if (routines.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
-                child: Text(tx('Diğer kayıtlar'),
-                    style: TextStyle(color: p.soft)),
-              ),
-            section(others),
-          ],
-        ];
-
-        final bodyColumn = Column(
-          children: [
-            if (store.storageError != null)
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                    color: p.delBg, borderRadius: BorderRadius.circular(12)),
-                child: Text(store.storageError!,
-                    style: TextStyle(color: p.ink, fontSize: 13)),
-              ),
-            ...[
-              if (catsToday.length > 1)
-                SizedBox(
+        final Widget chipsBar = catsToday.length > 1
+            ? SizedBox(
                   height: 44,
                   child: ListView(
                     scrollDirection: Axis.horizontal,
@@ -560,9 +502,75 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         ),
                     ],
                   ),
-                ),
+                )
+            : const SizedBox.shrink();
+
+        // Rutinler ve Diğer kayıtlar: açılır başlıklar (açılışta kapalı)
+        final children = <Widget>[
+          if (routinesTotal > 0)
+            _HomeSection(
+              icon: Icons.checklist_rounded,
+              title: tx('Rutinler'),
+              tone: const Color(0xFF4F8EF7),
+              badge: '$routinesMet/$routinesTotal',
+              open: _openSec.contains('routine'),
+              onToggle: () => setState(() => _openSec.contains('routine')
+                  ? _openSec.remove('routine')
+                  : _openSec.add('routine')),
+              child: Column(
+                children: [
+                  const SizedBox(height: 6),
+                  chipsBar,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                    child: section(routines),
+                  ),
+                ],
+              ),
+            ),
+          if (othersTotal > 0)
+            _HomeSection(
+              icon: Icons.more_horiz_rounded,
+              title: tx('Diğer kayıtlar'),
+              tone: const Color(0xFF17A9C4),
+              badge: '$othersTotal',
+              open: _openSec.contains('other'),
+              onToggle: () => setState(() => _openSec.contains('other')
+                  ? _openSec.remove('other')
+                  : _openSec.add('other')),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+                child: section(others),
+              ),
+            ),
+        ];
+
+        final bodyColumn = Column(
+          children: [
+            if (store.storageError != null)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                    color: p.delBg, borderRadius: BorderRadius.circular(12)),
+                child: Text(store.storageError!,
+                    style: TextStyle(color: p.ink, fontSize: 13)),
+              ),
+            ...[
               Expanded(
-                child: ListView(
+                child: RefreshIndicator(
+                  // Yukarıdan aşağı çekince ana ekran ilk haline döner
+                  onRefresh: () async {
+                    setState(() {
+                      day = dayOnly(DateTime.now());
+                      _wxOpen = false;
+                      _openSec.clear();
+                      _catFilter = null;
+                    });
+                  },
+                  child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
                   children: [
                     ...children,
@@ -628,6 +636,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       child: const RemindersBody(),
                     ),
                   ],
+                  ),
                 ),
               ),
             ],
@@ -706,14 +715,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ],
             ),
             actions: [
-              // Başka bir günde bakıyorsan tek dokunuşla bugüne dön
-              if (date != dKey(DateTime.now()))
-                IconButton(
-                  tooltip: tx('Bugün'),
-                  onPressed: () =>
-                      setState(() => day = dayOnly(DateTime.now())),
-                  icon: const Icon(Icons.today_rounded),
-                ),
               // Sağdan açılan Araçlar menüsü
               IconButton(
                 tooltip: tx('Araçlar'),

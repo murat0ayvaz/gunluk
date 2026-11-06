@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'data.dart';
 import 'notify.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:just_audio/just_audio.dart' show LoopMode;
 import 'media.dart';
+import 'online.dart';
 import 'podcast.dart';
 import 'strings.dart';
 import 'ui.dart';
@@ -261,11 +263,11 @@ class _SaveDialogState extends State<_SaveDialog> {
     ];
     final fit = all.where((e) => _fits(widget.kind, e.value)).toList();
     _subs = fit.isEmpty ? all : fit;
-    final d = defaultSubFor(widget.tool);
-    if (d != null && _subs.any((e) => e.value.id == d.id)) {
-      _sel = d.id;
-    } else if (_subs.isNotEmpty) {
-      _sel = _subs.first.value.id;
+    // İlk açılışta Serbest satır seçili; "Bu araç için hatırla" ile bir rutin
+    // seçildiyse o rutin seçili gelir.
+    final linkId = store.toolLinks[widget.tool];
+    if (linkId != null && _subs.any((e) => e.value.id == linkId)) {
+      _sel = linkId;
     } else {
       _sel = '__free__';
     }
@@ -1573,9 +1575,68 @@ class _SleepPageState extends State<SleepPage> {
 
 // ---------------------------------------------------------------
 // 8) Meditasyon: süre seç, yavaş nefes halkası, rehber cümleler,
-//    arka plan sesi (podcast bölümü ya da telefondan dosya)
+//    nefes al/ver sesleri + başta/sonda gong (isteğe bağlı titreşim),
+//    arka plan sesi (podcast, telefondan dosya ya da online müzik),
+//    biten seanslar sayfadaki kayıt listesine yazılır (not eklenir, silinir).
 // ---------------------------------------------------------------
-final _Countdown _medCtl = _Countdown(888803, tx('Meditasyon bitti.'));
+
+/// Nefes sesleri ve gong: ayrı çalarlarla, müzik/podcast'in üstüne karışarak çalar
+class _MedSounds {
+  final AudioPlayer _cue = AudioPlayer();
+  final AudioPlayer _gong = AudioPlayer();
+  bool _ready = false;
+
+  Future<void> _init() async {
+    if (_ready) return;
+    _ready = true;
+    try {
+      // Ses odağı istenmez: çalan podcast/müzik duraklamasın
+      const ctx = AudioContext(
+        android: AudioContextAndroid(audioFocus: AndroidAudioFocus.none),
+      );
+      await _cue.setAudioContext(ctx);
+      await _gong.setAudioContext(ctx);
+    } catch (_) {}
+  }
+
+  Future<void> _play(AudioPlayer p, String asset, double vol) async {
+    try {
+      await _init();
+      await p.stop();
+      await p.setVolume(vol);
+      await p.play(AssetSource(asset));
+    } catch (_) {}
+  }
+
+  Future<void> inhale() => _play(_cue, 'sounds/inhale.wav', 0.55);
+  Future<void> exhale() => _play(_cue, 'sounds/exhale.wav', 0.55);
+  Future<void> gong() => _play(_gong, 'sounds/gong.wav', 0.7);
+
+  Future<void> stopAll() async {
+    try {
+      await _cue.stop();
+      await _gong.stop();
+    } catch (_) {}
+  }
+}
+
+final _MedSounds _medSnd = _MedSounds();
+
+/// Seans bitince (sayfa açık olmasa da): gong, arka plan sesini kapat, kayda yaz
+void _medFinished() {
+  if (store.medSound) _medSnd.gong();
+  _medEndSound();
+  final min = double.parse((_medCtl.total / 60).toStringAsFixed(1));
+  if (min > 0) store.addMed(min);
+  _medLoggedSec = _medCtl.total;
+  _medPageHook?.call();
+}
+
+VoidCallback? _medPageHook; // açık meditasyon sayfası bitişte bunu çağırır
+int _medLoggedSec = 0; // şu ana kadar kayda yazılan süre (sn)
+
+final _Countdown _medCtl = _Countdown(888803, tx('Meditasyon bitti.'))
+  ..onFinish = _medFinished;
 int _medMin = 10;
 
 const _medGuides = [
@@ -1589,15 +1650,18 @@ const _medGuides = [
   'Şu an burada olmanın tadını çıkar.',
 ];
 
-/// Meditasyon bitince ya da durdurulunca arka plan sesini kapatır
+/// Meditasyon sırasındaki arka plan sesini (podcast/dosya/online) kapatır
 Future<void> _medEndSound() async {
   try {
     await media.player.setLoopMode(LoopMode.off);
   } catch (_) {}
-  if (media.nowId != null && (media.isPod || media.isVoice)) {
+  if (media.nowId != null && (media.isPod || media.isVoice || media.isOnline)) {
     await media.stop();
   }
 }
+
+bool get _medHasSound =>
+    media.nowId != null && (media.isPod || media.isVoice || media.isOnline);
 
 class _EpPickPage extends StatelessWidget {
   final Podcast pd;
@@ -1637,19 +1701,25 @@ class _MeditatePageState extends State<MeditatePage>
   // 10 sn'lik tam nefes döngüsü (5 sn al, 5 sn ver)
   late final AnimationController _br = AnimationController(
       vsync: this, duration: const Duration(seconds: 10));
+  int _lastPhase = -1; // 0 nefes al, 1 nefes ver
+  Timer? _startDelay;
 
   @override
   void initState() {
     super.initState();
     _medCtl.addListener(_u);
-    _medCtl.onFinish = _done;
+    _medPageHook = _finishedUi;
+    _br.addListener(_cueTick);
     if (_medCtl.total == 0) _medCtl.set(_medMin * 60);
     if (_medCtl.running) _br.repeat();
   }
 
   @override
   void dispose() {
+    _startDelay?.cancel();
     _medCtl.removeListener(_u);
+    if (_medPageHook == _finishedUi) _medPageHook = null;
+    _br.removeListener(_cueTick);
     _br.dispose();
     super.dispose();
   }
@@ -1658,9 +1728,32 @@ class _MeditatePageState extends State<MeditatePage>
     if (mounted) setState(() {});
   }
 
-  Future<void> _done() async {
+  /// Nefes aşaması değişince ses / titreşim
+  void _cueTick() {
+    if (!_medCtl.running) return;
+    final ph = _br.value < 0.5 ? 0 : 1;
+    if (ph == _lastPhase) return;
+    _lastPhase = ph;
+    if (store.medSound) {
+      if (ph == 0) {
+        _medSnd.inhale();
+      } else {
+        _medSnd.exhale();
+      }
+    }
+    if (store.medVibe) {
+      if (ph == 0) {
+        HapticFeedback.mediumImpact();
+      } else {
+        HapticFeedback.lightImpact();
+      }
+    }
+  }
+
+  /// Seans bitti (kayıt zaten yazıldı): sayfa açıksa özet penceresi
+  Future<void> _finishedUi() async {
     _br.stop();
-    await _medEndSound();
+    _startDelay?.cancel();
     if (!mounted) return;
     HapticFeedback.heavyImpact();
     final min = double.parse((_medCtl.total / 60).toStringAsFixed(1));
@@ -1692,26 +1785,53 @@ class _MeditatePageState extends State<MeditatePage>
     final ok = await saveToRoutine(context,
         tool: 'meditate', title: tx('Meditasyon'), value: v, kind: 'min');
     if (ok) {
-      _medCtl.set(_medMin * 60);
-      if (mounted) setState(() {});
+      _reset();
     }
+  }
+
+  void _reset() {
+    _medCtl.set(_medMin * 60);
+    _medLoggedSec = 0;
+    _medSnd.stopAll();
+    if (mounted) setState(() {});
+  }
+
+  /// Durdurulmuş seansı kayıt listesine ekler
+  void _logNow() {
+    final sec = _medCtl.total - _medCtl.left;
+    final m = store.addMed(_elapsedMin);
+    _medLoggedSec = sec;
+    setState(() {});
+    showUndo(context, tx('Kayda eklendi'), () {
+      store.deleteMed(m.id);
+      _medLoggedSec = 0;
+      if (mounted) setState(() {});
+    });
   }
 
   void _start() {
     HapticFeedback.lightImpact();
     _medCtl.start();
-    _br.repeat();
-    if (media.nowId != null && (media.isPod || media.isVoice)) {
-      media.player.play();
+    _lastPhase = -1;
+    if (store.medSound) {
+      // Başlangıç gongu; nefes döngüsü gongdan biraz sonra başlar
+      _medSnd.gong();
+      _startDelay?.cancel();
+      _startDelay = Timer(const Duration(milliseconds: 2500), () {
+        if (mounted && _medCtl.running) _br.repeat();
+      });
+    } else {
+      _br.repeat();
     }
+    if (_medHasSound) media.player.play();
   }
 
   void _pause() {
+    _startDelay?.cancel();
     _medCtl.pause();
     _br.stop();
-    if (media.nowId != null && (media.isPod || media.isVoice)) {
-      media.player.pause();
-    }
+    _medSnd.stopAll();
+    if (_medHasSound) media.player.pause();
   }
 
   Future<void> _custom() async {
@@ -1720,6 +1840,7 @@ class _MeditatePageState extends State<MeditatePage>
     if (v == null || v <= 0) return;
     _medMin = v.round().clamp(1, 600);
     _medCtl.set(_medMin * 60);
+    _medLoggedSec = 0;
   }
 
   Future<void> _soundMenu() async {
@@ -1735,6 +1856,11 @@ class _MeditatePageState extends State<MeditatePage>
               leading: const Icon(Icons.podcasts_rounded),
               title: Text(tx('Podcast\'lerimden')),
               onTap: () => Navigator.pop(ctx, 'pod'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.cloud_queue_rounded),
+              title: Text(tx('Online müzik')),
+              onTap: () => Navigator.pop(ctx, 'online'),
             ),
             ListTile(
               leading: const Icon(Icons.audio_file_outlined),
@@ -1755,6 +1881,8 @@ class _MeditatePageState extends State<MeditatePage>
       await _medEndSound();
     } else if (pick == 'file') {
       await _pickFile();
+    } else if (pick == 'online') {
+      await _pickOnline();
     } else {
       await _pickPod();
     }
@@ -1773,6 +1901,18 @@ class _MeditatePageState extends State<MeditatePage>
       messenger.showSnackBar(
           SnackBar(content: Text(tx('Ses seçilemedi: {0}', ['$e']))));
     }
+  }
+
+  Future<void> _pickOnline() async {
+    final p = palOf(context);
+    await Navigator.of(context).push(_route(Scaffold(
+      backgroundColor: p.bg,
+      appBar: AppBar(title: Text(tx('Online müzik'))),
+      body: const OnlineTab(),
+    )));
+    if (!mounted) return;
+    // Sayaç çalışmıyorsa seçilen müzik bekletilsin
+    if (!_medCtl.running && media.isOnline) media.player.pause();
   }
 
   Future<void> _pickPod() async {
@@ -1797,7 +1937,8 @@ class _MeditatePageState extends State<MeditatePage>
               for (final x in pods)
                 ListTile(
                   leading: const Icon(Icons.podcasts_rounded),
-                  title: Text(x.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  title: Text(x.title,
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
                   onTap: () => Navigator.pop(ctx, x),
                 ),
             ],
@@ -1808,10 +1949,120 @@ class _MeditatePageState extends State<MeditatePage>
     if (pd == null || !mounted) return;
     await Navigator.of(context).push(_route(_EpPickPage(pd)));
     if (!mounted) return;
-    // Sayaç çalışıyorsa seçilen ses de çalsın; durduysa bekletilsin
+    // Sayaç çalışmıyorsa seçilen bölüm bekletilsin
     if (!_medCtl.running && media.nowId != null && media.isPod) {
       media.player.pause();
     }
+  }
+
+  /// Arka plan sesi çalarken görünen oynatıcı: ilerleme, 10 sn geri/ileri, oynat/duraklat
+  Widget _playerCard(Pal p, Color tone) {
+    return ListenableBuilder(
+      listenable: media,
+      builder: (context, _) {
+        final has = _medHasSound;
+        return Container(
+          padding: const EdgeInsets.fromLTRB(14, 8, 6, 6),
+          decoration: BoxDecoration(
+              color: tone.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(18)),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.music_note_rounded, color: tone),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(has ? media.nowTitle : tx('Ses yok'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: p.ink, fontWeight: FontWeight.w600)),
+                  ),
+                  if (has)
+                    IconButton(
+                        tooltip: tx('Sesi kapat'),
+                        onPressed: _medEndSound,
+                        icon: const Icon(Icons.close_rounded)),
+                  TextButton(onPressed: _soundMenu, child: Text(tx('Ses'))),
+                ],
+              ),
+              if (has) ...[
+                StreamBuilder<Duration>(
+                  stream: media.player.positionStream,
+                  builder: (context, snap) {
+                    final pos = snap.data ?? Duration.zero;
+                    final dur = media.player.duration ?? Duration.zero;
+                    final maxMs = dur.inMilliseconds.toDouble();
+                    final v =
+                        pos.inMilliseconds.clamp(0, dur.inMilliseconds).toDouble();
+                    return Row(
+                      children: [
+                        Text(mmss(pos),
+                            style: TextStyle(color: p.soft, fontSize: 12)),
+                        Expanded(
+                          child: Slider(
+                            value: v,
+                            max: maxMs > 0 ? maxMs : 1,
+                            onChanged: maxMs > 0
+                                ? (x) => media.player
+                                    .seek(Duration(milliseconds: x.round()))
+                                : null,
+                          ),
+                        ),
+                        Text(mmss(dur),
+                            style: TextStyle(color: p.soft, fontSize: 12)),
+                      ],
+                    );
+                  },
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                        tooltip: tx('10 sn geri'),
+                        onPressed: () => media.skipBy(-10),
+                        icon: const Icon(Icons.replay_10_rounded, size: 32)),
+                    media.loading
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                                width: 28,
+                                height: 28,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 3)),
+                          )
+                        : IconButton(
+                            tooltip:
+                                media.playing ? tx('Duraklat') : tx('Çal'),
+                            onPressed: media.toggle,
+                            icon: Icon(
+                                media.playing
+                                    ? Icons.pause_circle_filled_rounded
+                                    : Icons.play_circle_fill_rounded,
+                                size: 48)),
+                    IconButton(
+                        tooltip: tx('10 sn ileri'),
+                        onPressed: () => media.skipBy(10),
+                        icon: const Icon(Icons.forward_10_rounded, size: 32)),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _editNote(MedSession m) async {
+    final v = await askText(context, tx('Not'), initial: m.note);
+    if (v != null) store.setMedNote(m.id, v);
+  }
+
+  void _deleteSession(MedSession m) {
+    store.deleteMed(m.id);
+    showUndo(context, tx('Kayıt silindi'), () => store.restoreMed(m));
   }
 
   @override
@@ -1823,175 +2074,231 @@ class _MeditatePageState extends State<MeditatePage>
     final idle = c.idle;
     final elapsedSec = c.total - c.left;
     final guide = _medGuides[(elapsedSec ~/ 12) % _medGuides.length];
+    final canLog = !running && elapsedSec >= 30 && elapsedSec >= _medLoggedSec + 30;
     return _page(
       context,
       tx('Meditasyon'),
       tone: tone,
-      SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            if (!running && idle)
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                alignment: WrapAlignment.center,
-                children: [
-                  for (final m in const [5, 10, 20, 30])
-                    ChoiceChip(
-                      label: Text('$m ${tx('dk')}'),
-                      selected: _medMin == m,
-                      onSelected: (_) {
-                        _medMin = m;
-                        c.set(m * 60);
-                      },
-                    ),
-                  ActionChip(
-                      label: Text(tx('Özel')), onPressed: _custom),
-                ],
-              )
-            else
-              const SizedBox(height: 40),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 300,
-              child: AnimatedBuilder(
-                animation: _br,
-                builder: (_, __) {
-                  // 0 → 1 → 0 yumuşak nefes eğrisi
-                  final v = running ? 0.5 - 0.5 * cos(_br.value * 2 * pi) : 0.0;
-                  final size = 130 + 120 * v;
-                  return Center(
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Container(
-                          width: size + 50,
-                          height: size + 50,
-                          decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: tone.withOpacity(0.07 + 0.08 * v)),
-                        ),
-                        Container(
-                          width: size + 22,
-                          height: size + 22,
-                          decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: tone.withOpacity(0.12 + 0.10 * v)),
-                        ),
-                        Container(
-                          width: size,
-                          height: size,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: RadialGradient(colors: [
-                              tone.withOpacity(0.70),
-                              const Color(0xFF5C6BC0).withOpacity(0.35),
-                            ]),
-                            boxShadow: [
-                              BoxShadow(
-                                  color: tone.withOpacity(0.25 + 0.30 * v),
-                                  blurRadius: 20 + 30 * v),
-                            ],
+      ListenableBuilder(
+        listenable: store,
+        builder: (context, _) => SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              if (!running && idle)
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    for (final m in const [5, 10, 20, 30])
+                      ChoiceChip(
+                        label: Text('$m ${tx('dk')}'),
+                        selected: _medMin == m,
+                        onSelected: (_) {
+                          _medMin = m;
+                          c.set(m * 60);
+                          _medLoggedSec = 0;
+                        },
+                      ),
+                    ActionChip(label: Text(tx('Özel')), onPressed: _custom),
+                  ],
+                )
+              else
+                const SizedBox(height: 40),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 300,
+                child: AnimatedBuilder(
+                  animation: _br,
+                  builder: (_, __) {
+                    // 0 → 1 → 0 yumuşak nefes eğrisi
+                    final v = running ? 0.5 - 0.5 * cos(_br.value * 2 * pi) : 0.0;
+                    final size = 130 + 120 * v;
+                    return Center(
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            width: size + 50,
+                            height: size + 50,
+                            decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: tone.withOpacity(0.07 + 0.08 * v)),
                           ),
-                          alignment: Alignment.center,
-                          child: Text(
-                              running
-                                  ? (_br.value < 0.5
-                                      ? tx('Nefes al')
-                                      : tx('Nefes ver'))
-                                  : tx('Hazır'),
-                              style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white)),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-            Text(_clock(c.left),
-                style: TextStyle(
-                    fontSize: 44,
-                    fontWeight: FontWeight.w300,
-                    color: p.ink,
-                    fontFeatures: const [FontFeature.tabularFigures()])),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 56,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 900),
-                child: Text(
-                  running ? tx(guide) : '',
-                  key: ValueKey<int>(running ? elapsedSec ~/ 12 : -1),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      fontSize: 16,
-                      height: 1.35,
-                      fontStyle: FontStyle.italic,
-                      color: p.soft),
+                          Container(
+                            width: size + 22,
+                            height: size + 22,
+                            decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: tone.withOpacity(0.12 + 0.10 * v)),
+                          ),
+                          Container(
+                            width: size,
+                            height: size,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: RadialGradient(colors: [
+                                tone.withOpacity(0.70),
+                                const Color(0xFF5C6BC0).withOpacity(0.35),
+                              ]),
+                              boxShadow: [
+                                BoxShadow(
+                                    color: tone.withOpacity(0.25 + 0.30 * v),
+                                    blurRadius: 20 + 30 * v),
+                              ],
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                                running
+                                    ? (_br.value < 0.5
+                                        ? tx('Nefes al')
+                                        : tx('Nefes ver'))
+                                    : tx('Hazır'),
+                                style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white)),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            ListenableBuilder(
-              listenable: media,
-              builder: (context, _) {
-                final has =
-                    media.nowId != null && (media.isPod || media.isVoice);
-                return Container(
-                  padding: const EdgeInsets.fromLTRB(14, 4, 4, 4),
-                  decoration: BoxDecoration(
-                      color: tone.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(16)),
-                  child: Row(
-                    children: [
-                      Icon(Icons.music_note_rounded, color: tone),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(has ? media.nowTitle : tx('Ses yok'),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: p.ink)),
-                      ),
-                      if (has)
-                        IconButton(
-                            onPressed: media.toggle,
-                            icon: Icon(media.playing
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded)),
-                      TextButton(
-                          onPressed: _soundMenu, child: Text(tx('Ses'))),
-                    ],
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 18),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              alignment: WrapAlignment.center,
-              children: [
-                _bigBtn(running ? tx('Duraklat') : tx('Başlat'),
-                    running ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                    running ? _pause : _start),
-                if (!running && !idle)
-                  _bigBtn(tx('Sıfırla'), Icons.restart_alt_rounded, () {
-                    _medCtl.set(_medMin * 60);
-                    _medEndSound();
-                  }, filled: false),
-              ],
-            ),
-            if (!running && _elapsedMin >= 0.5) ...[
+              Text(_clock(c.left),
+                  style: TextStyle(
+                      fontSize: 44,
+                      fontWeight: FontWeight.w300,
+                      color: p.ink,
+                      fontFeatures: const [FontFeature.tabularFigures()])),
               const SizedBox(height: 10),
-              _bigBtn(tx('Rutine kaydet'), Icons.add_task_rounded, _save),
+              SizedBox(
+                height: 56,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 900),
+                  child: Text(
+                    running ? tx(guide) : '',
+                    key: ValueKey<int>(running ? elapsedSec ~/ 12 : -1),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 16,
+                        height: 1.35,
+                        fontStyle: FontStyle.italic,
+                        color: p.soft),
+                  ),
+                ),
+              ),
+              Wrap(
+                spacing: 8,
+                children: [
+                  FilterChip(
+                    avatar: const Icon(Icons.volume_up_rounded, size: 18),
+                    label: Text(tx('Nefes sesi')),
+                    selected: store.medSound,
+                    onSelected: store.setMedSound,
+                  ),
+                  FilterChip(
+                    avatar: const Icon(Icons.vibration_rounded, size: 18),
+                    label: Text(tx('Titreşim')),
+                    selected: store.medVibe,
+                    onSelected: store.setMedVibe,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _playerCard(p, tone),
+              const SizedBox(height: 18),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                alignment: WrapAlignment.center,
+                children: [
+                  _bigBtn(running ? tx('Duraklat') : tx('Başlat'),
+                      running ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                      running ? _pause : _start),
+                  if (!running && !idle)
+                    _bigBtn(tx('Sıfırla'), Icons.restart_alt_rounded, _reset,
+                        filled: false),
+                ],
+              ),
+              if (canLog) ...[
+                const SizedBox(height: 10),
+                _bigBtn(tx('Kayda ekle'), Icons.bookmark_add_outlined, _logNow,
+                    filled: false),
+              ],
+              if (!running && _elapsedMin >= 0.5) ...[
+                const SizedBox(height: 10),
+                _bigBtn(tx('Rutine kaydet'), Icons.add_task_rounded, _save),
+              ],
+              const SizedBox(height: 26),
+              _medHistory(p, tone),
             ],
-          ],
+          ),
         ),
       ),
+    );
+  }
+
+  /// Geçmiş seanslar: dokununca not, çöp kutusu ile sil
+  Widget _medHistory(Pal p, Color tone) {
+    final list = store.medLog;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.history_rounded, color: tone),
+            const SizedBox(width: 8),
+            Text(tx('Meditasyon kayıtları'),
+                style: TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w700, color: p.ink)),
+            const Spacer(),
+            if (list.isNotEmpty)
+              Text(
+                  tx('{0} dk', [
+                    fmt(list.fold<double>(0, (a, m) => a + m.minutes))
+                  ]),
+                  style: TextStyle(color: p.soft)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (list.isEmpty)
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text(tx('Henüz kayıt yok. Biten seanslar buraya eklenir.'),
+                textAlign: TextAlign.center,
+                style: TextStyle(color: p.soft)),
+          )
+        else
+          for (final m in list)
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: Color.alphaBlend(
+                    tone.withOpacity(p.dark ? 0.14 : 0.08), p.card),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: tone.withOpacity(0.35)),
+              ),
+              child: ListTile(
+                onTap: () => _editNote(m),
+                title: Text(
+                    '${dtLabel(m.ms)}  •  ${tx('{0} dk', [fmt(m.minutes)])}',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600, color: p.ink)),
+                subtitle: Text(
+                    m.note.isEmpty ? tx('Not eklemek için dokun') : m.note,
+                    style: TextStyle(
+                        color: p.soft,
+                        fontStyle:
+                            m.note.isEmpty ? FontStyle.italic : FontStyle.normal)),
+                trailing: IconButton(
+                    tooltip: tx('Sil'),
+                    onPressed: () => _deleteSession(m),
+                    icon: const Icon(Icons.delete_outline_rounded)),
+              ),
+            ),
+      ],
     );
   }
 }
