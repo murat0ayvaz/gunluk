@@ -1,0 +1,206 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:   # Actions sekmesinden elle de başlatılabilir
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # android/ klasörünü otomatik üretir (repoda tutmaya gerek yok)
+      - name: Android klasörünü oluştur
+        run: flutter create --platforms=android --project-name gunluk .
+
+      # Telefondaki uygulama adını "Daily Routine" yap
+      - name: Uygulama adı
+        run: sed -i 's/android:label="[^"]*"/android:label="Daily Routine"/' android/app/src/main/AndroidManifest.xml
+
+      # Bildirimler için Android ayarları (izinler, alıcılar, desugaring)
+      - name: Android ayarları (bildirimler)
+        run: |
+          python3 - <<'PY'
+          import re, os
+          m = 'android/app/src/main/AndroidManifest.xml'
+          s = open(m, encoding='utf-8').read()
+          if 'SCHEDULE_EXACT_ALARM' not in s:
+              perms = ''.join('    <uses-permission android:name="android.permission.%s"/>\n' % x for x in
+                  ['POST_NOTIFICATIONS', 'SCHEDULE_EXACT_ALARM', 'RECEIVE_BOOT_COMPLETED', 'VIBRATE'])
+              s = s.replace('<application', perms + '    <application', 1)
+          if 'ScheduledNotificationReceiver' not in s:
+              rec = (
+                  '        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />\n'
+                  '        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">\n'
+                  '            <intent-filter>\n'
+                  '                <action android:name="android.intent.action.BOOT_COMPLETED"/>\n'
+                  '                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>\n'
+                  '                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>\n'
+                  '                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>\n'
+                  '            </intent-filter>\n'
+                  '        </receiver>\n')
+              s = s.replace('</application>', rec + '    </application>', 1)
+          open(m, 'w', encoding='utf-8').write(s)
+          for g, kts in (('android/app/build.gradle.kts', True), ('android/app/build.gradle', False)):
+              if not os.path.exists(g):
+                  continue
+              t = open(g, encoding='utf-8').read()
+              if 'desugar_jdk_libs' in t:
+                  break
+              if kts:
+                  t = re.sub(r'compileOptions\s*\{', 'compileOptions {\n        isCoreLibraryDesugaringEnabled = true', t, count=1)
+                  t += '\ndependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")\n}\n'
+              else:
+                  t = re.sub(r'compileOptions\s*\{', 'compileOptions {\n        coreLibraryDesugaringEnabled true', t, count=1)
+                  t += "\ndependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'\n}\n"
+              open(g, 'w', encoding='utf-8').write(t)
+              break
+          PY
+          grep -n "desugar" android/app/build.gradle* || echo "UYARI: desugar eklenemedi"
+
+      # Müzik / radyo için Android ayarları (internet, arka planda çalma)
+      - name: Android ayarları (müzik)
+        run: |
+          python3 - <<'PY'
+          import os
+          m = 'android/app/src/main/AndroidManifest.xml'
+          s = open(m, encoding='utf-8').read()
+          if 'xmlns:tools' not in s:
+              s = s.replace('<manifest ', '<manifest xmlns:tools="http://schemas.android.com/tools" ', 1)
+          if 'FOREGROUND_SERVICE_MEDIA_PLAYBACK' not in s:
+              perms = ''.join('    <uses-permission android:name="android.permission.%s"/>\n' % x for x in
+                  ['INTERNET', 'WAKE_LOCK', 'FOREGROUND_SERVICE', 'FOREGROUND_SERVICE_MEDIA_PLAYBACK'])
+              s = s.replace('<application', perms + '    <application', 1)
+          if 'usesCleartextTraffic' not in s:
+              s = s.replace('<application', '<application android:usesCleartextTraffic="true"', 1)
+          if 'com.ryanheise.audioservice.AudioService' not in s:
+              svc = (
+                  '        <service android:name="com.ryanheise.audioservice.AudioService" android:foregroundServiceType="mediaPlayback" android:exported="true" tools:ignore="Instantiatable">\n'
+                  '            <intent-filter>\n'
+                  '                <action android:name="android.media.browse.MediaBrowserService" />\n'
+                  '            </intent-filter>\n'
+                  '        </service>\n'
+                  '        <receiver android:name="com.ryanheise.audioservice.MediaButtonReceiver" android:exported="true" tools:ignore="Instantiatable">\n'
+                  '            <intent-filter>\n'
+                  '                <action android:name="android.intent.action.MEDIA_BUTTON" />\n'
+                  '            </intent-filter>\n'
+                  '        </receiver>\n')
+              s = s.replace('</application>', svc + '    </application>', 1)
+          open(m, 'w', encoding='utf-8').write(s)
+          done = False
+          for root, _, files in os.walk('android/app/src/main'):
+              for fn in files:
+                  if fn == 'MainActivity.kt':
+                      p = os.path.join(root, fn)
+                      t = open(p, encoding='utf-8').read()
+                      if 'AudioServiceActivity' not in t:
+                          t = t.replace('import io.flutter.embedding.android.FlutterActivity', 'import com.ryanheise.audioservice.AudioServiceActivity')
+                          t = t.replace('FlutterActivity()', 'AudioServiceActivity()')
+                          open(p, 'w', encoding='utf-8').write(t)
+                      done = True
+                      print(p)
+                      print(t)
+          if not done:
+              print('UYARI: MainActivity.kt bulunamadi')
+          PY
+          grep -n "audioservice\|INTERNET\|Cleartext" android/app/src/main/AndroidManifest.xml
+
+      # Hava durumu için konum izni (telefonun konumunu kullan seçeneği)
+      - name: Android ayarları (konum)
+        run: |
+          python3 - <<'PY'
+          m = 'android/app/src/main/AndroidManifest.xml'
+          s = open(m, encoding='utf-8').read()
+          if 'ACCESS_COARSE_LOCATION' not in s:
+              perms = ''.join('    <uses-permission android:name="android.permission.%s"/>\n' % x for x in
+                  ['ACCESS_COARSE_LOCATION', 'ACCESS_FINE_LOCATION'])
+              s = s.replace('<application', perms + '    <application', 1)
+          open(m, 'w', encoding='utf-8').write(s)
+          PY
+          grep -n "ACCESS_" android/app/src/main/AndroidManifest.xml
+
+      # Haber: sesli okuma (TTS) ve bağlantı açma için Android 11+ paket görünürlüğü
+      - name: Android ayarları (haber)
+        run: |
+          python3 - <<'PY'
+          m = 'android/app/src/main/AndroidManifest.xml'
+          s = open(m, encoding='utf-8').read()
+          add = ''
+          if 'android.intent.action.TTS_SERVICE' not in s:
+              add += '        <intent><action android:name="android.intent.action.TTS_SERVICE"/></intent>\n'
+          if 'android.intent.action.VIEW' not in s:
+              add += '        <intent><action android:name="android.intent.action.VIEW"/><data android:scheme="https"/></intent>\n'
+          if add:
+              if '</queries>' in s:
+                  s = s.replace('</queries>', add + '    </queries>', 1)
+              else:
+                  s = s.replace('<application', '    <queries>\n' + add + '    </queries>\n    <application', 1)
+          open(m, 'w', encoding='utf-8').write(s)
+          PY
+          grep -n "queries\|TTS_SERVICE" android/app/src/main/AndroidManifest.xml
+
+      # Ses kaydı: mikrofon izni ve minimum Android sürümü (kayıt eklentisi en az 23 ister)
+      - name: Android ayarları (ses kaydı)
+        run: |
+          python3 - <<'PY'
+          import re, os
+          m = 'android/app/src/main/AndroidManifest.xml'
+          s = open(m, encoding='utf-8').read()
+          if 'RECORD_AUDIO' not in s:
+              s = s.replace('<application', '    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <application', 1)
+          open(m, 'w', encoding='utf-8').write(s)
+          for g in ('android/app/build.gradle.kts', 'android/app/build.gradle'):
+              if not os.path.exists(g):
+                  continue
+              t = open(g, encoding='utf-8').read()
+              t2 = re.sub(r'minSdk(Version)?\s*=?\s*flutter\.minSdkVersion', lambda mo: 'minSdk' + ('Version' if mo.group(1) else '') + (' = 24' if '=' in mo.group(0) else ' 24'), t)
+              if t2 != t:
+                  open(g, 'w', encoding='utf-8').write(t2)
+              break
+          PY
+          grep -n "minSdk\|RECORD_AUDIO" android/app/build.gradle* android/app/src/main/AndroidManifest.xml
+
+      # Her derlemede AYNI imza anahtarı kullanılsın: yeni APK eskisinin üstüne kurulsun.
+      # debug.keystore yoksa derleme bilerek hata verir.
+      - name: Sabit imza anahtarı
+        run: |
+          if [ ! -f debug.keystore ]; then
+            echo "HATA: debug.keystore reponun ana klasorunde yok."
+            exit 1
+          fi
+          mkdir -p ~/.android
+          cp debug.keystore ~/.android/debug.keystore
+          echo "Anahtar kopyalandi."
+
+      - run: flutter pub get
+
+      # Uygulama simgesini üret (hata verirse derleme yine de devam eder)
+      - name: Uygulama simgesi
+        continue-on-error: true
+        run: dart run flutter_launcher_icons
+
+      # --no-shrink: Android kod küçültmesi (R8) kapalı
+      - run: flutter build apk --release --no-shrink
+
+      # Bu satir her derlemede AYNI olmali (SHA-256)
+      - name: Imza parmak izi
+        run: |
+          APKSIGNER=$(ls $ANDROID_HOME/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs build/app/outputs/flutter-apk/app-release.apk | grep "SHA-256" || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gunluk-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
