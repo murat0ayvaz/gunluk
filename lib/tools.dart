@@ -11,6 +11,8 @@ import 'package:just_audio/just_audio.dart' show LoopMode;
 import 'media.dart';
 import 'online.dart';
 import 'podcast.dart';
+import 'reminders.dart' show dtLabel;
+import 'theme.dart' show Pal;
 import 'strings.dart';
 import 'ui.dart';
 
@@ -1591,7 +1593,7 @@ class _MedSounds {
     _ready = true;
     try {
       // Ses odağı istenmez: çalan podcast/müzik duraklamasın
-      const ctx = AudioContext(
+      final ctx = AudioContext(
         android: AudioContextAndroid(audioFocus: AndroidAudioFocus.none),
       );
       await _cue.setAudioContext(ctx);
