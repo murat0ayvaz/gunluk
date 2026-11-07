@@ -146,62 +146,79 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     return '${two(d.day)}.${two(d.month)}.${d.year}';
   }
 
-  /// Ekle paneli: sağ alttaki yuvarlak DR düğmesinden büyüyerek açılır
+  /// Ekle paneli: sağ alttaki DR düğmesinin üstünde, ekranın yarısına kadar açılır.
+  /// DR düğmesi görünür kalır; tekrar basınca panel kapanır.
   void _openAdd() {
     final p = palOf(context);
-    final mq = MediaQuery.of(context);
-    final size = mq.size;
-    // DR düğmesinin merkezi (sağdan 16+28, alttan 16+28)
-    final cx = size.width - 16 - 28;
-    final cy = size.height - 16 - mq.padding.bottom - 28;
-    final from = Alignment((cx - size.width / 2) / (size.width / 2),
-        (cy - size.height / 2) / (size.height / 2));
     final date = dKey(day);
     Navigator.of(context).push(PageRouteBuilder<void>(
       opaque: false,
       barrierDismissible: true,
       barrierLabel: tx('Kapat'),
-      barrierColor: Colors.black45,
-      transitionDuration: const Duration(milliseconds: 380),
-      reverseTransitionDuration: const Duration(milliseconds: 280),
+      barrierColor: Colors.black38,
+      transitionDuration: const Duration(milliseconds: 320),
+      reverseTransitionDuration: const Duration(milliseconds: 240),
       pageBuilder: (ctx, a, b) {
         final m = MediaQuery.of(ctx);
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-              10, m.padding.top + 12, 10, m.padding.bottom + 10),
-          child: Material(
-            color: p.bg,
-            elevation: 10,
-            borderRadius: BorderRadius.circular(28),
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              children: [
-                Container(
-                  margin: const EdgeInsets.only(top: 8, bottom: 2),
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                      color: p.line, borderRadius: BorderRadius.circular(2)),
-                ),
-                Expanded(child: AddSheet(date: date)),
-              ],
-            ),
-          ),
-        );
-      },
-      transitionsBuilder: (ctx, a, b, child) {
-        final c = CurvedAnimation(
+        final kb = m.viewInsets.bottom; // klavye açıksa panel yukarı kayar
+        final keyboard = kb > 0;
+        // DR düğmesinin yüksekliği (56) + kenar boşlukları
+        final btnBottom = 16 + m.padding.bottom;
+        final panelBottom = keyboard ? kb + 8 : btnBottom + 56 + 10;
+        final panelH = keyboard
+            ? (m.size.height - kb - m.padding.top - 20)
+            : m.size.height * 0.5;
+        final scale = CurvedAnimation(
             parent: a,
             curve: Curves.easeOutCubic,
             reverseCurve: Curves.easeInCubic);
-        final fade = CurvedAnimation(
-            parent: a,
-            curve: const Interval(0.2, 1.0, curve: Curves.easeOut),
-            reverseCurve: const Interval(0.0, 0.7));
-        return ScaleTransition(
-          scale: c,
-          alignment: from,
-          child: FadeTransition(opacity: fade, child: child),
+        return Stack(
+          children: [
+            Positioned(
+              left: 10,
+              right: 10,
+              bottom: panelBottom,
+              height: panelH,
+              child: ScaleTransition(
+                scale: scale,
+                alignment: Alignment.bottomRight,
+                child: FadeTransition(
+                  opacity: scale,
+                  child: Material(
+                    color: p.bg,
+                    elevation: 10,
+                    borderRadius: BorderRadius.circular(24),
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      children: [
+                        Container(
+                          margin: const EdgeInsets.only(top: 8, bottom: 2),
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                              color: p.line,
+                              borderRadius: BorderRadius.circular(2)),
+                        ),
+                        Expanded(child: AddSheet(date: date)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // DR düğmesi panelin altında görünür kalır; basınca panel kapanır
+            if (!keyboard)
+              Positioned(
+                right: 16,
+                bottom: btnBottom,
+                child: _CornerBtn(
+                  letter: 'DR',
+                  tooltip: 'Daily Routine',
+                  active: true,
+                  onTap: () => Navigator.of(ctx).pop(),
+                ),
+              ),
+          ],
         );
       },
     ));

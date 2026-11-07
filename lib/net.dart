@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+import 'package:crypto/crypto.dart' show sha1;
 
 // ---------------------------------------------------------------
 // İNTERNET YARDIMCILARI (ek paket yok, dart:io ile)
@@ -165,6 +166,101 @@ Future<List<PodResult>> podSearch(String term, {bool turkey = true}) async {
   return out;
 }
 
+// ---------- Diğer podcast kaynakları ----------
+
+/// Podcast Index (ücretsiz anahtar + gizli anahtar ister)
+Future<List<PodResult>> podSearchIdx(String term, String key, String secret) async {
+  final ts = (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString();
+  final auth = sha1.convert(utf8.encode('$key$secret$ts')).toString();
+  final data = await httpGetJson(
+      Uri.https('api.podcastindex.org', '/api/1.0/search/byterm',
+          {'q': term.trim(), 'max': '25'}),
+      headers: {'X-Auth-Date': ts, 'X-Auth-Key': key, 'Authorization': auth},
+      ua: 'DailyRoutine/1.0');
+  final out = <PodResult>[];
+  final list = (data is Map ? data['feeds'] : null) as List? ?? [];
+  for (final e in list) {
+    final m = e as Map;
+    final feed = (m['url'] ?? '').toString();
+    final title = (m['title'] ?? '').toString();
+    if (feed.isEmpty || title.isEmpty) continue;
+    final art = (m['artwork'] ?? m['image'] ?? '').toString();
+    out.add(PodResult(title, (m['author'] ?? '').toString(), feed, art));
+  }
+  return out;
+}
+
+/// Spreaker (anahtarsız): programın RSS adresi program numarasından üretilir
+Future<List<PodResult>> podSearchSpreaker(String term) async {
+  final data = await httpGetJson(Uri.https('api.spreaker.com', '/v2/search',
+      {'type': 'shows', 'q': term.trim(), 'limit': '25'}));
+  final out = <PodResult>[];
+  final items = (((data is Map ? data['response'] : null) as Map?)?['items'])
+          as List? ??
+      [];
+  for (final e in items) {
+    final m = e as Map;
+    final id = m['show_id'];
+    final title = (m['title'] ?? '').toString();
+    if (id == null || title.isEmpty) continue;
+    final author = ((m['author'] as Map?)?['fullname'] ?? '').toString();
+    out.add(PodResult(title, author,
+        'https://www.spreaker.com/show/$id/episodes.rss',
+        (m['image_url'] ?? '').toString()));
+  }
+  return out;
+}
+
+/// Internet Archive (anahtarsız): ses koleksiyonları. Adres "archive:<kimlik>" olarak tutulur
+Future<List<PodResult>> podSearchArchive(String term) async {
+  final data = await httpGetJson(Uri.https('archive.org', '/advancedsearch.php', {
+    'q': '(${term.trim()}) AND mediatype:(audio)',
+    'fl[]': ['identifier', 'title', 'creator'],
+    'sort[]': 'downloads desc',
+    'rows': '25',
+    'output': 'json',
+  }));
+  final out = <PodResult>[];
+  final docs = (((data is Map ? data['response'] : null) as Map?)?['docs'])
+          as List? ??
+      [];
+  for (final e in docs) {
+    final m = e as Map;
+    final id = (m['identifier'] ?? '').toString();
+    final t = m['title'];
+    final title = t is List ? (t.isEmpty ? '' : '${t.first}') : (t ?? '').toString();
+    if (id.isEmpty || title.isEmpty) continue;
+    final c = m['creator'];
+    final author = c is List ? (c.isEmpty ? '' : '${c.first}') : (c ?? '').toString();
+    out.add(PodResult(title, author, 'archive:$id',
+        'https://archive.org/services/img/$id'));
+  }
+  return out;
+}
+
+/// RSS adresinden podcast adını / kapağını okur ("RSS adresiyle ekle")
+Future<PodResult> podFeedInfo(String url) async {
+  var u = url.trim();
+  if (!u.startsWith('http')) u = 'https://$u';
+  final xml = await httpGetText(Uri.parse(u), maxBytes: 3000000);
+  final head = xml.split(RegExp(r'<item[\s>]')).first;
+  final title = _tag(head, 'title');
+  if (title.isEmpty || !xml.contains('<item')) {
+    throw Exception('rss değil');
+  }
+  var art = '';
+  final im = RegExp(r'''<itunes:image\b[^>]*?\bhref\s*=\s*["']([^"']+)["']''',
+          caseSensitive: false)
+      .firstMatch(head);
+  if (im != null) {
+    art = _decode(im.group(1)!);
+  } else {
+    final ui = RegExp(r'<image>.*?<url>(.*?)</url>', dotAll: true).firstMatch(head);
+    if (ui != null) art = _decode(ui.group(1)!);
+  }
+  return PodResult(title, _tag(head, 'itunes:author'), u, art);
+}
+
 // ---------- Podcast RSS ----------
 
 class Episode {
@@ -222,6 +318,7 @@ String _durText(String d) {
 
 /// Podcast RSS'inden bölümleri okur (en yeni en üstte, en çok 150)
 Future<List<Episode>> fetchEpisodes(String podId, String feed) async {
+  if (feed.startsWith('archive:')) return _archiveEpisodes(podId, feed.substring(8));
   final xml = await httpGetText(Uri.parse(feed), maxBytes: 8000000);
   final out = <Episode>[];
   final items = RegExp(r'<item[\s>].*?</item>', dotAll: true).allMatches(xml);
@@ -238,6 +335,34 @@ Future<List<Episode>> fetchEpisodes(String podId, String feed) async {
     if (title.isEmpty) title = url;
     out.add(Episode('$podId|$url', title, url,
         _shortDate(_tag(s, 'pubDate')), _durText(_tag(s, 'itunes:duration'))));
+  }
+  return out;
+}
+
+/// Internet Archive koleksiyonundaki ses dosyalarını bölüm olarak listeler
+Future<List<Episode>> _archiveEpisodes(String podId, String id) async {
+  final j = await httpGetJson(Uri.https('archive.org', '/metadata/$id'));
+  final files = ((j is Map ? j['files'] : null) as List?) ?? [];
+  final out = <Episode>[];
+  for (final e in files) {
+    if (out.length >= 150) break;
+    final m = e as Map;
+    final name = (m['name'] ?? '').toString();
+    final fmt = (m['format'] ?? '').toString().toLowerCase();
+    final low = name.toLowerCase();
+    final isAudio = fmt.contains('mp3') ||
+        low.endsWith('.mp3') ||
+        low.endsWith('.m4a') ||
+        low.endsWith('.ogg');
+    if (!isAudio || (m['source'] ?? '') == 'derivative' && !fmt.contains('mp3')) {
+      continue;
+    }
+    final url = Uri.https('archive.org', '/download/$id/$name').toString();
+    final t = (m['title'] ?? '').toString();
+    var dur = (m['length'] ?? '').toString();
+    final secs = double.tryParse(dur);
+    if (secs != null) dur = _durText(secs.round().toString());
+    out.add(Episode('$podId|$url', t.isEmpty ? name : t, url, '', dur));
   }
   return out;
 }
@@ -877,4 +1002,459 @@ Future<WeatherData> _fetchMgm(double lat, double lon, String place) async {
   }
   if (days.isEmpty && hours.isEmpty) throw WxError('mgm', 'veri', 'boş');
   return WeatherData(days, hours, nowT, nowC);
+}
+
+// ===============================================================
+// AYRINTILI HAVA: birden fazla kaynaktan nem, rüzgar, basınç, yağış,
+// hissedilen, UV, görüş. Kaynakta olmayan değer boş kalır (tahmin yok);
+// her değerin hangi kaynaktan geldiği yazılır.
+// ===============================================================
+
+/// Bir zaman dilimi (şimdi / saat / gün) için değerler: alan -> sayı, alan -> kaynak
+/// Alanlar: temp feels hum wind gust dir press rain pop uv vis cloud tmin tmax
+class WxPt {
+  final DateTime t;
+  final Map<String, double> v = {};
+  final Map<String, String> s = {};
+  int? code;
+  String? codeSrc;
+  WxPt(this.t);
+
+  void put(String k, double? x, String src) {
+    if (x == null || x.isNaN) return;
+    v[k] = x;
+    s[k] = src;
+  }
+
+  void putCode(int? c, String src) {
+    if (c == null) return;
+    code = c;
+    codeSrc = src;
+  }
+
+  /// Bu noktada olmayan alanları diğerinden doldurur (kaynak adıyla birlikte)
+  void fillFrom(WxPt o) {
+    o.v.forEach((k, x) {
+      if (!v.containsKey(k)) {
+        v[k] = x;
+        s[k] = o.s[k] ?? '';
+      }
+    });
+    if (code == null && o.code != null) {
+      code = o.code;
+      codeSrc = o.codeSrc;
+    }
+  }
+}
+
+class WxDetail {
+  WxPt? now;
+  List<WxPt> hourly = [];
+  List<WxPt> daily = [];
+  final List<String> used = []; // veri alınan kaynaklar
+  final List<String> notes = []; // alınamayan kaynaklar ve nedenleri
+}
+
+String _hKey(DateTime t) => '${_dk(t)}T${_two(t.hour)}';
+
+List? _ar(Map m, String k) => m[k] is List ? m[k] as List : null;
+double? _at(List? l, int i) => (l == null || i >= l.length) ? null : _d(l[i]);
+
+DateTime? _naive(String s) => DateTime.tryParse(s.length == 16 ? '$s:00' : s);
+
+// ---------- Open-Meteo (ve modelleri) ----------
+Future<WxDetail> _detOm(double lat, double lon, String model, String name) async {
+  final q = <String, String>{
+    'latitude': lat.toStringAsFixed(4),
+    'longitude': lon.toStringAsFixed(4),
+    'current':
+        'temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl,precipitation,weather_code,uv_index,visibility,cloud_cover',
+    'hourly':
+        'temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl,precipitation,precipitation_probability,uv_index,visibility,weather_code,cloud_cover',
+    'daily':
+        'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,uv_index_max',
+    'timezone': 'auto',
+    'forecast_days': '16',
+  };
+  if (model.isNotEmpty) q['models'] = model;
+  final m = await httpGetJson(
+      Uri.https('api.open-meteo.com', '/v1/forecast', q)) as Map;
+  final out = WxDetail();
+
+  final c = m['current'] as Map?;
+  if (c != null) {
+    final t = _naive((c['time'] ?? '').toString()) ?? DateTime.now();
+    final p = WxPt(t);
+    p.put('temp', _d(c['temperature_2m']), name);
+    p.put('feels', _d(c['apparent_temperature']), name);
+    p.put('hum', _d(c['relative_humidity_2m']), name);
+    p.put('wind', _d(c['wind_speed_10m']), name);
+    p.put('dir', _d(c['wind_direction_10m']), name);
+    p.put('gust', _d(c['wind_gusts_10m']), name);
+    p.put('press', _d(c['pressure_msl']), name);
+    p.put('rain', _d(c['precipitation']), name);
+    p.put('uv', _d(c['uv_index']), name);
+    final vis = _d(c['visibility']);
+    p.put('vis', vis == null ? null : vis / 1000, name);
+    p.put('cloud', _d(c['cloud_cover']), name);
+    p.putCode(c['weather_code'] is num ? _i(c['weather_code']) : null, name);
+    out.now = p;
+  }
+
+  final h = m['hourly'] as Map?;
+  if (h != null) {
+    final ts = _ar(h, 'time') ?? [];
+    for (var i = 0; i < ts.length; i++) {
+      final t = _naive(ts[i].toString());
+      if (t == null) continue;
+      final p = WxPt(t);
+      p.put('temp', _at(_ar(h, 'temperature_2m'), i), name);
+      p.put('feels', _at(_ar(h, 'apparent_temperature'), i), name);
+      p.put('hum', _at(_ar(h, 'relative_humidity_2m'), i), name);
+      p.put('wind', _at(_ar(h, 'wind_speed_10m'), i), name);
+      p.put('dir', _at(_ar(h, 'wind_direction_10m'), i), name);
+      p.put('gust', _at(_ar(h, 'wind_gusts_10m'), i), name);
+      p.put('press', _at(_ar(h, 'pressure_msl'), i), name);
+      p.put('rain', _at(_ar(h, 'precipitation'), i), name);
+      p.put('pop', _at(_ar(h, 'precipitation_probability'), i), name);
+      p.put('uv', _at(_ar(h, 'uv_index'), i), name);
+      final vis = _at(_ar(h, 'visibility'), i);
+      p.put('vis', vis == null ? null : vis / 1000, name);
+      p.put('cloud', _at(_ar(h, 'cloud_cover'), i), name);
+      final cd = _at(_ar(h, 'weather_code'), i);
+      p.putCode(cd?.round(), name);
+      if (p.v.containsKey('temp')) out.hourly.add(p);
+    }
+  }
+
+  final d = m['daily'] as Map?;
+  if (d != null) {
+    final ts = _ar(d, 'time') ?? [];
+    for (var i = 0; i < ts.length; i++) {
+      final t = _naive(ts[i].toString());
+      if (t == null) continue;
+      final p = WxPt(t);
+      p.put('tmax', _at(_ar(d, 'temperature_2m_max'), i), name);
+      p.put('tmin', _at(_ar(d, 'temperature_2m_min'), i), name);
+      p.put('rain', _at(_ar(d, 'precipitation_sum'), i), name);
+      p.put('pop', _at(_ar(d, 'precipitation_probability_max'), i), name);
+      p.put('wind', _at(_ar(d, 'wind_speed_10m_max'), i), name);
+      p.put('gust', _at(_ar(d, 'wind_gusts_10m_max'), i), name);
+      p.put('uv', _at(_ar(d, 'uv_index_max'), i), name);
+      p.putCode(_at(_ar(d, 'weather_code'), i)?.round(), name);
+      if (p.v.containsKey('tmax') || p.v.containsKey('tmin')) out.daily.add(p);
+    }
+  }
+  if (out.now == null && out.hourly.isEmpty && out.daily.isEmpty) {
+    throw WxError('om', 'veri', 'boş');
+  }
+  out.used.add(name);
+  return out;
+}
+
+// ---------- MET Norway ----------
+Future<WxDetail> _detMet(double lat, double lon) async {
+  const name = 'MET Norway';
+  final j = await httpGetJson(
+      Uri.https('api.met.no', '/weatherapi/locationforecast/2.0/compact', {
+        'lat': lat.toStringAsFixed(4),
+        'lon': lon.toStringAsFixed(4),
+      }),
+      ua: 'DailyRoutine/1.15 github.com/murat0ayvaz/gunluk');
+  final ts = (((j as Map)['properties'] as Map?)?['timeseries'] as List?) ?? [];
+  final out = WxDetail();
+  final dayAgg = <String, List<WxPt>>{};
+  for (final e in ts) {
+    final m = e as Map;
+    final t = DateTime.tryParse((m['time'] ?? '').toString())?.toLocal();
+    final data = m['data'] as Map?;
+    if (t == null || data == null) continue;
+    final inst = (data['instant'] as Map?)?['details'] as Map?;
+    if (inst == null) continue;
+    final p = WxPt(t);
+    p.put('temp', _d(inst['air_temperature']), name);
+    p.put('hum', _d(inst['relative_humidity']), name);
+    final ws = _d(inst['wind_speed']);
+    p.put('wind', ws == null ? null : ws * 3.6, name); // m/s -> km/sa
+    final wg = _d(inst['wind_speed_of_gust']);
+    p.put('gust', wg == null ? null : wg * 3.6, name);
+    p.put('dir', _d(inst['wind_from_direction']), name);
+    p.put('press', _d(inst['air_pressure_at_sea_level']), name);
+    p.put('cloud', _d(inst['cloud_area_fraction']), name);
+    final n1 = data['next_1_hours'] as Map?;
+    if (n1 != null) {
+      p.put('rain', _d((n1['details'] as Map?)?['precipitation_amount']), name);
+      final sym = ((n1['summary'] as Map?)?['symbol_code'] ?? '').toString();
+      if (sym.isNotEmpty) p.putCode(_metCode(sym), name);
+    }
+    if (!p.v.containsKey('temp')) continue;
+    // Saatlik tablo: ilk saatlik bölüm (sonrası 6 saatlik, yağış anlamı değişir)
+    if (n1 != null || out.hourly.length < 60) out.hourly.add(p);
+    (dayAgg[_dk(t)] ??= []).add(p);
+  }
+  if (out.hourly.isNotEmpty) out.now = out.hourly.first;
+  dayAgg.forEach((k, l) {
+    final t = DateTime.tryParse(k);
+    if (t == null || l.isEmpty) return;
+    final p = WxPt(t);
+    var hi = l.first.v['temp']!;
+    var lo = hi;
+    var wmax = 0.0;
+    var gmax = 0.0;
+    for (final x in l) {
+      final tv = x.v['temp'];
+      if (tv != null) {
+        if (tv > hi) hi = tv;
+        if (tv < lo) lo = tv;
+      }
+      final w = x.v['wind'];
+      if (w != null && w > wmax) wmax = w;
+      final g = x.v['gust'];
+      if (g != null && g > gmax) gmax = g;
+    }
+    p.put('tmax', hi, name);
+    p.put('tmin', lo, name);
+    if (wmax > 0) p.put('wind', wmax, name);
+    if (gmax > 0) p.put('gust', gmax, name);
+    // gün ortası koduna en yakın sembol
+    WxPt? mid;
+    for (final x in l) {
+      if (x.code == null) continue;
+      if (mid == null || (x.t.hour - 12).abs() < (mid.t.hour - 12).abs()) mid = x;
+    }
+    p.putCode(mid?.code, name);
+    out.daily.add(p);
+  });
+  out.daily.sort((a, b) => a.t.compareTo(b.t));
+  if (out.hourly.isEmpty) throw WxError('met', 'veri', 'boş');
+  out.used.add(name);
+  return out;
+}
+
+// ---------- MGM ----------
+double? _pick(Map? m, List<String> keys) {
+  if (m == null) return null;
+  for (final k in keys) {
+    final x = _d(m[k]);
+    if (x != null && x > -90) return x;
+  }
+  return null;
+}
+
+Future<WxDetail> _detMgm(double lat, double lon, String place) async {
+  const name = 'MGM';
+  final c = await _mgmStation(lat, lon, place);
+  final mid = c['merkezId'];
+  final hIst = c['saatlikTahminIstNo'] ?? mid;
+  final gIst = c['gunlukTahminIstNo'] ?? mid;
+  final out = WxDetail();
+
+  // Saatlik (3 saatlik): MGM'nin verdiği haliyle
+  try {
+    final hj = await _mgmGet('/web/tahminler/saatlik', {'istno': '$hIst'});
+    final tahmin = (_first(hj)?['tahmin'] as List?) ?? [];
+    for (final e in tahmin) {
+      final m = e as Map;
+      final t = DateTime.tryParse((m['tarih'] ?? '').toString())?.toLocal();
+      if (t == null) continue;
+      final p = WxPt(t);
+      p.put('temp', _pick(m, ['sicaklik']), name);
+      p.put('feels', _pick(m, ['hissedilenSicaklik']), name);
+      p.put('hum', _pick(m, ['nem']), name);
+      p.put('wind', _pick(m, ['ruzgarHizi', 'ruzgarHiz']), name);
+      p.put('gust', _pick(m, ['maksimumRuzgarHizi']), name);
+      p.put('dir', _pick(m, ['ruzgarYonu', 'ruzgarYon']), name);
+      final hd = (m['hadise'] ?? '').toString();
+      if (hd.isNotEmpty) p.putCode(_mgmCode(hd), name);
+      if (p.v.containsKey('temp')) out.hourly.add(p);
+    }
+  } catch (_) {}
+
+  // Günlük (5 gün)
+  try {
+    final g = _first(await _mgmGet('/web/tahminler/gunluk', {'istno': '$gIst'}));
+    if (g != null) {
+      final today = DateTime.now();
+      for (var n = 1; n <= 5; n++) {
+        final hi = _d(g['enYuksekGun$n']);
+        final lo = _d(g['enDusukGun$n']);
+        if (hi == null || lo == null) continue;
+        final raw = (g['tarihGun$n'] ?? '').toString();
+        final t = (raw.length >= 10 ? DateTime.tryParse(raw.substring(0, 10)) : null) ??
+            DateTime(today.year, today.month, today.day + n - 1);
+        final p = WxPt(t);
+        p.put('tmax', hi, name);
+        p.put('tmin', lo, name);
+        p.put('wind', _pick(g, ['ruzgarHizGun$n']), name);
+        p.put('dir', _pick(g, ['ruzgarYonGun$n']), name);
+        p.putCode(_mgmCode((g['hadiseGun$n'] ?? '').toString()), name);
+        out.daily.add(p);
+      }
+    }
+  } catch (_) {}
+
+  // Şimdi: en son ölçüm
+  try {
+    final s = _first(await _mgmGet('/web/sondurumlar', {'merkezid': '$mid'}));
+    if (s != null) {
+      final p = WxPt(DateTime.now());
+      p.put('temp', _pick(s, ['sicaklik']), name);
+      p.put('feels', _pick(s, ['hissedilenSicaklik']), name);
+      p.put('hum', _pick(s, ['nem']), name);
+      p.put('wind', _pick(s, ['ruzgarHiz', 'ruzgarHizi']), name);
+      p.put('dir', _pick(s, ['ruzgarYon', 'ruzgarYonu']), name);
+      p.put('press', _pick(s, ['aktuelBasinc', 'denizeIndirgenmisBasinc']), name);
+      p.put('rain', _pick(s, ['yagis00Now', 'toplamYagis']), name);
+      final vis = _pick(s, ['gorus']);
+      // MGM görüş değeri metre olabilir: büyükse km'ye çevir
+      p.put('vis', vis == null ? null : (vis > 100 ? vis / 1000 : vis), name);
+      final hd = (s['hadiseKodu'] ?? s['hadise'] ?? '').toString();
+      if (hd.isNotEmpty) p.putCode(_mgmCode(hd), name);
+      if (p.v.isNotEmpty) out.now = p;
+    }
+  } catch (_) {}
+  if (out.now == null && out.hourly.isNotEmpty) out.now = out.hourly.first;
+  if (out.now == null && out.hourly.isEmpty && out.daily.isEmpty) {
+    throw WxError('mgm', 'veri', 'boş');
+  }
+  out.used.add(name);
+  return out;
+}
+
+/// Kaynak anahtarı: auto (birleşik), mgm, om, ecmwf, icon, gfs, met
+Future<WxDetail> fetchWxDetail(String src, double lat, double lon,
+    {String place = ''}) async {
+  Future<WxDetail> one(String k) {
+    switch (k) {
+      case 'mgm':
+        return _detMgm(lat, lon, place);
+      case 'met':
+        return _detMet(lat, lon);
+      case 'ecmwf':
+        return _detOm(lat, lon, 'ecmwf_ifs025', 'ECMWF');
+      case 'icon':
+        return _detOm(lat, lon, 'icon_seamless', 'ICON');
+      case 'gfs':
+        return _detOm(lat, lon, 'gfs_seamless', 'GFS');
+      default:
+        return _detOm(lat, lon, '', 'Open-Meteo');
+    }
+  }
+
+  if (src != 'auto') return one(src);
+
+  // Birleşik: MGM (varsa) + Open-Meteo + MET; önceliğe göre eksikler doldurulur
+  const order = ['mgm', 'om', 'met'];
+  final names = {'mgm': 'MGM', 'om': 'Open-Meteo', 'met': 'MET Norway'};
+  final res = await Future.wait(order.map((k) async {
+    try {
+      return await one(k);
+    } catch (e) {
+      final t = e.toString();
+      final d = WxDetail();
+      d.notes.add('${names[k]}: ${t.length > 50 ? t.substring(0, 50) : t}');
+      return d;
+    }
+  }));
+  final ok = res.where((d) => d.used.isNotEmpty).toList();
+  final out = WxDetail();
+  for (final d in res) {
+    out.notes.addAll(d.notes);
+  }
+  if (ok.isEmpty) throw WxError('auto', 'veri', out.notes.join(' | '));
+  for (final d in ok) {
+    out.used.addAll(d.used);
+  }
+
+  // Şimdi
+  for (final d in ok) {
+    final n = d.now;
+    if (n == null) continue;
+    if (out.now == null) {
+      out.now = WxPt(n.t)..fillFrom(n);
+    } else {
+      out.now!.fillFrom(n);
+    }
+  }
+  // Saatlik: ilk kaynağın saatleri esas; aynı saatteki diğer kaynak değerleri eksikleri doldurur
+  final base = ok.firstWhere((d) => d.hourly.isNotEmpty, orElse: () => ok.first);
+  for (final bp in base.hourly) {
+    final p = WxPt(bp.t)..fillFrom(bp);
+    for (final d in ok) {
+      if (identical(d, base)) continue;
+      for (final o in d.hourly) {
+        if (_hKey(o.t) == _hKey(bp.t)) {
+          p.fillFrom(o);
+          break;
+        }
+      }
+    }
+    out.hourly.add(p);
+  }
+  // Günlük: tüm günlerin birleşimi; aynı günün eksik alanları sıradaki kaynaktan
+  final days = <String, WxPt>{};
+  for (final d in ok) {
+    for (final o in d.daily) {
+      final k = _dk(o.t);
+      final ex = days[k];
+      if (ex == null) {
+        days[k] = WxPt(DateTime(o.t.year, o.t.month, o.t.day))..fillFrom(o);
+      } else {
+        ex.fillFrom(o);
+      }
+    }
+  }
+  out.daily = days.values.toList()..sort((a, b) => a.t.compareTo(b.t));
+  return out;
+}
+
+// ---------- Deniz durumu (Open-Meteo Marine) ----------
+class WxMarine {
+  final WxPt? now;
+  final List<WxPt> daily;
+  WxMarine(this.now, this.daily);
+}
+
+/// Kıyıdan uzaksa servis veri vermez: null döner
+Future<WxMarine?> fetchMarine(double lat, double lon) async {
+  final j = await httpGetJson(
+      Uri.https('marine-api.open-meteo.com', '/v1/marine', {
+    'latitude': lat.toStringAsFixed(4),
+    'longitude': lon.toStringAsFixed(4),
+    'current':
+        'wave_height,wave_direction,wave_period,sea_surface_temperature,swell_wave_height',
+    'daily':
+        'wave_height_max,wave_direction_dominant,wave_period_max,swell_wave_height_max',
+    'timezone': 'auto',
+    'forecast_days': '7',
+  })) as Map;
+  const name = 'Open-Meteo';
+  WxPt? now;
+  final c = j['current'] as Map?;
+  if (c != null) {
+    final p = WxPt(_naive((c['time'] ?? '').toString()) ?? DateTime.now());
+    p.put('wave', _d(c['wave_height']), name);
+    p.put('wdir', _d(c['wave_direction']), name);
+    p.put('wper', _d(c['wave_period']), name);
+    p.put('sst', _d(c['sea_surface_temperature']), name);
+    p.put('swell', _d(c['swell_wave_height']), name);
+    if (p.v.isNotEmpty) now = p;
+  }
+  final daily = <WxPt>[];
+  final d = j['daily'] as Map?;
+  if (d != null) {
+    final ts = _ar(d, 'time') ?? [];
+    for (var i = 0; i < ts.length; i++) {
+      final t = _naive(ts[i].toString());
+      if (t == null) continue;
+      final p = WxPt(t);
+      p.put('wave', _at(_ar(d, 'wave_height_max'), i), name);
+      p.put('wdir', _at(_ar(d, 'wave_direction_dominant'), i), name);
+      p.put('wper', _at(_ar(d, 'wave_period_max'), i), name);
+      p.put('swell', _at(_ar(d, 'swell_wave_height_max'), i), name);
+      if (p.v.isNotEmpty) daily.add(p);
+    }
+  }
+  if (now == null && daily.isEmpty) return null;
+  return WxMarine(now, daily);
 }

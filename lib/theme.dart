@@ -5,18 +5,45 @@ import 'package:flutter/material.dart';
 // ---------------------------------------------------------------
 
 /// Tema menüsünden seçilebilen pastel vurgu renkleri
-const accentNames = ['Mavi', 'Yeşil', 'Lavanta', 'Pembe', 'Şeftali'];
+const accentNames = [
+  'Mavi',
+  'Yeşil',
+  'Lavanta',
+  'Pembe',
+  'Şeftali',
+  'Turkuaz',
+  'Nane',
+  'Limon',
+  'Mercan',
+  'Gül',
+  'Mor',
+  'Gök',
+];
 const accentColors = <Color>[
   Color(0xFF9CC3EC), // pastel mavi
   Color(0xFFA6D4B0), // pastel yeşil
   Color(0xFFC3B3EA), // lavanta
   Color(0xFFF0B3C8), // pastel pembe
   Color(0xFFF3C29C), // şeftali
+  Color(0xFF8FD3D0), // turkuaz
+  Color(0xFFB5E3C4), // nane
+  Color(0xFFEBDD8E), // limon
+  Color(0xFFF2A99B), // mercan
+  Color(0xFFE59AB0), // gül
+  Color(0xFFA98FD9), // mor
+  Color(0xFF8FB8E8), // gök
 ];
+
+/// Renk skalasından seçilen özel vurgu rengi (accent == -1 iken kullanılır)
+Color customAccent = const Color(0xFF9CC3EC);
+
+/// Seçili vurgunun ham rengi: -1 = özel (skala), diğerleri hazır renkler
+Color accentBase(int i) =>
+    (i < 0 || i >= accentColors.length) ? customAccent : accentColors[i];
 
 /// Koyu temada vurgu rengi biraz sönükleştirilir (göz yormasın diye)
 Color accentFor(int i, bool dark) {
-  final c = accentColors[i];
+  final c = accentBase(i);
   return dark ? Color.lerp(c, const Color(0xFF1F2125), 0.3)! : c;
 }
 
@@ -50,10 +77,10 @@ ThemeData buildTheme(Brightness b, int accent) {
   // Metin düğmeleri / anahtarlar için biraz daha koyu vurgu (okunabilirlik)
   final strong = dark
       ? pal.accent
-      : Color.lerp(accentColors[accent], Colors.black, 0.45)!;
+      : Color.lerp(accentBase(accent), Colors.black, 0.45)!;
 
   final scheme = ColorScheme.fromSeed(
-    seedColor: accentColors[accent],
+    seedColor: accentBase(accent),
     brightness: b,
   ).copyWith(
     surface: pal.bg,
@@ -74,10 +101,10 @@ ThemeData buildTheme(Brightness b, int accent) {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     ),
-    // Alt bildirimler: sağ alttaki DR düğmesinin üstüne binmesin
+    // Alt bildirimler: tam genişlik
     snackBarTheme: const SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      insetPadding: EdgeInsets.fromLTRB(12, 0, 84, 12),
+      insetPadding: EdgeInsets.fromLTRB(12, 0, 12, 12),
     ),
     chipTheme: ChipThemeData(
       backgroundColor: pal.card,

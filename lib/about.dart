@@ -10,9 +10,11 @@ import 'version.dart';
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
       tx('Verilerin korundu.'),
-      tx('Meditasyon: nefes sesleri, gong, oynatıcı, online müzik, kayıt listesi ve notlar.'),
-      tx('Ana ekranda tek "Rutinler" başlığı; aşağı çekince ekran ilk haline döner.'),
-      tx('Tebrikler ekranı daha sade; "Geri al" bildirimi kendiliğinden kapanır.'),
+      tx('Ayrıntılı hava (Araçlar): günlük, haftalık, 15 günlük; nem, rüzgar, basınç, UV, görüş ve deniz durumu. Kaynak adı yazar.'),
+      tx('Podcast, Spreaker, Internet Archive ve RSS ile bul; radyo ve podcast için yıldızlı favoriler.'),
+      tx('DR paneli ekranın yarısına kadar açılır; Ayarlar\'da renk skalası.'),
+      tx('Pomodoro süreleri ayarlanır, gong ve titreşim uyarısı; su sayacında ml girişi.'),
+      tx('Nefes sesi hava sesi oldu; Nefes aracında da ses ve titreşim. Müzikte Tekrar/Karışık.'),
     ];
 
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {

@@ -6,7 +6,7 @@ import 'strings.dart';
 // ---------------------------------------------------------------
 // KUTLAMA: tüm hedefler tamamlanınca ~5,5 saniye oynar.
 // Havai fişek (iz bırakan parçacıklar) + konfeti yağmuru +
-// ortada sade "Tebrikler" yazısı ve gaz verici bir cümle + hafif titreşim.
+// ortada sade "Tebrikler" yazısı ve gaz verici bir cümle + patlamalarla eşleşen güçlü titreşim.
 // Dokunuşları engellemez. Eklenti kullanmaz (kendi çizimi).
 // ---------------------------------------------------------------
 class _Spark {
@@ -110,13 +110,19 @@ class _FireworksOverlayState extends State<FireworksOverlay>
   @override
   void initState() {
     super.initState();
-    HapticFeedback.mediumImpact();
-    Future.delayed(const Duration(milliseconds: 280), () {
-      HapticFeedback.lightImpact();
-    });
-    Future.delayed(const Duration(milliseconds: 700), () {
-      HapticFeedback.lightImpact();
-    });
+    // Güçlü titreşim: başlangıçta ağır, sonra her havai fişek patlamasıyla eşleşen vuruşlar
+    HapticFeedback.heavyImpact();
+    for (var i = 0; i < _bursts.length; i++) {
+      final ms = (_bursts[i].start * 5500).round() + 150;
+      Future.delayed(Duration(milliseconds: ms), () {
+        if (!mounted) return;
+        if (i % 3 == 0) {
+          HapticFeedback.heavyImpact();
+        } else {
+          HapticFeedback.mediumImpact();
+        }
+      });
+    }
     _c.forward().whenComplete(() {
       if (mounted) widget.onDone?.call();
     });

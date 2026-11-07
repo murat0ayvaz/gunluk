@@ -184,6 +184,8 @@ class SettingsPage extends StatelessWidget {
                     ),
                 ],
               ),
+              const SizedBox(height: 14),
+              _ColorScale(key: ValueKey(store.accent)),
 
               // ----- Özlü sözler -----
               title(tx('Özlü sözler')),
@@ -640,6 +642,136 @@ class _RestoreDialogState extends State<_RestoreDialog> {
             child: Text(tx('Vazgeç'))),
         FilledButton(onPressed: _ok, child: Text(tx('Geri yükle'))),
       ],
+    );
+  }
+}
+
+
+// ---------------------------------------------------------------
+// RENK SKALASI: ton (renk), doygunluk ve parlaklık kaydırıcılarıyla
+// istenen vurgu rengi seçilir. "Uygula" ile kaydedilir.
+// ---------------------------------------------------------------
+class _ColorScale extends StatefulWidget {
+  const _ColorScale({super.key});
+
+  @override
+  State<_ColorScale> createState() => _ColorScaleState();
+}
+
+class _ColorScaleState extends State<_ColorScale> {
+  late double _h;
+  late double _s;
+  late double _v;
+
+  @override
+  void initState() {
+    super.initState();
+    final hsv = HSVColor.fromColor(accentBase(store.accent));
+    _h = hsv.hue;
+    _s = hsv.saturation;
+    _v = hsv.value;
+  }
+
+  Color get _color => HSVColor.fromAHSV(1, _h, _s, _v).toColor();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palOf(context);
+    final dark = p.dark;
+    // Ton kaydırıcısının gökkuşağı zemini
+    final rainbow = [
+      for (var i = 0; i <= 6; i++)
+        HSVColor.fromAHSV(1, i * 60.0, _s.clamp(0.35, 1.0), 1).toColor(),
+    ];
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: p.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: p.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: dark
+                      ? Color.lerp(_color, const Color(0xFF1F2125), 0.3)
+                      : _color,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                      color: store.accent == -1 ? p.ink : p.line,
+                      width: store.accent == -1 ? 2.5 : 1),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(tx('Renk skalası'),
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700, color: p.ink)),
+              ),
+              FilledButton(
+                onPressed: () => store.setCustomAccent(_color),
+                child: Text(tx('Uygula')),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(tx('Renk'), style: TextStyle(color: p.soft, fontSize: 12)),
+          _track(rainbow, _h, 360, (v) => setState(() => _h = v)),
+          Text(tx('Doygunluk'), style: TextStyle(color: p.soft, fontSize: 12)),
+          _track([
+            HSVColor.fromAHSV(1, _h, 0, _v).toColor(),
+            HSVColor.fromAHSV(1, _h, 1, _v).toColor(),
+          ], _s, 1, (v) => setState(() => _s = v)),
+          Text(tx('Parlaklık'), style: TextStyle(color: p.soft, fontSize: 12)),
+          _track([
+            HSVColor.fromAHSV(1, _h, _s, 0.35).toColor(),
+            HSVColor.fromAHSV(1, _h, _s, 1).toColor(),
+          ], _v, 1, (v) => setState(() => _v = v), min: 0.35),
+        ],
+      ),
+    );
+  }
+
+  /// Renk geçişli çizgi üstünde kaydırıcı
+  Widget _track(List<Color> colors, double value, double max,
+      ValueChanged<double> onChanged,
+      {double min = 0}) {
+    return SizedBox(
+      height: 32,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            height: 10,
+            margin: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(5),
+              gradient: LinearGradient(colors: colors),
+            ),
+          ),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 0,
+              activeTrackColor: Colors.transparent,
+              inactiveTrackColor: Colors.transparent,
+              overlayShape: SliderComponentShape.noOverlay,
+              thumbColor: Colors.white,
+            ),
+            child: Slider(
+              value: value.clamp(min, max),
+              min: min,
+              max: max,
+              onChanged: onChanged,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

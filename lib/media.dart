@@ -31,7 +31,8 @@ Future<void> initAudio() async {
     await JustAudioBackground.init(
       androidNotificationChannelId: 'com.example.gunluk.audio',
       androidNotificationChannelName: 'Daily Routine müzik',
-      androidNotificationOngoing: true,
+      androidNotificationOngoing: false,
+      androidStopForegroundOnPause: true, // duraklatınca bildirim kaydırılıp kapatılabilir
     ).timeout(const Duration(seconds: 5));
   } catch (_) {
     // başlatılamazsa çalar yine çalışır, sadece bildirim kontrolü olmaz
@@ -111,14 +112,19 @@ class MediaCtl extends ChangeNotifier {
 
   void _onCompleted() {
     if (isSong) {
-      if (store.playMode == 2) {
+      if (store.repeatMode == 2) {
         player.seek(Duration.zero);
         player.play();
       } else {
         next(auto: true);
       }
     } else if (isOnline) {
-      nextOnline(auto: true);
+      if (store.repeatMode == 2) {
+        player.seek(Duration.zero);
+        player.play();
+      } else {
+        nextOnline(auto: true);
+      }
     } else if (isPod) {
       final k = podKey;
       if (k != null) {
@@ -219,17 +225,25 @@ class MediaCtl extends ChangeNotifier {
   void nextOnline({bool auto = false, int step = 1}) {
     if (!isOnline || onQueue.isEmpty) return;
     final i = onQueue.indexWhere((x) => x.id == nowId);
-    var n = i + step;
-    if (n >= onQueue.length) {
-      if (auto) {
-        player.pause();
-        player.seek(Duration.zero);
-        notifyListeners();
-        return;
+    int n;
+    if (store.shuffleOn && onQueue.length > 1 && step > 0) {
+      do {
+        n = _rnd.nextInt(onQueue.length);
+      } while (n == i);
+    } else {
+      n = i + step;
+      if (n >= onQueue.length) {
+        // Tekrar kapalıyken liste bitince durur (otomatik geçişte)
+        if (auto && store.repeatMode == 0) {
+          player.pause();
+          player.seek(Duration.zero);
+          notifyListeners();
+          return;
+        }
+        n = 0;
       }
-      n = 0;
+      if (n < 0) n = onQueue.length - 1;
     }
-    if (n < 0) n = onQueue.length - 1;
     playOnline(onQueue, n);
   }
 
@@ -264,17 +278,16 @@ class MediaCtl extends ChangeNotifier {
     if (pl == null || pl.songs.isEmpty) return;
     final l = pl.songs;
     final i = l.indexWhere((s) => s.id == nowId);
-    final mode = store.playMode;
     int n;
-    if (mode == 3 && l.length > 1) {
+    if (store.shuffleOn && l.length > 1) {
       do {
         n = _rnd.nextInt(l.length);
       } while (n == i);
     } else {
       n = i + 1;
       if (n >= l.length) {
-        // Sırayla modunda liste bitince durur
-        if (auto && mode == 0) {
+        // Tekrar kapalıyken liste bitince durur
+        if (auto && store.repeatMode == 0) {
           player.pause();
           player.seek(Duration.zero);
           notifyListeners();
@@ -488,23 +501,20 @@ class MediaPage extends StatelessWidget {
 class NowBar extends StatelessWidget {
   const NowBar({super.key});
 
-  static const _modeIcons = [
-    Icons.playlist_play_rounded,
+  static const _repIcons = [
+    Icons.repeat_rounded,
     Icons.repeat_rounded,
     Icons.repeat_one_rounded,
-    Icons.shuffle_rounded,
   ];
 
-  String _modeName(int m) {
+  String _repName(int m) {
     switch (m) {
       case 1:
-        return tx('Tekrar');
+        return tx('Sürekli tekrar');
       case 2:
-        return tx('Tek şarkı tekrar');
-      case 3:
-        return tx('Karışık');
+        return tx('Tek parça tekrar');
       default:
-        return tx('Sırayla');
+        return tx('Tekrar kapalı');
     }
   }
 
@@ -515,7 +525,8 @@ class NowBar extends StatelessWidget {
       listenable: Listenable.merge([media, store]),
       builder: (context, _) {
         if (media.nowId == null) return const SizedBox.shrink();
-        final mode = store.playMode;
+        final rep = store.repeatMode;
+        final shuf = store.shuffleOn;
         final tone = tagTone(media.nowId ?? '');
         return Container(
           decoration: BoxDecoration(
@@ -592,20 +603,21 @@ class NowBar extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    if (media.isSong)
+                    // Tekrar: Kapalı > Sürekli > 1 tekrar (her basışta döner)
+                    if (media.isSong || media.isOnline)
                       IconButton(
-                        tooltip: _modeName(mode),
+                        tooltip: _repName(rep),
                         onPressed: () {
-                          final nm = (mode + 1) % 4;
-                          store.setPlayMode(nm);
+                          final nr = (rep + 1) % 3;
+                          store.setRepeat(nr);
                           final m = ScaffoldMessenger.of(context);
                           m.clearSnackBars();
                           m.showSnackBar(SnackBar(
                               duration: const Duration(milliseconds: 1200),
-                              content: Text(_modeName(nm))));
+                              content: Text(_repName(nr))));
                         },
-                        icon: Icon(_modeIcons[mode],
-                            color: mode == 0 ? p.soft : p.ink),
+                        icon: Icon(_repIcons[rep],
+                            color: rep == 0 ? p.soft : tone),
                       ),
                     if (media.isSong || media.isOnline)
                       IconButton(
@@ -644,6 +656,13 @@ class NowBar extends StatelessWidget {
                               ? () => media.nextOnline()
                               : media.next,
                           icon: const Icon(Icons.skip_next_rounded, size: 32)),
+                    if (media.isSong || media.isOnline)
+                      IconButton(
+                        tooltip: tx('Karışık'),
+                        onPressed: () => store.setShuffle(!shuf),
+                        icon: Icon(Icons.shuffle_rounded,
+                            color: shuf ? tone : p.soft),
+                      ),
                     if (media.isPod)
                       IconButton(
                           tooltip: tx('30 sn ileri'),

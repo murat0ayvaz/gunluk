@@ -315,14 +315,17 @@ class Station {
   final String id;
   String name;
   String url;
-  Station({required this.id, required this.name, required this.url});
+  bool fav; // favori (yıldız)
+  Station({required this.id, required this.name, required this.url, this.fav = false});
 
-  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'url': url};
+  Map<String, dynamic> toJson() =>
+      {'id': id, 'name': name, 'url': url, 'fav': fav};
 
   factory Station.fromJson(Map<String, dynamic> j) => Station(
         id: j['id'] as String,
         name: (j['name'] ?? '') as String,
         url: (j['url'] ?? '') as String,
+        fav: (j['fav'] ?? false) as bool,
       );
 }
 
@@ -364,13 +367,15 @@ class Podcast {
   String feed; // RSS adresi
   String art; // kapak resmi adresi
   bool open;
+  bool fav; // favori (yıldız)
   Podcast(
       {required this.id,
       required this.title,
       this.author = '',
       required this.feed,
       this.art = '',
-      this.open = false});
+      this.open = false,
+      this.fav = false});
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -379,6 +384,7 @@ class Podcast {
         'feed': feed,
         'art': art,
         'open': open,
+        'fav': fav,
       };
 
   factory Podcast.fromJson(Map<String, dynamic> j) => Podcast(
@@ -388,6 +394,7 @@ class Podcast {
         feed: (j['feed'] ?? '') as String,
         art: (j['art'] ?? '') as String,
         open: (j['open'] ?? false) as bool,
+        fav: (j['fav'] ?? false) as bool,
       );
 }
 
@@ -913,6 +920,30 @@ class AppStore extends ChangeNotifier {
     _commit();
   }
 
+  // Pomodoro ayarları (dakika) ve süre bitiş uyarıları
+  int pomoWork = 25;
+  int pomoShort = 5;
+  int pomoLong = 15;
+  bool pomoSound = true; // süre bitince gong
+  bool pomoVibe = true; // süre bitince titreşim
+
+  void setPomo({int? work, int? short, int? long}) {
+    if (work != null) pomoWork = work.clamp(1, 240).toInt();
+    if (short != null) pomoShort = short.clamp(1, 120).toInt();
+    if (long != null) pomoLong = long.clamp(1, 240).toInt();
+    _commit();
+  }
+
+  void setPomoSound(bool v) {
+    pomoSound = v;
+    _commit();
+  }
+
+  void setPomoVibe(bool v) {
+    pomoVibe = v;
+    _commit();
+  }
+
   void setMedVibe(bool v) {
     medVibe = v;
     _commit();
@@ -1034,7 +1065,8 @@ class AppStore extends ChangeNotifier {
   List<Podcast> get podcasts => [for (final c in podCats) ...c.pods];
   Map<String, int> epPos = {}; // podcast bölümü -> kaldığı yer (ms)
   Set<String> epDone = {}; // bitirilen bölümler
-  int playMode = 0; // 0 sırayla, 1 tekrar, 2 tek şarkı tekrar, 3 karışık
+  int repeatMode = 0; // 0 kapalı, 1 sürekli tekrar (liste), 2 tek parça tekrar
+  bool shuffleOn = false; // karışık çalma
 
   /// Radyo kategorileri hiç yoksa (ilk kurulum) hazır listeyi kurar
   void _mediaDefaults() {
@@ -1090,8 +1122,13 @@ class AppStore extends ChangeNotifier {
     return d;
   }
 
-  void setPlayMode(int m) {
-    playMode = m.clamp(0, 3).toInt();
+  void setRepeat(int m) {
+    repeatMode = m.clamp(0, 2).toInt();
+    _commit();
+  }
+
+  void setShuffle(bool v) {
+    shuffleOn = v;
     _commit();
   }
 
@@ -1390,6 +1427,33 @@ class AppStore extends ChangeNotifier {
     _commit();
   }
 
+  /// Favori yıldızı (radyo / podcast)
+  void toggleFavStation(String id) {
+    for (final c in radCats) {
+      for (final st in c.stations) {
+        if (st.id == id) st.fav = !st.fav;
+      }
+    }
+    _commit();
+  }
+
+  void toggleFavPodcast(String id) {
+    for (final pd in podcasts) {
+      if (pd.id == id) pd.fav = !pd.fav;
+    }
+    _commit();
+  }
+
+  // Podcast Index (ücretsiz anahtar + gizli anahtar)
+  String pIdxKey = '';
+  String pIdxSecret = '';
+
+  void setPIdx(String key, String secret) {
+    pIdxKey = key.trim();
+    pIdxSecret = secret.trim();
+    _commit();
+  }
+
   void togglePodcast(String id) {
     for (final p in podcasts) {
       if (p.id == id) p.open = !p.open;
@@ -1523,8 +1587,9 @@ class AppStore extends ChangeNotifier {
     themeMode = ThemeMode
         .values[((s['themeMode'] as int?) ?? 0).clamp(0, 2).toInt()];
     accent = ((s['accent'] as int?) ?? 0)
-        .clamp(0, accentColors.length - 1)
+        .clamp(-1, accentColors.length - 1)
         .toInt();
+    if (s['customAccent'] is int) customAccent = Color(s['customAccent'] as int);
     seenIntro = (s['seenIntro'] as bool?) ?? false;
     lastBuild = (s['lastBuild'] as int?) ?? 0;
 
@@ -1614,6 +1679,13 @@ class AppStore extends ChangeNotifier {
       glassMl = (tl['glass'] as num?)?.toInt() ?? 250;
       medSound = (tl['msnd'] as bool?) ?? true;
       medVibe = (tl['mvib'] as bool?) ?? false;
+      pIdxKey = (tl['pik'] as String?) ?? '';
+      pIdxSecret = (tl['pis'] as String?) ?? '';
+      pomoWork = ((tl['pw'] as int?) ?? 25).clamp(1, 240).toInt();
+      pomoShort = ((tl['ps'] as int?) ?? 5).clamp(1, 120).toInt();
+      pomoLong = ((tl['pl'] as int?) ?? 15).clamp(1, 240).toInt();
+      pomoSound = (tl['psnd'] as bool?) ?? true;
+      pomoVibe = (tl['pvib'] as bool?) ?? true;
     }
     if (j['newscats'] is List) {
       newsCats = (j['newscats'] as List)
@@ -1627,7 +1699,15 @@ class AppStore extends ChangeNotifier {
     if (j['epdone'] is List) {
       epDone = (j['epdone'] as List).map((e) => e as String).toSet();
     }
-    if (j['pmode'] is int) playMode = ((j['pmode'] as int).clamp(0, 3)).toInt();
+    if (j['rep'] is int) {
+      repeatMode = ((j['rep'] as int).clamp(0, 2)).toInt();
+      shuffleOn = (j['shuf'] as bool?) ?? false;
+    } else if (j['pmode'] is int) {
+      // eski sürümden: 1 tekrar, 2 tek şarkı, 3 karışık
+      final o = (j['pmode'] as int);
+      repeatMode = o == 2 ? 2 : (o == 1 || o == 3 ? 1 : 0);
+      shuffleOn = o == 3;
+    }
 
     homeOrder = ((j['order'] as List?) ?? []).map((e) => e as String).toList();
 
@@ -1798,10 +1878,18 @@ class AppStore extends ChangeNotifier {
           'glass': glassMl,
           'msnd': medSound,
           'mvib': medVibe,
+          'pik': pIdxKey,
+          'pis': pIdxSecret,
+          'pw': pomoWork,
+          'ps': pomoShort,
+          'pl': pomoLong,
+          'psnd': pomoSound,
+          'pvib': pomoVibe,
         },
         'eppos': epPos,
         'epdone': epDone.toList(),
-        'pmode': playMode,
+        'rep': repeatMode,
+        'shuf': shuffleOn,
         'weather': {
           'on': wxOn,
           'city': wxCity,
@@ -1827,6 +1915,7 @@ class AppStore extends ChangeNotifier {
           'lang': lang,
           'themeMode': themeMode.index,
           'accent': accent,
+          'customAccent': customAccent.value,
           'seenIntro': seenIntro,
           'lastBuild': lastBuild,
         },
@@ -2391,6 +2480,13 @@ class AppStore extends ChangeNotifier {
 
   void setAccent(int i) {
     accent = i;
+    _commit();
+  }
+
+  /// Renk skalasından özel vurgu rengi (accent = -1)
+  void setCustomAccent(Color c) {
+    customAccent = c;
+    accent = -1;
     _commit();
   }
 

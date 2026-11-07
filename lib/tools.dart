@@ -15,6 +15,7 @@ import 'reminders.dart' show dtLabel;
 import 'theme.dart' show Pal;
 import 'strings.dart';
 import 'ui.dart';
+import 'wxdetail.dart';
 
 // ---------------------------------------------------------------
 // ARAÇLAR (ana ekranın sağ üstündeki simgeden açılan sağ menü)
@@ -48,6 +49,8 @@ List<_ToolInfo> _tools() => [
           const Color(0xFF2FB38A), () => const ZikirPage()),
       _ToolInfo('water', Icons.water_drop_outlined, tx('Su sayacı'),
           const Color(0xFF3BA3E8), () => const WaterPage()),
+      _ToolInfo('wxdetail', Icons.thermostat_rounded, tx('Ayrıntılı hava'),
+          const Color(0xFF3E9FD6), () => const WxDetailPage()),
       _ToolInfo('sleep', Icons.bedtime_outlined, tx('Uyku'),
           const Color(0xFF5C6BC0), () => const SleepPage()),
     ];
@@ -780,9 +783,6 @@ class _TimerPageState extends State<TimerPage> {
 // 3) Pomodoro: çalışma / mola
 // ---------------------------------------------------------------
 final _Countdown _pomoCtl = _Countdown(888802, tx('Pomodoro: süre doldu.'));
-int _pomoWork = 25; // dakika
-int _pomoShort = 5;
-int _pomoLong = 15;
 int _pomoRound = 1; // kaçıncı çalışma turu (1..4)
 bool _pomoIsWork = true;
 int _pomoFocusSec = 0; // tamamlanan çalışma süresi (saniye)
@@ -816,16 +816,31 @@ class _PomodoroPageState extends State<PomodoroPage> {
 
   void _prepare() {
     final m = _pomoIsWork
-        ? _pomoWork
-        : (_pomoRound >= 4 ? _pomoLong : _pomoShort);
+        ? store.pomoWork
+        : (_pomoRound >= 4 ? store.pomoLong : store.pomoShort);
     _pomoCtl.set(m * 60);
     _pomoStartLeft = m * 60;
   }
 
   /// Süre dolunca: çalışma süresini topla, sıradaki aşamayı hazırla (duraklı)
   void _next() {
+    // Süre bitti: çalışma bitişi derin gong, mola bitişi daha açık zil + titreşim
+    if (store.pomoSound) {
+      if (_pomoIsWork) {
+        _snd.gong();
+      } else {
+        _snd.bell();
+      }
+    }
+    if (store.pomoVibe) {
+      HapticFeedback.heavyImpact();
+      Future.delayed(const Duration(milliseconds: 350), HapticFeedback.heavyImpact);
+      if (_pomoIsWork) {
+        Future.delayed(const Duration(milliseconds: 700), HapticFeedback.heavyImpact);
+      }
+    }
     if (_pomoIsWork) {
-      _pomoFocusSec += _pomoWork * 60;
+      _pomoFocusSec += store.pomoWork * 60;
       _pomoIsWork = false;
     } else {
       _pomoIsWork = true;
@@ -833,6 +848,26 @@ class _PomodoroPageState extends State<PomodoroPage> {
     }
     _prepare();
     if (mounted) setState(() {});
+  }
+
+  /// Çalışma / kısa mola / uzun mola sürelerini (dakika) kendin belirle
+  Future<void> _editTimes() async {
+    final w = await askNumber(context,
+        title: tx('Çalışma süresi'),
+        unit: tx('dk'),
+        initial: store.pomoWork.toDouble());
+    if (w == null || !mounted) return;
+    final sh = await askNumber(context,
+        title: tx('Kısa mola'),
+        unit: tx('dk'),
+        initial: store.pomoShort.toDouble());
+    if (sh == null || !mounted) return;
+    final lg = await askNumber(context,
+        title: tx('Uzun mola (4 turda bir)'),
+        unit: tx('dk'),
+        initial: store.pomoLong.toDouble());
+    if (lg == null) return;
+    setState(() => _preset(w.round(), sh.round(), lg.round()));
   }
 
   /// O ana kadar odaklanılan toplam süre (tamamlananlar + yarım tur)
@@ -843,9 +878,7 @@ class _PomodoroPageState extends State<PomodoroPage> {
   }
 
   void _preset(int w, int s, int l) {
-    _pomoWork = w;
-    _pomoShort = s;
-    _pomoLong = l;
+    store.setPomo(work: w, short: s, long: l);
     _pomoIsWork = true;
     _pomoRound = 1;
     _pomoFocusSec = 0;
@@ -937,11 +970,43 @@ class _PomodoroPageState extends State<PomodoroPage> {
                   ])
                     ChoiceChip(
                       label: Text('${t[0]} / ${t[1]}'),
-                      selected: _pomoWork == t[0],
+                      selected: store.pomoWork == t[0] &&
+                          store.pomoShort == t[1] &&
+                          store.pomoLong == t[2],
                       onSelected: (_) => setState(() => _preset(t[0], t[1], t[2])),
                     ),
+                  ActionChip(
+                    avatar: const Icon(Icons.tune_rounded, size: 16),
+                    label: Text(tx('Süreleri ayarla')),
+                    onPressed: _editTimes,
+                  ),
                 ],
               ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              children: [
+                FilterChip(
+                  avatar: const Icon(Icons.notifications_active_outlined,
+                      size: 18),
+                  label: Text(tx('Gong')),
+                  selected: store.pomoSound,
+                  onSelected: (v) {
+                    store.setPomoSound(v);
+                    setState(() {});
+                  },
+                ),
+                FilterChip(
+                  avatar: const Icon(Icons.vibration_rounded, size: 18),
+                  label: Text(tx('Titreşim')),
+                  selected: store.pomoVibe,
+                  onSelected: (v) {
+                    store.setPomoVibe(v);
+                    setState(() {});
+                  },
+                ),
+              ],
+            ),
             const SizedBox(height: 16),
             Wrap(
               spacing: 10,
@@ -965,7 +1030,7 @@ class _PomodoroPageState extends State<PomodoroPage> {
                   setState(() {});
                 }, filled: false),
                 _bigBtn(tx('Sıfırla'), Icons.restart_alt_rounded, () {
-                  _preset(_pomoWork, _pomoShort, _pomoLong);
+                  _preset(store.pomoWork, store.pomoShort, store.pomoLong);
                   setState(() {});
                 }, filled: false),
               ],
@@ -982,7 +1047,7 @@ class _PomodoroPageState extends State<PomodoroPage> {
                     value: focusMin,
                     kind: 'min');
                 if (ok) {
-                  _preset(_pomoWork, _pomoShort, _pomoLong);
+                  _preset(store.pomoWork, store.pomoShort, store.pomoLong);
                   setState(() {});
                 }
               }),
@@ -1037,6 +1102,7 @@ class _BreathPageState extends State<BreathPage> {
   @override
   void dispose() {
     _t?.cancel();
+    _snd.stopAll();
     super.dispose();
   }
 
@@ -1045,8 +1111,16 @@ class _BreathPageState extends State<BreathPage> {
     _phase = 0;
     _inPhase = 0;
     _scale = 0;
-    HapticFeedback.lightImpact();
+    if (store.medVibe) HapticFeedback.lightImpact();
     _t?.cancel();
+    if (store.medSound) {
+      // Başlangıç gongu + sessiz başlayan hava sesi
+      _snd.gong();
+      _snd.breathStart();
+      Timer(const Duration(milliseconds: 1500), () {
+        if (mounted) _snd.report(context);
+      });
+    }
     _t = Timer.periodic(const Duration(milliseconds: 50), (_) => _tick());
     setState(() {});
   }
@@ -1054,6 +1128,9 @@ class _BreathPageState extends State<BreathPage> {
   void _stop() {
     _on = false;
     _t?.cancel();
+    _snd.breathStop();
+    // Bitişte gong (en az birkaç saniye yapıldıysa)
+    if (store.medSound && _total > 3) _snd.gong();
     setState(() {});
   }
 
@@ -1064,13 +1141,29 @@ class _BreathPageState extends State<BreathPage> {
     while (_dur(_phase) == 0 || _inPhase >= _dur(_phase)) {
       _inPhase = 0;
       _phase = (_phase + 1) % 4;
-      HapticFeedback.lightImpact();
+      if (store.medVibe) {
+        if (_phase == 0 || _phase == 2) {
+          HapticFeedback.mediumImpact();
+        } else {
+          HapticFeedback.lightImpact();
+        }
+      }
     }
     final f = _inPhase / _dur(_phase);
     if (_phase == 0) _scale = Curves.easeInOut.transform(f);
     if (_phase == 1) _scale = 1;
     if (_phase == 2) _scale = 1 - Curves.easeInOut.transform(f);
     if (_phase == 3) _scale = 0;
+    // Hava sesi: nefes alırken yükselir, verirken düşer, tutarken sessiz
+    if (store.medSound) {
+      if (_phase == 0) {
+        _snd.breathLevel(true, _scale);
+      } else if (_phase == 2) {
+        _snd.breathLevel(false, _scale);
+      } else {
+        _snd.breathHush();
+      }
+    }
     if (mounted) setState(() {});
   }
 
@@ -1116,7 +1209,32 @@ class _BreathPageState extends State<BreathPage> {
                     ),
                 ],
               ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              children: [
+                FilterChip(
+                  avatar: const Icon(Icons.volume_up_rounded, size: 18),
+                  label: Text(tx('Nefes sesi')),
+                  selected: store.medSound,
+                  onSelected: (v) {
+                    store.setMedSound(v);
+                    if (!v) _snd.stopAll();
+                    setState(() {});
+                  },
+                ),
+                FilterChip(
+                  avatar: const Icon(Icons.vibration_rounded, size: 18),
+                  label: Text(tx('Titreşim')),
+                  selected: store.medVibe,
+                  onSelected: (v) {
+                    store.setMedVibe(v);
+                    setState(() {});
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
             SizedBox(
               height: 290,
               child: Center(
@@ -1339,6 +1457,12 @@ class _WaterPageState extends State<WaterPage> {
     if (mounted) setState(() {});
   }
 
+  /// Yuvarlağın doluluk oranı: hedef varsa hedefe göre, yoksa 2 litreye göre
+  double _fill(double total, double? goal) {
+    final g = (goal != null && goal > 0) ? goal : 2.0;
+    return (total / g).clamp(0.0, 1.0);
+  }
+
   Future<void> _sub(SubCat s, double liters) async {
     final today = dKey(DateTime.now());
     final e = store.entryFor(s.id, today);
@@ -1366,68 +1490,194 @@ class _WaterPageState extends State<WaterPage> {
       Column(
         children: [
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
+          // Miktar: tek alan, solda − sağda +, 25 ml adım; ortaya dokununca elle yazılır
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              for (final ml in [200, 250, 330, 500])
-                ChoiceChip(
-                  label: Text('$ml ml'),
-                  selected: store.glassMl == ml,
-                  onSelected: (_) => setState(() => store.setGlassMl(ml)),
+              IconButton.filledTonal(
+                tooltip: '-25 ml',
+                onPressed: store.glassMl > 25
+                    ? () => setState(() => store.setGlassMl(store.glassMl - 25))
+                    : null,
+                icon: const Icon(Icons.remove_rounded),
+              ),
+              const SizedBox(width: 10),
+              InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () async {
+                  final v = await askNumber(context,
+                      title: tx('Miktar'),
+                      unit: 'ml',
+                      initial: store.glassMl.toDouble());
+                  if (v != null && v >= 1) {
+                    setState(() => store.setGlassMl(v.round().clamp(1, 5000)));
+                  }
+                },
+                child: Container(
+                  width: 130,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: p.card,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: p.line),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text('${store.glassMl} ml',
+                      style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w600,
+                          color: p.ink)),
                 ),
+              ),
+              const SizedBox(width: 10),
+              IconButton.filledTonal(
+                tooltip: '+25 ml',
+                onPressed: () => setState(
+                    () => store.setGlassMl((store.glassMl + 25).clamp(1, 5000))),
+                icon: const Icon(Icons.add_rounded),
+              ),
             ],
           ),
           Expanded(
             child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                      s == null
-                          ? tx('Henüz bir su rutini seçilmedi')
-                          : '${fmt(total)} ${s.unit}',
-                      style: TextStyle(
-                          fontSize: 44,
-                          fontWeight: FontWeight.w300,
-                          color: p.ink)),
-                  if (s != null && goal != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Text(
-                          tx('Hedef: {0} {1}', [fmt(goal), s.unit]),
-                          style: TextStyle(color: p.soft)),
-                    ),
-                  const SizedBox(height: 24),
-                  GestureDetector(
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      _add(glassL);
-                    },
-                    child: Container(
-                      width: 180,
-                      height: 180,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: const Color(0xFF5E9BD6).withOpacity(0.2),
-                        border: Border.all(
-                            color: const Color(0xFF5E9BD6), width: 4),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                        s == null
+                            ? tx('Henüz bir su rutini seçilmedi')
+                            : '${fmt(total)} ${s.unit}',
+                        style: TextStyle(
+                            fontSize: 44,
+                            fontWeight: FontWeight.w300,
+                            color: p.ink)),
+                    if (s != null && goal != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                            tx('Hedef: {0} {1}', [fmt(goal), s.unit]),
+                            style: TextStyle(color: p.soft)),
                       ),
-                      alignment: Alignment.center,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
+                    const SizedBox(height: 20),
+                    // Yuvarlak gösterge: üst yarıya dokun = ekle (dolar),
+                    // alt yarıya dokun = çıkar (boşalır). Doluluk hedefe göre.
+                    SizedBox(
+                      width: 210,
+                      height: 210,
+                      child: Stack(
                         children: [
-                          const Icon(Icons.water_drop_rounded,
-                              size: 44, color: Color(0xFF5E9BD6)),
-                          Text('+ ${store.glassMl} ml',
-                              style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                  color: p.ink)),
+                          Positioned.fill(
+                            child: ClipOval(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF5E9BD6)
+                                      .withOpacity(0.12),
+                                ),
+                                child: Align(
+                                  alignment: Alignment.bottomCenter,
+                                  child: TweenAnimationBuilder<double>(
+                                    tween: Tween<double>(
+                                        begin: 0,
+                                        end: _fill(total, goal)),
+                                    duration:
+                                        const Duration(milliseconds: 600),
+                                    curve: Curves.easeOutCubic,
+                                    builder: (_, f, __) => FractionallySizedBox(
+                                      heightFactor: f,
+                                      widthFactor: 1,
+                                      child: DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topCenter,
+                                            end: Alignment.bottomCenter,
+                                            colors: [
+                                              const Color(0xFF7DB8EC)
+                                                  .withOpacity(0.75),
+                                              const Color(0xFF3E7FC0)
+                                                  .withOpacity(0.85),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Positioned.fill(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: const Color(0xFF5E9BD6), width: 4),
+                              ),
+                            ),
+                          ),
+                          Positioned.fill(
+                            child: ClipOval(
+                              child: Column(
+                                children: [
+                                  Expanded(
+                                    child: InkWell(
+                                      onTap: () {
+                                        HapticFeedback.selectionClick();
+                                        _add(glassL);
+                                      },
+                                      child: Center(
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.add_rounded,
+                                                size: 30, color: Colors.white),
+                                            Text('${store.glassMl} ml',
+                                                style: const TextStyle(
+                                                    fontWeight:
+                                                        FontWeight.w700,
+                                                    color: Colors.white,
+                                                    shadows: [
+                                                      Shadow(
+                                                          blurRadius: 6,
+                                                          color:
+                                                              Colors.black45)
+                                                    ])),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Container(
+                                      height: 2,
+                                      color: Colors.white.withOpacity(0.55)),
+                                  Expanded(
+                                    child: InkWell(
+                                      onTap: s != null && total > 0
+                                          ? () {
+                                              HapticFeedback.selectionClick();
+                                              _sub(s, glassL);
+                                            }
+                                          : null,
+                                      child: Center(
+                                        child: Icon(Icons.remove_rounded,
+                                            size: 30,
+                                            color: p.ink.withOpacity(
+                                                total > 0 ? 0.8 : 0.3)),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    Text(tx('Üstü ekler, altı çıkarır'),
+                        style: TextStyle(color: p.soft, fontSize: 12)),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1438,9 +1688,6 @@ class _WaterPageState extends State<WaterPage> {
               runSpacing: 10,
               alignment: WrapAlignment.center,
               children: [
-                _bigBtn(tx('Bir bardak çıkar'), Icons.remove_rounded,
-                    s != null && total > 0 ? () => _sub(s, glassL) : null,
-                    filled: false),
                 _bigBtn(tx('Rutin seç'), Icons.link_rounded, () async {
                   final subs = <MapEntry<Category, SubCat>>[
                     for (final c in store.cats)
@@ -1582,11 +1829,17 @@ class _SleepPageState extends State<SleepPage> {
 //    biten seanslar sayfadaki kayıt listesine yazılır (not eklenir, silinir).
 // ---------------------------------------------------------------
 
-/// Nefes sesleri ve gong: ayrı çalarlarla, müzik/podcast'in üstüne karışarak çalar
-class _MedSounds {
-  final AudioPlayer _cue = AudioPlayer();
+/// Nefes havası sesi, gong ve zil. Müzik/podcast'in üstüne karışarak çalar.
+/// Nefes sesi iki döngü çalardır (al: parlak hava, ver: alçak hava); ses seviyesi
+/// nefes eğrisini izler: nefes alırken yükselir, verirken düşer, tutarken sessizdir.
+class _Snd {
+  final AudioPlayer _in = AudioPlayer();
+  final AudioPlayer _out = AudioPlayer();
   final AudioPlayer _gong = AudioPlayer();
+  final AudioPlayer _bell = AudioPlayer();
   bool _ready = false;
+  bool _breathOn = false;
+  String? err; // son hata (ekranda gösterilir)
 
   Future<void> _init() async {
     if (_ready) return;
@@ -1596,37 +1849,98 @@ class _MedSounds {
       final ctx = AudioContext(
         android: AudioContextAndroid(audioFocus: AndroidAudioFocus.none),
       );
-      await _cue.setAudioContext(ctx);
-      await _gong.setAudioContext(ctx);
-    } catch (_) {}
+      for (final p in [_in, _out, _gong, _bell]) {
+        await p.setAudioContext(ctx);
+      }
+      await _in.setReleaseMode(ReleaseMode.loop);
+      await _out.setReleaseMode(ReleaseMode.loop);
+    } catch (e) {
+      err = '$e';
+    }
   }
 
-  Future<void> _play(AudioPlayer p, String asset, double vol) async {
+  Future<void> _once(AudioPlayer p, String asset, double vol) async {
     try {
       await _init();
-      await p.stop();
       await p.setVolume(vol);
       await p.play(AssetSource(asset));
+    } catch (e) {
+      err = '$e';
+    }
+  }
+
+  Future<void> gong() => _once(_gong, 'sounds/gong.wav', 0.7);
+  Future<void> bell() => _once(_bell, 'sounds/bell.wav', 0.7);
+
+  Future<void> _vol(AudioPlayer p, double v) async {
+    try {
+      await p.setVolume(v);
     } catch (_) {}
   }
 
-  Future<void> inhale() => _play(_cue, 'sounds/inhale.wav', 0.55);
-  Future<void> exhale() => _play(_cue, 'sounds/exhale.wav', 0.55);
-  Future<void> gong() => _play(_gong, 'sounds/gong.wav', 0.7);
+  /// Nefes havası döngülerini sessiz başlatır
+  Future<void> breathStart() async {
+    if (_breathOn) return;
+    _breathOn = true;
+    try {
+      await _init();
+      await _in.setVolume(0);
+      await _out.setVolume(0);
+      await _in.play(AssetSource('sounds/breath_in.wav'));
+      await _out.play(AssetSource('sounds/breath_out.wav'));
+    } catch (e) {
+      err = '$e';
+      _breathOn = false;
+    }
+  }
+
+  /// inhale: nefes alınıyor mu; level 0..1 (nefes eğrisinin o anki değeri)
+  void breathLevel(bool inhale, double level) {
+    if (!_breathOn) return;
+    final v = level.clamp(0.0, 1.0) * level.clamp(0.0, 1.0) * 0.9;
+    _vol(_in, inhale ? v : 0);
+    _vol(_out, inhale ? 0 : v);
+  }
+
+  /// Sessize al ama çalmaya devam et (nefes tutma anı)
+  void breathHush() {
+    _vol(_in, 0);
+    _vol(_out, 0);
+  }
+
+  Future<void> breathStop() async {
+    _breathOn = false;
+    try {
+      await _in.stop();
+      await _out.stop();
+    } catch (_) {}
+  }
 
   Future<void> stopAll() async {
+    await breathStop();
     try {
-      await _cue.stop();
       await _gong.stop();
+      await _bell.stop();
     } catch (_) {}
+  }
+
+  /// Ses çalınamadıysa bir kez bildirir
+  void report(BuildContext context) {
+    final e = err;
+    if (e == null) return;
+    err = null;
+    final short = e.length > 90 ? e.substring(0, 90) : e;
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(tx('Nefes sesi çalınamadı: {0}', [short]))));
   }
 }
 
-final _MedSounds _medSnd = _MedSounds();
+final _Snd _snd = _Snd();
 
 /// Seans bitince (sayfa açık olmasa da): gong, arka plan sesini kapat, kayda yaz
 void _medFinished() {
-  if (store.medSound) _medSnd.gong();
+  _snd.breathStop();
+  if (store.medSound) _snd.gong();
   _medEndSound();
   final min = double.parse((_medCtl.total / 60).toStringAsFixed(1));
   if (min > 0) store.addMed(min);
@@ -1719,6 +2033,7 @@ class _MeditatePageState extends State<MeditatePage>
   @override
   void dispose() {
     _startDelay?.cancel();
+    _snd.breathHush(); // sayfa kapanınca hava sesi sessize (seans sürüyorsa geri dönünce devam eder)
     _medCtl.removeListener(_u);
     if (_medPageHook == _finishedUi) _medPageHook = null;
     _br.removeListener(_cueTick);
@@ -1730,26 +2045,30 @@ class _MeditatePageState extends State<MeditatePage>
     if (mounted) setState(() {});
   }
 
-  /// Nefes aşaması değişince ses / titreşim
+  int _lastLvlMs = 0;
+
+  /// Nefes eğrisini izler: ses seviyesi (hava sesi) ve aşama değişiminde titreşim
   void _cueTick() {
     if (!_medCtl.running) return;
-    final ph = _br.value < 0.5 ? 0 : 1;
-    if (ph == _lastPhase) return;
-    _lastPhase = ph;
-    if (store.medSound) {
-      if (ph == 0) {
-        _medSnd.inhale();
-      } else {
-        _medSnd.exhale();
+    final inh = _br.value < 0.5;
+    final ph = inh ? 0 : 1;
+    if (ph != _lastPhase) {
+      _lastPhase = ph;
+      if (store.medVibe) {
+        if (ph == 0) {
+          HapticFeedback.mediumImpact();
+        } else {
+          HapticFeedback.lightImpact();
+        }
       }
     }
-    if (store.medVibe) {
-      if (ph == 0) {
-        HapticFeedback.mediumImpact();
-      } else {
-        HapticFeedback.lightImpact();
-      }
-    }
+    if (!store.medSound) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastLvlMs < 90) return; // saniyede ~11 kez ayarla
+    _lastLvlMs = now;
+    // 0 → 1 → 0 yumuşak eğri: alırken yükselir, verirken düşer
+    final lvl = 0.5 - 0.5 * cos(_br.value * 2 * pi);
+    _snd.breathLevel(inh, lvl);
   }
 
   /// Seans bitti (kayıt zaten yazıldı): sayfa açıksa özet penceresi
@@ -1794,7 +2113,7 @@ class _MeditatePageState extends State<MeditatePage>
   void _reset() {
     _medCtl.set(_medMin * 60);
     _medLoggedSec = 0;
-    _medSnd.stopAll();
+    _snd.stopAll();
     if (mounted) setState(() {});
   }
 
@@ -1816,11 +2135,13 @@ class _MeditatePageState extends State<MeditatePage>
     _medCtl.start();
     _lastPhase = -1;
     if (store.medSound) {
-      // Başlangıç gongu; nefes döngüsü gongdan biraz sonra başlar
-      _medSnd.gong();
+      // Başlangıç gongu; nefes döngüsü ve hava sesi gongdan biraz sonra başlar
+      _snd.gong();
+      _snd.breathStart();
       _startDelay?.cancel();
       _startDelay = Timer(const Duration(milliseconds: 2500), () {
         if (mounted && _medCtl.running) _br.repeat();
+        _snd.report(context);
       });
     } else {
       _br.repeat();
@@ -1832,7 +2153,7 @@ class _MeditatePageState extends State<MeditatePage>
     _startDelay?.cancel();
     _medCtl.pause();
     _br.stop();
-    _medSnd.stopAll();
+    _snd.stopAll();
     if (_medHasSound) media.player.pause();
   }
 

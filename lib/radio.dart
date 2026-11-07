@@ -28,6 +28,9 @@ Future<StationInput?> showStationDialog(BuildContext context,
   );
 }
 
+/// Radyo sekmesi: false = hepsi (kategoriler), true = sadece favoriler
+final ValueNotifier<bool> radFavOnly = ValueNotifier<bool>(false);
+
 class RadioTab extends StatelessWidget {
   const RadioTab({super.key});
 
@@ -145,6 +148,14 @@ class RadioTab extends StatelessWidget {
               if (cur)
                 Icon(media.playing ? Icons.graphic_eq_rounded : Icons.pause_rounded,
                     color: p.ink, size: 20),
+              IconButton(
+                tooltip: tx('Favori'),
+                visualDensity: VisualDensity.compact,
+                onPressed: () => store.toggleFavStation(s.id),
+                icon: Icon(
+                    s.fav ? Icons.star_rounded : Icons.star_outline_rounded,
+                    color: s.fav ? const Color(0xFFE9A23B) : p.soft),
+              ),
               PopupMenuButton<String>(
                 onSelected: (v) {
                   if (v == 'edit') _editStation(context, c, s);
@@ -164,13 +175,67 @@ class RadioTab extends StatelessWidget {
     );
   }
 
+  /// Favoriler görünümü: tüm kategorilerdeki yıldızlı radyolar tek listede
+  Widget _favList(BuildContext context) {
+    final p = palOf(context);
+    final items = <MapEntry<RadioCat, Station>>[
+      for (final c in store.radCats)
+        for (final s in c.stations)
+          if (s.fav) MapEntry(c, s),
+    ];
+    if (items.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Text(tx('Henüz favori radyo yok. Radyonun yanındaki yıldıza dokun.'),
+              textAlign: TextAlign.center,
+              style: TextStyle(color: p.soft, height: 1.4)),
+        ),
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+      children: [
+        for (final e in items)
+          Container(
+            margin: const EdgeInsets.only(bottom: 6),
+            decoration: BoxDecoration(
+              color: p.card,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                  color: tagTone(e.key.id).withOpacity(0.5)),
+            ),
+            child: ListTile(
+              dense: true,
+              title: Text(e.value.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontWeight: media.nowId == e.value.id && media.isRadio
+                          ? FontWeight.w700
+                          : FontWeight.w400)),
+              subtitle: Text(e.key.name,
+                  style: TextStyle(color: p.soft, fontSize: 12)),
+              onTap: () => media.playStation(e.value),
+              trailing: IconButton(
+                tooltip: tx('Favori'),
+                onPressed: () => store.toggleFavStation(e.value.id),
+                icon: const Icon(Icons.star_rounded, color: Color(0xFFE9A23B)),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = palOf(context);
     return ListenableBuilder(
-      listenable: Listenable.merge([store, media]),
+      listenable: Listenable.merge([store, media, radFavOnly]),
       builder: (context, _) {
         final cats = store.radCats;
+        final favOnly = radFavOnly.value;
         return Column(
           children: [
             Padding(
@@ -195,6 +260,29 @@ class RadioTab extends StatelessWidget {
                 ],
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 2, 16, 2),
+              child: Row(
+                children: [
+                  ChoiceChip(
+                    label: Text(tx('Hepsi')),
+                    selected: !favOnly,
+                    onSelected: (_) => radFavOnly.value = false,
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    avatar: const Icon(Icons.star_rounded,
+                        size: 16, color: Color(0xFFE9A23B)),
+                    label: Text(tx('Favoriler')),
+                    selected: favOnly,
+                    onSelected: (_) => radFavOnly.value = true,
+                  ),
+                ],
+              ),
+            ),
+            if (favOnly)
+              Expanded(child: _favList(context))
+            else
             Expanded(
               child: ReorderableListView.builder(
                 padding: const EdgeInsets.only(bottom: 12),

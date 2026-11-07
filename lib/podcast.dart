@@ -33,6 +33,9 @@ Widget _art(String url, double size) {
   );
 }
 
+/// Podcast sekmesi: false = hepsi (kategoriler), true = sadece favoriler
+final ValueNotifier<bool> podFavOnly = ValueNotifier<bool>(false);
+
 class PodcastTab extends StatelessWidget {
   const PodcastTab({super.key});
 
@@ -149,6 +152,14 @@ class PodcastTab extends StatelessWidget {
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  IconButton(
+                    tooltip: tx('Favori'),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => store.toggleFavPodcast(pd.id),
+                    icon: Icon(
+                        pd.fav ? Icons.star_rounded : Icons.star_outline_rounded,
+                        color: pd.fav ? const Color(0xFFE9A23B) : p.soft),
+                  ),
                   Icon(
                       pd.open
                           ? Icons.expand_less_rounded
@@ -181,13 +192,81 @@ class PodcastTab extends StatelessWidget {
     );
   }
 
+  /// Favoriler görünümü: tüm kategorilerdeki yıldızlı podcast'ler tek listede
+  Widget _favList(BuildContext context) {
+    final p = palOf(context);
+    final items = <MapEntry<PodCat, Podcast>>[
+      for (final c in store.podCats)
+        for (final pd in c.pods)
+          if (pd.fav) MapEntry(c, pd),
+    ];
+    if (items.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Text(tx('Henüz favori podcast yok. Podcast\'in yanındaki yıldıza dokun.'),
+              textAlign: TextAlign.center,
+              style: TextStyle(color: p.soft, height: 1.4)),
+        ),
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+      children: [
+        for (final e in items)
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              color: p.card,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: tagTone(e.key.id).withOpacity(0.5)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ListTile(
+                  dense: true,
+                  leading: _art(e.value.art, 36),
+                  title: Text(e.value.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(e.key.name,
+                      style: TextStyle(color: p.soft, fontSize: 12)),
+                  onTap: () => store.togglePodcast(e.value.id),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: tx('Favori'),
+                        onPressed: () => store.toggleFavPodcast(e.value.id),
+                        icon: const Icon(Icons.star_rounded,
+                            color: Color(0xFFE9A23B)),
+                      ),
+                      Icon(
+                          e.value.open
+                              ? Icons.expand_less_rounded
+                              : Icons.expand_more_rounded,
+                          color: p.soft),
+                    ],
+                  ),
+                ),
+                if (e.value.open) EpisodesView(podcast: e.value),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = palOf(context);
     return ListenableBuilder(
-      listenable: Listenable.merge([store, media]),
+      listenable: Listenable.merge([store, media, podFavOnly]),
       builder: (context, _) {
         final cats = store.podCats;
+        final favOnly = podFavOnly.value;
         return Column(
           children: [
             Padding(
@@ -215,6 +294,29 @@ class PodcastTab extends StatelessWidget {
                 ],
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 2, 16, 2),
+              child: Row(
+                children: [
+                  ChoiceChip(
+                    label: Text(tx('Hepsi')),
+                    selected: !favOnly,
+                    onSelected: (_) => podFavOnly.value = false,
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    avatar: const Icon(Icons.star_rounded,
+                        size: 16, color: Color(0xFFE9A23B)),
+                    label: Text(tx('Favoriler')),
+                    selected: favOnly,
+                    onSelected: (_) => podFavOnly.value = true,
+                  ),
+                ],
+              ),
+            ),
+            if (favOnly)
+              Expanded(child: _favList(context))
+            else
             Expanded(
               child: ReorderableListView.builder(
                 padding: const EdgeInsets.only(bottom: 12),
@@ -456,6 +558,7 @@ class _PodcastSearchPageState extends State<PodcastSearchPage> {
   List<PodResult> _res = [];
   bool _loading = false;
   bool _turkey = true;
+  String _src = 'itunes'; // itunes | idx | spreaker | archive | rss
   bool _searched = false;
   String? _err;
   int _gen = 0;
@@ -485,7 +588,30 @@ class _PodcastSearchPageState extends State<PodcastSearchPage> {
       _searched = true;
     });
     try {
-      final r = await podSearch(term, turkey: _turkey);
+      List<PodResult> r;
+      if (_src == 'idx') {
+        if (store.pIdxKey.isEmpty || store.pIdxSecret.isEmpty) {
+          await _askIdxKey();
+          if (store.pIdxKey.isEmpty || store.pIdxSecret.isEmpty) {
+            if (!mounted || g != _gen) return;
+            setState(() {
+              _res = [];
+              _loading = false;
+              _err = tx('Podcast Index için anahtar gerekli (podcastindex.org\'da ücretsiz kayıt).');
+            });
+            return;
+          }
+        }
+        r = await podSearchIdx(term, store.pIdxKey, store.pIdxSecret);
+      } else if (_src == 'spreaker') {
+        r = await podSearchSpreaker(term);
+      } else if (_src == 'archive') {
+        r = await podSearchArchive(term);
+      } else if (_src == 'rss') {
+        r = [await podFeedInfo(term)];
+      } else {
+        r = await podSearch(term, turkey: _turkey);
+      }
       if (!mounted || g != _gen) return;
       setState(() {
         _res = r;
@@ -496,9 +622,22 @@ class _PodcastSearchPageState extends State<PodcastSearchPage> {
       setState(() {
         _res = [];
         _loading = false;
-        _err = tx('Podcast rehberine bağlanılamadı. İnternetini kontrol et.');
+        _err = _src == 'rss'
+            ? tx('Bu adreste podcast RSS\'i bulunamadı.')
+            : tx('Podcast rehberine bağlanılamadı. İnternetini kontrol et.');
       });
     }
+  }
+
+  /// Podcast Index anahtarı (ücretsiz kayıtla alınır); bir kez girilir
+  Future<void> _askIdxKey() async {
+    final k = await askText(context, tx('Podcast Index API anahtarı'),
+        initial: store.pIdxKey);
+    if (k == null || k.trim().isEmpty || !mounted) return;
+    final sec = await askText(context, tx('Podcast Index gizli anahtarı'),
+        initial: store.pIdxSecret);
+    if (sec == null || sec.trim().isEmpty) return;
+    store.setPIdx(k, sec);
   }
 
   void _follow(PodResult r) {
@@ -529,7 +668,9 @@ class _PodcastSearchPageState extends State<PodcastSearchPage> {
                     textInputAction: TextInputAction.search,
                     onSubmitted: (_) => _search(),
                     decoration: InputDecoration(
-                      hintText: tx('Podcast adı veya konu (ör. haber özeti)'),
+                      hintText: _src == 'rss'
+                          ? tx('RSS adresi (https://...)')
+                          : tx('Podcast adı veya konu (ör. haber özeti)'),
                       isDense: true,
                     ),
                   ),
@@ -541,6 +682,43 @@ class _PodcastSearchPageState extends State<PodcastSearchPage> {
               ],
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Wrap(
+                spacing: 8,
+                children: [
+                  for (final x in const [
+                    ['itunes', 'iTunes'],
+                    ['idx', 'Podcast Index'],
+                    ['spreaker', 'Spreaker'],
+                    ['archive', 'Internet Archive'],
+                    ['rss', 'RSS'],
+                  ])
+                    ChoiceChip(
+                      label: Text(x[1]),
+                      selected: _src == x[0],
+                      onSelected: (_) {
+                        setState(() {
+                          _src = x[0];
+                          _res = [];
+                          _err = null;
+                          _searched = false;
+                        });
+                      },
+                    ),
+                  if (_src == 'idx')
+                    ActionChip(
+                      avatar: const Icon(Icons.key_rounded, size: 16),
+                      label: Text(tx('Anahtar')),
+                      onPressed: _askIdxKey,
+                    ),
+                ],
+              ),
+            ),
+          ),
+          if (_src == 'itunes')
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
             child: Row(

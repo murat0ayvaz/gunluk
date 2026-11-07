@@ -577,24 +577,25 @@ void showUndo(BuildContext context, String message, VoidCallback onUndo) {
   m.showSnackBar(SnackBar(
     duration: const Duration(seconds: 5),
     persist: false, // "Geri al" olsa da 5 saniye sonra kapansın
-    // "Geri al" solda: sağ alttaki DR düğmesiyle çakışmasın
-    content: Row(
-      children: [
-        TextButton(
-          style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              minimumSize: const Size(0, 36),
-              foregroundColor: const Color(0xFFA6D4B0)),
-          onPressed: () {
-            m.hideCurrentSnackBar();
-            onUndo();
-          },
-          child: Text(tx('Geri al'),
-              style: const TextStyle(fontWeight: FontWeight.w700)),
+    // Tüm satır geri al düğmesi: satırın herhangi bir yerine dokununca geri alınır.
+    // "Geri al" yazısı solda, mesaj yanında.
+    content: InkWell(
+      onTap: () {
+        m.hideCurrentSnackBar();
+        onUndo();
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            Text(tx('Geri al'),
+                style: const TextStyle(
+                    fontWeight: FontWeight.w800, color: Color(0xFFA6D4B0))),
+            const SizedBox(width: 14),
+            Expanded(child: Text(message)),
+          ],
         ),
-        const SizedBox(width: 8),
-        Expanded(child: Text(message)),
-      ],
+      ),
     ),
   ));
 }
