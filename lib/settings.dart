@@ -91,11 +91,31 @@ class SettingsPage extends StatelessWidget {
         final p = palOf(context);
         final dark = p.dark;
 
-        Widget title(String s) => Padding(
-              padding: const EdgeInsets.only(top: 20, bottom: 10),
-              child: Text(s,
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w700, color: p.ink)),
+
+        Widget sec(String s, List<Widget> kids) => Container(
+              margin: const EdgeInsets.only(top: 10),
+              decoration: BoxDecoration(
+                color: p.card,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: p.line),
+              ),
+              child: Theme(
+                data: Theme.of(context)
+                    .copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  key: PageStorageKey('set_$s'),
+                  initiallyExpanded: false,
+                  tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+                  childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                  expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+                  title: Text(s,
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: p.ink)),
+                  children: kids,
+                ),
+              ),
             );
 
         return Scaffold(
@@ -108,8 +128,7 @@ class SettingsPage extends StatelessWidget {
           body: ListView(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
             children: [
-              // ----- Dil -----
-              title(tx('Dil')),
+              sec(tx('Dil'), [
               Wrap(spacing: 8, children: [
                 ChoiceChip(
                   label: const Text('Türkçe'),
@@ -127,9 +146,8 @@ class SettingsPage extends StatelessWidget {
                 tx('Kendi eklediğin kategori ve alt kategori adları çevrilmez. Adını değiştirmediğin hazır kategoriler yeni dile çevrilir.'),
                 style: TextStyle(fontSize: 12.5, color: p.soft, height: 1.4),
               ),
-
-              // ----- Tema -----
-              title(tx('Tema')),
+              ]),
+              sec(tx('Tema'), [
               Text(tx('Görünüm'), style: TextStyle(color: p.soft)),
               const SizedBox(height: 8),
               Wrap(spacing: 8, children: [
@@ -186,9 +204,8 @@ class SettingsPage extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               _ColorScale(key: ValueKey(store.accent)),
-
-              // ----- Özlü sözler -----
-              title(tx('Özlü sözler')),
+              ]),
+              sec(tx('Özlü sözler'), [
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(tx('Ana ekranda özlü söz göster')),
@@ -248,9 +265,8 @@ class SettingsPage extends StatelessWidget {
                   style: TextStyle(fontSize: 12.5, color: p.soft, height: 1.4),
                 ),
               ],
-
-              // ----- Hatırlatıcılar -----
-              title(tx('Hatırlatıcılar')),
+              ]),
+              sec(tx('Hatırlatıcılar'), [
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.verified_user_outlined),
@@ -269,106 +285,8 @@ class SettingsPage extends StatelessWidget {
                 title: Text(tx('Çalışmıyorsa ne yapmalı?')),
                 onTap: () => showReminderHelp(context),
               ),
-
-              // ----- Hava durumu -----
-              title(tx('Hava durumu')),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(tx('Hava durumunu göster')),
-                subtitle: Text(store.wxGps
-                    ? tx('Konumum')
-                    : (store.wxCity.isEmpty
-                        ? tx('Önce bir şehir seç')
-                        : store.wxCity)),
-                value: store.wxOn,
-                onChanged: (v) {
-                  if (v && !store.wxGps && store.wxLat == null) {
-                    showCityDialog(context);
-                  } else {
-                    store.setWxOn(v);
-                    if (v) weather.ensure();
-                  }
-                },
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.cloud_queue_rounded),
-                title: Text(tx('Hava durumu servisi')),
-                subtitle: DropdownButton<String>(
-                  isExpanded: true,
-                  value: store.wxProvider,
-                  underline: const SizedBox.shrink(),
-                  items: [
-                    for (final pr in wxProviders)
-                      DropdownMenuItem(
-                          value: pr[0],
-                          child: Text(pr[1],
-                              style: const TextStyle(fontSize: 13))),
-                  ],
-                  onChanged: (v) async {
-                    if (v == null) return;
-                    store.setWxProvider(v);
-                    if (v == 'owm' && store.wxOwmKey.isEmpty) {
-                      final k = await askText(
-                          context, tx('OpenWeatherMap anahtarı'),
-                          label: tx('API anahtarı'));
-                      if (k != null) store.setWxOwmKey(k.trim());
-                    }
-                    weather.reset();
-                  },
-                ),
-              ),
-              if (store.wxProvider == 'owm')
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.key_rounded),
-                  title: Text(tx('OpenWeatherMap anahtarı')),
-                  subtitle: Text(store.wxOwmKey.isEmpty
-                      ? tx('Girilmedi')
-                      : tx('Girildi')),
-                  onTap: () async {
-                    final k = await askText(
-                        context, tx('OpenWeatherMap anahtarı'),
-                        initial: store.wxOwmKey, label: tx('API anahtarı'));
-                    if (k != null) {
-                      store.setWxOwmKey(k.trim());
-                      weather.reset();
-                    }
-                  },
-                ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.location_city_outlined),
-                title: Text(tx('Şehir adıyla seç')),
-                subtitle: store.wxGps || store.wxCity.isEmpty
-                    ? null
-                    : Text(store.wxCity),
-                trailing: store.wxGps
-                    ? null
-                    : const Icon(Icons.check_rounded, size: 20),
-                onTap: () => showCityDialog(context),
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.my_location_rounded),
-                title: Text(tx('Konumumu kullan')),
-                trailing: store.wxGps
-                    ? const Icon(Icons.check_rounded, size: 20)
-                    : null,
-                onTap: () {
-                  store.setWxGps(true);
-                  weather.reset();
-                },
-              ),
-              Text(
-                store.wxProvider == 'mgm'
-                    ? tx('MGM verisi resmi olmayan yoldan alınır; çalışmazsa başka bir servis seç.')
-                    : tx('Hava durumu internetten alınır. Bugünde şimdiki durum, tarihin yanındaki simgeye basınca saatlik hava açılır.'),
-                style: TextStyle(fontSize: 12.5, color: p.soft, height: 1.4),
-              ),
-
-              // ----- Güvenlik: uygulama kilidi -----
-              title(tx('Güvenlik')),
+              ]),
+              sec(tx('Güvenlik'), [
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(tx('Uygulama kilidi')),
@@ -388,9 +306,8 @@ class SettingsPage extends StatelessWidget {
                 tx('Bu kilit uygulamanın ekranını korur. Veri telefonda şifrelenmeden durur; “son uygulamalar” ekranındaki önizleme ve Ayarlar’daki yedek metni de korunmaz.'),
                 style: TextStyle(fontSize: 12.5, color: p.soft, height: 1.4),
               ),
-
-              // ----- Yedek -----
-              title(tx('Yedek')),
+              ]),
+              sec(tx('Yedek'), [
               Text(
                 tx('Uygulamayı kaldırırsan tüm verilerin silinir. Kaldırmadan önce yedek al: yedek metin olarak panoya kopyalanır; bir not uygulamasına ya da kendine mesaj olarak yapıştırıp sakla. Yedek, günlük notların dahil tüm verini içerir; sakladığın yeri başkalarıyla paylaşma.'),
                 style: TextStyle(fontSize: 12.5, color: p.soft, height: 1.4),
@@ -408,9 +325,8 @@ class SettingsPage extends StatelessWidget {
                   label: Text(tx('Yedeği geri yükle')),
                 ),
               ]),
-
-              // ----- Tanıtım -----
-              title(tx('Tanıtım')),
+              ]),
+              sec(tx('Tanıtım'), [
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.help_outline_rounded),
@@ -422,9 +338,8 @@ class SettingsPage extends StatelessWidget {
                   ));
                 },
               ),
-
-              // ----- Hakkında -----
-              title(tx('Hakkında')),
+              ]),
+              sec(tx('Hakkında'), [
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.new_releases_outlined),
@@ -438,6 +353,7 @@ class SettingsPage extends StatelessWidget {
                 trailing: Text('$appVersion ($appBuild)',
                     style: TextStyle(color: p.soft)),
               ),
+              ]),
             ],
           ),
         );

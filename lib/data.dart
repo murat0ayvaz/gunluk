@@ -244,6 +244,41 @@ class Song {
 
 /// Oynatma listesi (içindeki şarkıların sırası listenin sırasıdır)
 /// Yapılan bir meditasyon seansı (Meditasyon sayfasındaki kayıt listesi)
+/// Ders çalışma: kullanıcının kendi kartı (hazır kartlar studydata.dart'ta)
+class StudyCard {
+  final String id;
+  String topic; // hazır konu kimliği (örn. lgs_tr.0) ya da 'u:...' özel konu
+  String front;
+  String exp;
+  String ex;
+  StudyCard(this.id, this.topic, this.front, this.exp, this.ex);
+
+  Map<String, dynamic> toJson() =>
+      {'id': id, 't': topic, 'f': front, 'e': exp, 'x': ex};
+
+  factory StudyCard.fromJson(Map<String, dynamic> j) => StudyCard(
+      (j['id'] ?? '').toString(),
+      (j['t'] ?? '').toString(),
+      (j['f'] ?? '').toString(),
+      (j['e'] ?? '').toString(),
+      (j['x'] ?? '').toString());
+}
+
+/// Kullanıcının eklediği konu başlığı
+class StudyTopicUser {
+  final String id; // 'u:...'
+  final String subj; // ders kimliği
+  String name;
+  StudyTopicUser(this.id, this.subj, this.name);
+
+  Map<String, dynamic> toJson() => {'id': id, 's': subj, 'n': name};
+
+  factory StudyTopicUser.fromJson(Map<String, dynamic> j) => StudyTopicUser(
+      (j['id'] ?? '').toString(),
+      (j['s'] ?? '').toString(),
+      (j['n'] ?? '').toString());
+}
+
 class MedSession {
   final String id;
   final int ms; // seansın bittiği zaman
@@ -879,6 +914,107 @@ class AppStore extends ChangeNotifier {
     } else {
       onFavs.insert(0, t);
     }
+    _commit();
+  }
+
+  // ----- Ders çalışma -----
+  List<StudyCard> studyCards = []; // kullanıcı kartları
+  List<StudyTopicUser> studyTopics = []; // kullanıcı konuları
+  Map<String, List<int>> studySt = {}; // kart kimliği -> [kutu, tekrar zamanı (ms)]
+  Set<String> studyHid = {}; // gizlenen hazır kartlar
+  String studyTab = 'lgs';
+
+  static const studyDays = [1, 3, 7, 14];
+
+  int studyBox(String id) => studySt[id]?[0] ?? 0;
+  int studyDue(String id) => studySt[id]?[1] ?? 0;
+
+  /// Şimdi tekrar edilmesi gereken mi (yeni kartlar da dahil)
+  bool studyIsDue(String id) =>
+      studyDue(id) <= DateTime.now().millisecondsSinceEpoch;
+
+  void studyKnow(String id) {
+    final box = (studyBox(id) + 1).clamp(1, studyDays.length);
+    final n = DateTime.now();
+    final due = DateTime(n.year, n.month, n.day + studyDays[box - 1])
+        .millisecondsSinceEpoch;
+    studySt[id] = [box, due];
+    _commit();
+  }
+
+  void studyForget(String id) {
+    studySt[id] = [0, 0];
+    _commit();
+  }
+
+  void setStudyTab(String t) {
+    studyTab = t;
+    _commit();
+  }
+
+  StudyCard addStudyCard(String topic, String front, String exp, String ex) {
+    final c = StudyCard(newId(), topic, front.trim(), exp.trim(), ex.trim());
+    studyCards.add(c);
+    _commit();
+    return c;
+  }
+
+  void editStudyCard(String id, String front, String exp, String ex) {
+    for (final c in studyCards) {
+      if (c.id == id) {
+        c.front = front.trim();
+        c.exp = exp.trim();
+        c.ex = ex.trim();
+      }
+    }
+    _commit();
+  }
+
+  /// Hazır kartı düzenleyince kullanıcı kopyası oluşur, hazır olan gizlenir
+  StudyCard editBuiltinCard(
+      String id, String topic, String front, String exp, String ex) {
+    final c = StudyCard(newId(), topic, front.trim(), exp.trim(), ex.trim());
+    studyCards.add(c);
+    studyHid.add(id);
+    final old = studySt.remove(id);
+    if (old != null) studySt[c.id] = old;
+    _commit();
+    return c;
+  }
+
+  void deleteStudyCard(String id) {
+    final before = studyCards.length;
+    studyCards.removeWhere((c) => c.id == id);
+    if (studyCards.length == before) studyHid.add(id); // hazır kart
+    studySt.remove(id);
+    _commit();
+  }
+
+  void restoreStudyHidden(String topicPrefix) {
+    studyHid.removeWhere((h) => h.startsWith('$topicPrefix#'));
+    _commit();
+  }
+
+  StudyTopicUser addStudyTopic(String subj, String name) {
+    final t = StudyTopicUser('u:${newId()}', subj, name.trim());
+    studyTopics.add(t);
+    _commit();
+    return t;
+  }
+
+  void renameStudyTopic(String id, String name) {
+    for (final t in studyTopics) {
+      if (t.id == id) t.name = name.trim();
+    }
+    _commit();
+  }
+
+  void deleteStudyTopic(String id) {
+    studyTopics.removeWhere((t) => t.id == id);
+    for (final c in studyCards.where((c) => c.topic == id)) {
+      studySt.remove(c.id);
+    }
+    studyCards.removeWhere((c) => c.topic == id);
     _commit();
   }
 
@@ -1664,6 +1800,23 @@ class AppStore extends ChangeNotifier {
           .map((e) => MedSession.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
     }
+    final stj = j['study'];
+    if (stj is Map) {
+      studyCards = ((stj['cards'] as List?) ?? [])
+          .map((e) => StudyCard.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+      studyTopics = ((stj['topics'] as List?) ?? [])
+          .map((e) =>
+              StudyTopicUser.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+      studySt = {};
+      ((stj['st'] as Map?) ?? {}).forEach((k, v) {
+        final l = (v as List).map((x) => (x as num).toInt()).toList();
+        if (l.length >= 2) studySt[k.toString()] = l;
+      });
+      studyHid = {for (final h in ((stj['hid'] as List?) ?? [])) h.toString()};
+      studyTab = (stj['tab'] as String?) ?? 'lgs';
+    }
     if (j['onfavs'] is List) {
       onFavs = (j['onfavs'] as List)
           .map((e) => OnTrack.fromJson(Map<String, dynamic>.from(e as Map)))
@@ -1885,6 +2038,13 @@ class AppStore extends ChangeNotifier {
           'pl': pomoLong,
           'psnd': pomoSound,
           'pvib': pomoVibe,
+        },
+        'study': {
+          'cards': studyCards.map((c) => c.toJson()).toList(),
+          'topics': studyTopics.map((t) => t.toJson()).toList(),
+          'st': studySt,
+          'hid': studyHid.toList(),
+          'tab': studyTab,
         },
         'eppos': epPos,
         'epdone': epDone.toList(),

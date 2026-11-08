@@ -10,11 +10,12 @@ import 'version.dart';
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
       tx('Verilerin korundu.'),
-      tx('Ayrıntılı hava (Araçlar): günlük, haftalık, 15 günlük; nem, rüzgar, basınç, UV, görüş ve deniz durumu. Kaynak adı yazar.'),
-      tx('Podcast, Spreaker, Internet Archive ve RSS ile bul; radyo ve podcast için yıldızlı favoriler.'),
-      tx('DR paneli ekranın yarısına kadar açılır; Ayarlar\'da renk skalası.'),
-      tx('Pomodoro süreleri ayarlanır, gong ve titreşim uyarısı; su sayacında ml girişi.'),
-      tx('Nefes sesi hava sesi oldu; Nefes aracında da ses ve titreşim. Müzikte Tekrar/Karışık.'),
+      tx('Yeni: Ders çalışma (üst çubukta sol). LGS dersleri ve İngilizce için hazır kartlar; kendi kartlarını ekle, Biliyorum/Bilmiyorum ile aralıklı tekrar yap.'),
+      tx('Hava durumu sayfası yenilendi: kaynaklar yan yana, açılır başlıklar. Hava ayarları buraya taşındı.'),
+      tx('Ayarlar\'daki başlıklar açılır kapanır oldu.'),
+      tx('Meditasyon ve Nefes\'te nefes al/ver için tek tını sesi.'),
+      tx('Araç sayfalarının sağ üstünde Araçlar simgesi; sayfadan çıkınca süre sayan araçlar duraklar.'),
+      tx('Su sayacında Geri al bildirimi kaldırıldı.'),
     ];
 
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {

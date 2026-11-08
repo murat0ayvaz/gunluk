@@ -49,7 +49,7 @@ List<_ToolInfo> _tools() => [
           const Color(0xFF2FB38A), () => const ZikirPage()),
       _ToolInfo('water', Icons.water_drop_outlined, tx('Su sayacı'),
           const Color(0xFF3BA3E8), () => const WaterPage()),
-      _ToolInfo('wxdetail', Icons.thermostat_rounded, tx('Ayrıntılı hava'),
+      _ToolInfo('wxdetail', Icons.thermostat_rounded, tx('Hava durumu'),
           const Color(0xFF3E9FD6), () => const WxDetailPage()),
       _ToolInfo('sleep', Icons.bedtime_outlined, tx('Uyku'),
           const Color(0xFF5C6BC0), () => const SleepPage()),
@@ -74,8 +74,24 @@ Route<void> _route(Widget page) => PageRouteBuilder<void>(
       },
     );
 
+/// Araç sayfalarının sağ üstündeki Araçlar simgesi: menüyü açar
+class ToolsButton extends StatelessWidget {
+  const ToolsButton({super.key});
+
+  @override
+  Widget build(BuildContext context) => Builder(
+        builder: (ctx) => IconButton(
+          tooltip: tx('Araçlar'),
+          onPressed: () => Scaffold.of(ctx).openEndDrawer(),
+          icon: const Icon(Icons.handyman_outlined),
+        ),
+      );
+}
+
 class ToolsDrawer extends StatelessWidget {
-  const ToolsDrawer({super.key});
+  /// replace: bir araç sayfasının içinden açıldı; seçilen araç bu sayfanın yerine geçer
+  final bool replace;
+  const ToolsDrawer({super.key, this.replace = false});
 
   @override
   Widget build(BuildContext context) {
@@ -114,7 +130,11 @@ class ToolsDrawer extends StatelessWidget {
                           borderRadius: BorderRadius.circular(16),
                           onTap: () {
                             nav.pop(); // menüyü kapat
-                            nav.push(_route(t.page()));
+                            if (replace) {
+                              nav.pushReplacement(_route(t.page()));
+                            } else {
+                              nav.push(_route(t.page()));
+                            }
                           },
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
@@ -345,6 +365,7 @@ Future<bool> saveToRoutine(
   required double value,
   required String kind,
   bool ask = true,
+  bool quiet = false,
 }) async {
   SubCat? sub = defaultSubFor(tool);
   bool free = false;
@@ -365,8 +386,10 @@ Future<bool> saveToRoutine(
   if (free || sub == null) {
     final f = store.addFree(
         today, title, '${fmt(value)} ${_kindUnit(kind)}'.trim());
-    showUndo(context, tx('Diğer kayıtlara eklendi.'),
-        () => store.deleteFree(f.id));
+    if (!quiet) {
+      showUndo(context, tx('Diğer kayıtlara eklendi.'),
+          () => store.deleteFree(f.id));
+    }
     return true;
   }
   final s = sub;
@@ -374,6 +397,7 @@ Future<bool> saveToRoutine(
   final prev = store.entryFor(s.id, today);
   final prevVal = prev?.value;
   store.setEntry(s.id, today, (prevVal ?? 0) + add);
+  if (quiet) return true;
   showUndo(
       context,
       tx('{0}: {1} {2} eklendi.', [s.name, fmt(add), s.unit]).trim(),
@@ -436,7 +460,9 @@ Widget _page(BuildContext context, String title, Widget body,
         elevation: 0,
         scrolledUnderElevation: 0,
         title: Text(title),
+        actions: const [ToolsButton()],
       ),
+      endDrawer: const ToolsDrawer(replace: true),
       body: SafeArea(child: body),
     ),
   );
@@ -547,6 +573,7 @@ class _StopwatchPageState extends State<StopwatchPage> {
   @override
   void dispose() {
     _t?.cancel();
+    _sw.stop(); // sayfadan çıkınca duraklar
     super.dispose();
   }
 
@@ -660,6 +687,7 @@ class _TimerPageState extends State<TimerPage> {
   @override
   void dispose() {
     _timerCtl.removeListener(_u);
+    _timerCtl.pause(); // sayfadan çıkınca duraklar, bildirimi iptal olur
     super.dispose();
   }
 
@@ -807,6 +835,7 @@ class _PomodoroPageState extends State<PomodoroPage> {
   @override
   void dispose() {
     _pomoCtl.removeListener(_u);
+    _pomoCtl.pause();
     super.dispose();
   }
 
@@ -1101,7 +1130,7 @@ class _BreathPageState extends State<BreathPage> {
 
   @override
   void dispose() {
-    _t?.cancel();
+    _t?.cancel(); // sayfadan çıkınca duraklar
     _snd.stopAll();
     super.dispose();
   }
@@ -1116,7 +1145,9 @@ class _BreathPageState extends State<BreathPage> {
     if (store.medSound) {
       // Başlangıç gongu + sessiz başlayan hava sesi
       _snd.gong();
-      _snd.breathStart();
+      Timer(const Duration(milliseconds: 2200), () {
+        if (mounted && _on) _snd.tone();
+      });
       Timer(const Duration(milliseconds: 1500), () {
         if (mounted) _snd.report(context);
       });
@@ -1148,22 +1179,15 @@ class _BreathPageState extends State<BreathPage> {
           HapticFeedback.lightImpact();
         }
       }
+      if (store.medSound && (_phase == 0 || _phase == 2) && _total > 1) {
+        _snd.tone();
+      }
     }
     final f = _inPhase / _dur(_phase);
     if (_phase == 0) _scale = Curves.easeInOut.transform(f);
     if (_phase == 1) _scale = 1;
     if (_phase == 2) _scale = 1 - Curves.easeInOut.transform(f);
     if (_phase == 3) _scale = 0;
-    // Hava sesi: nefes alırken yükselir, verirken düşer, tutarken sessiz
-    if (store.medSound) {
-      if (_phase == 0) {
-        _snd.breathLevel(true, _scale);
-      } else if (_phase == 2) {
-        _snd.breathLevel(false, _scale);
-      } else {
-        _snd.breathHush();
-      }
-    }
     if (mounted) setState(() {});
   }
 
@@ -1453,6 +1477,7 @@ class _WaterPageState extends State<WaterPage> {
         title: tx('Su'),
         value: liters,
         kind: 'lt',
+        quiet: true,
         ask: defaultSubFor('water') == null);
     if (mounted) setState(() {});
   }
@@ -1834,11 +1859,9 @@ class _SleepPageState extends State<SleepPage> {
 /// nefes eğrisini izler: nefes alırken yükselir, verirken düşer, tutarken sessizdir.
 class _Snd {
   final AudioPlayer _in = AudioPlayer();
-  final AudioPlayer _out = AudioPlayer();
   final AudioPlayer _gong = AudioPlayer();
   final AudioPlayer _bell = AudioPlayer();
   bool _ready = false;
-  bool _breathOn = false;
   String? err; // son hata (ekranda gösterilir)
 
   Future<void> _init() async {
@@ -1849,11 +1872,9 @@ class _Snd {
       final ctx = AudioContext(
         android: AudioContextAndroid(audioFocus: AndroidAudioFocus.none),
       );
-      for (final p in [_in, _out, _gong, _bell]) {
+      for (final p in [_in, _gong, _bell]) {
         await p.setAudioContext(ctx);
       }
-      await _in.setReleaseMode(ReleaseMode.loop);
-      await _out.setReleaseMode(ReleaseMode.loop);
     } catch (e) {
       err = '$e';
     }
@@ -1878,41 +1899,12 @@ class _Snd {
     } catch (_) {}
   }
 
-  /// Nefes havası döngülerini sessiz başlatır
-  Future<void> breathStart() async {
-    if (_breathOn) return;
-    _breathOn = true;
-    try {
-      await _init();
-      await _in.setVolume(0);
-      await _out.setVolume(0);
-      await _in.play(AssetSource('sounds/breath_in.wav'));
-      await _out.play(AssetSource('sounds/breath_out.wav'));
-    } catch (e) {
-      err = '$e';
-      _breathOn = false;
-    }
-  }
-
-  /// inhale: nefes alınıyor mu; level 0..1 (nefes eğrisinin o anki değeri)
-  void breathLevel(bool inhale, double level) {
-    if (!_breathOn) return;
-    final v = level.clamp(0.0, 1.0) * level.clamp(0.0, 1.0) * 0.9;
-    _vol(_in, inhale ? v : 0);
-    _vol(_out, inhale ? 0 : v);
-  }
-
-  /// Sessize al ama çalmaya devam et (nefes tutma anı)
-  void breathHush() {
-    _vol(_in, 0);
-    _vol(_out, 0);
-  }
+  /// Nefes al/ver geçişinde çalan tını (en çok 3 sn)
+  Future<void> tone() => _once(_in, 'sounds/tone.wav', 0.8);
 
   Future<void> breathStop() async {
-    _breathOn = false;
     try {
       await _in.stop();
-      await _out.stop();
     } catch (_) {}
   }
 
@@ -1939,7 +1931,6 @@ final _Snd _snd = _Snd();
 
 /// Seans bitince (sayfa açık olmasa da): gong, arka plan sesini kapat, kayda yaz
 void _medFinished() {
-  _snd.breathStop();
   if (store.medSound) _snd.gong();
   _medEndSound();
   final min = double.parse((_medCtl.total / 60).toStringAsFixed(1));
@@ -2033,19 +2024,20 @@ class _MeditatePageState extends State<MeditatePage>
   @override
   void dispose() {
     _startDelay?.cancel();
-    _snd.breathHush(); // sayfa kapanınca hava sesi sessize (seans sürüyorsa geri dönünce devam eder)
     _medCtl.removeListener(_u);
     if (_medPageHook == _finishedUi) _medPageHook = null;
     _br.removeListener(_cueTick);
     _br.dispose();
+    // Sayfadan çıkınca seans duraklar (geri dönünce devam edilebilir)
+    _medCtl.pause();
+    _snd.stopAll();
+    if (_medHasSound) media.player.pause();
     super.dispose();
   }
 
   void _u() {
     if (mounted) setState(() {});
   }
-
-  int _lastLvlMs = 0;
 
   /// Nefes eğrisini izler: ses seviyesi (hava sesi) ve aşama değişiminde titreşim
   void _cueTick() {
@@ -2061,14 +2053,8 @@ class _MeditatePageState extends State<MeditatePage>
           HapticFeedback.lightImpact();
         }
       }
+      if (store.medSound) _snd.tone();
     }
-    if (!store.medSound) return;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastLvlMs < 90) return; // saniyede ~11 kez ayarla
-    _lastLvlMs = now;
-    // 0 → 1 → 0 yumuşak eğri: alırken yükselir, verirken düşer
-    final lvl = 0.5 - 0.5 * cos(_br.value * 2 * pi);
-    _snd.breathLevel(inh, lvl);
   }
 
   /// Seans bitti (kayıt zaten yazıldı): sayfa açıksa özet penceresi
@@ -2137,7 +2123,6 @@ class _MeditatePageState extends State<MeditatePage>
     if (store.medSound) {
       // Başlangıç gongu; nefes döngüsü ve hava sesi gongdan biraz sonra başlar
       _snd.gong();
-      _snd.breathStart();
       _startDelay?.cancel();
       _startDelay = Timer(const Duration(milliseconds: 2500), () {
         if (mounted && _medCtl.running) _br.repeat();

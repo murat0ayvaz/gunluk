@@ -11,6 +11,7 @@ import 'notes.dart';
 import 'notify.dart';
 import 'reminders.dart';
 import 'rowedit.dart';
+import 'study.dart';
 import 'strings.dart';
 import 'theme.dart';
 import 'todos.dart';
@@ -686,9 +687,26 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             scrolledUnderElevation: 0,
             centerTitle: true,
             titleSpacing: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.menu_rounded),
-              onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+            leadingWidth: 92,
+            leading: Row(
+              children: [
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                  icon: const Icon(Icons.menu_rounded),
+                  onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                ),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                  tooltip: tx('Ders çalışma'),
+                  icon: const Icon(Icons.edit_note_rounded),
+                  onPressed: () => Navigator.of(context)
+                      .push(slideFromRight(const StudyPage())),
+                ),
+              ],
             ),
             // Tarih seçici en üstte: < Bugün • 3 Kasım >
             title: Row(

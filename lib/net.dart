@@ -1458,3 +1458,114 @@ Future<WxMarine?> fetchMarine(double lat, double lon) async {
   if (now == null && daily.isEmpty) return null;
   return WxMarine(now, daily);
 }
+
+// ---------------------------------------------------------------
+// Hava durumu sayfası: tüm kaynakları birlikte çeker (her biri ayrı tutulur,
+// sıcaklıklar yan yana gösterilebilsin diye) ve gerekirse birleştirir.
+// ---------------------------------------------------------------
+
+/// Kaynak anahtarları (gösterim sırası)
+const wxSourceKeys = ['mgm', 'om', 'ecmwf', 'icon', 'gfs', 'met'];
+
+/// Kısa görünen adlar
+const wxSourceShort = {
+  'mgm': 'MGM',
+  'om': 'OM',
+  'ecmwf': 'ECMWF',
+  'icon': 'ICON',
+  'gfs': 'GFS',
+  'met': 'MET',
+};
+
+class WxAll {
+  final Map<String, WxDetail> by = {}; // kaynak anahtarı -> veri (alınabilenler)
+  final List<String> notes = []; // alınamayanlar ve nedeni
+}
+
+Future<WxAll> fetchWxAll(double lat, double lon, {String place = ''}) async {
+  Future<WxDetail> one(String k) {
+    switch (k) {
+      case 'mgm':
+        return _detMgm(lat, lon, place);
+      case 'met':
+        return _detMet(lat, lon);
+      case 'ecmwf':
+        return _detOm(lat, lon, 'ecmwf_ifs025', 'ECMWF');
+      case 'icon':
+        return _detOm(lat, lon, 'icon_seamless', 'ICON');
+      case 'gfs':
+        return _detOm(lat, lon, 'gfs_seamless', 'GFS');
+      default:
+        return _detOm(lat, lon, '', 'Open-Meteo');
+    }
+  }
+
+  final all = WxAll();
+  final res = await Future.wait(wxSourceKeys.map((k) async {
+    try {
+      return MapEntry<String, WxDetail?>(k, await one(k));
+    } catch (e) {
+      final t = e.toString();
+      all.notes.add('${wxSourceShort[k]}: ${t.length > 40 ? t.substring(0, 40) : t}');
+      return MapEntry<String, WxDetail?>(k, null);
+    }
+  }));
+  for (final e in res) {
+    final d = e.value;
+    if (d != null) all.by[e.key] = d;
+  }
+  if (all.by.isEmpty) throw WxError('all', 'veri', all.notes.join(' | '));
+  return all;
+}
+
+/// Birkaç kaynağı öncelik sırasıyla birleştirir: eksik alanlar sıradaki kaynaktan dolar
+WxDetail mergeWx(List<WxDetail> ok) {
+  final out = WxDetail();
+  if (ok.isEmpty) return out;
+  for (final d in ok) {
+    out.used.addAll(d.used);
+  }
+  for (final d in ok) {
+    final n = d.now;
+    if (n == null) continue;
+    if (out.now == null) {
+      out.now = WxPt(n.t)..fillFrom(n);
+    } else {
+      out.now!.fillFrom(n);
+    }
+  }
+  final base = ok.firstWhere((d) => d.hourly.isNotEmpty, orElse: () => ok.first);
+  for (final bp in base.hourly) {
+    final p = WxPt(bp.t)..fillFrom(bp);
+    for (final d in ok) {
+      if (identical(d, base)) continue;
+      for (final o in d.hourly) {
+        if (_hKey(o.t) == _hKey(bp.t)) {
+          p.fillFrom(o);
+          break;
+        }
+      }
+    }
+    out.hourly.add(p);
+  }
+  final days = <String, WxPt>{};
+  for (final d in ok) {
+    for (final o in d.daily) {
+      final k = _dk(o.t);
+      final ex = days[k];
+      if (ex == null) {
+        days[k] = WxPt(DateTime(o.t.year, o.t.month, o.t.day))..fillFrom(o);
+      } else {
+        ex.fillFrom(o);
+      }
+    }
+  }
+  out.daily = days.values.toList()..sort((a, b) => a.t.compareTo(b.t));
+  return out;
+}
+
+/// Saat anahtarı (yıl-ay-gün + saat): kaynakların aynı saatini eşleştirmek için
+String wxHourKey(DateTime t) => _hKey(t);
+
+/// Gün anahtarı (yıl-ay-gün)
+String wxDayKey(DateTime t) => _dk(t);

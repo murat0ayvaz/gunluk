@@ -3,18 +3,21 @@ import 'data.dart';
 import 'net.dart';
 import 'strings.dart';
 import 'theme.dart' show Pal;
+import 'tools.dart' show ToolsButton, ToolsDrawer;
 import 'ui.dart';
-import 'weather.dart' show wxIcon, wxColor;
+import 'weather.dart';
 
 // ---------------------------------------------------------------
-// AYRINTILI HAVA (Araçlar): sıcaklık, hissedilen, nem, rüzgar, basınç,
-// yağış, UV, görüş. Günlük (saatlik) / Haftalık / 15 günlük görünüm.
-// Kaynak seçilebilir: Birleşik (MGM + Open-Meteo + MET), MGM, Open-Meteo,
-// ECMWF, ICON, GFS, MET Norway. Kaynakta olmayan değer gösterilmez;
-// her değerin altında kaynağı yazar. Deniz durumu dokununca açılır.
+// HAVA DURUMU (Araçlar)
+// Üstte gün aralığı (Günlük / Haftalık / 15 gün). Altında açılır başlıklar:
+//   Sıcaklık  -> saat saat (ya da gün gün); bütün kaynakların değeri yan yana
+//   Hissedilen, Nem, Rüzgar, Basınç, Yağış, UV, Görüş -> seçili kaynaktan tek değer
+//   Deniz durumu -> dokununca yüklenir
+//   Kaynaklar ve ayarlar -> en altta, kapalı: kaynak seçimi + ana ekran hava ayarları
+// Kaynakta olmayan değer gösterilmez (tahmin yok).
 // ---------------------------------------------------------------
 
-const _srcList = <List<String>>[
+const _srcChoices = <List<String>>[
   ['auto', 'Birleşik'],
   ['mgm', 'MGM'],
   ['om', 'Open-Meteo'],
@@ -42,7 +45,89 @@ String _compass(double deg) {
 
 String _n(double v, [int d = 0]) {
   final s = v.toStringAsFixed(d);
-  return s.contains('.') ? s.replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '') : s;
+  return s.contains('.')
+      ? s.replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '')
+      : s;
+}
+
+String _two(int n) => n.toString().padLeft(2, '0');
+
+/// Açılır başlık: kendi durumunu tutar; ilk açılışta kapalı (Sıcaklık hariç)
+class _Sec extends StatefulWidget {
+  final String title;
+  final IconData icon;
+  final bool initOpen;
+  final VoidCallback? onOpen;
+  final Widget child;
+  const _Sec(
+      {super.key,
+      required this.title,
+      required this.icon,
+      required this.child,
+      this.initOpen = false,
+      this.onOpen});
+
+  @override
+  State<_Sec> createState() => _SecState();
+}
+
+class _SecState extends State<_Sec> {
+  late bool _open = widget.initOpen;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_open) widget.onOpen?.call();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palOf(context);
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      decoration: BoxDecoration(
+        color: p.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: p.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () {
+              setState(() => _open = !_open);
+              if (_open) widget.onOpen?.call();
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+              child: Row(
+                children: [
+                  Icon(widget.icon, color: p.accent),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(widget.title,
+                        style: TextStyle(
+                            color: p.ink,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600)),
+                  ),
+                  Icon(_open
+                      ? Icons.expand_less_rounded
+                      : Icons.expand_more_rounded),
+                ],
+              ),
+            ),
+          ),
+          if (_open)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+              child: widget.child,
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class WxDetailPage extends StatefulWidget {
@@ -53,8 +138,9 @@ class WxDetailPage extends StatefulWidget {
 }
 
 class _WxDetailPageState extends State<WxDetailPage> {
-  String _src = 'auto';
-  WxDetail? _d;
+  String _src = 'auto'; // diğer başlıklar için kaynak
+  WxAll? _all;
+  WxDetail? _sel;
   bool _loading = false;
   String? _err;
   int _tab = 0; // 0 günlük (saatlik), 1 haftalık, 2 15 gün
@@ -71,10 +157,18 @@ class _WxDetailPageState extends State<WxDetailPage> {
   }
 
   Future<void> _load() async {
+    if ((store.wxLat == null || store.wxLon == null) && store.wxGps) {
+      setState(() => _loading = true);
+      try {
+        await weather.ensure(force: true); // telefonun konumunu bulup kaydeder
+      } catch (_) {}
+      if (!mounted) return;
+    }
     final lat = store.wxLat;
     final lon = store.wxLon;
     if (lat == null || lon == null) {
-      setState(() => _err = tx('Konum yok. Önce Ayarlar\'dan hava durumunu aç (konum ya da şehir seç).'));
+      setState(() => _loading = false);
+      setState(() => _err = tx('Konum yok. Aşağıdaki Kaynaklar ve ayarlar bölümünden konum ya da şehir seç.'));
       return;
     }
     setState(() {
@@ -82,28 +176,47 @@ class _WxDetailPageState extends State<WxDetailPage> {
       _err = null;
     });
     try {
-      final d = await fetchWxDetail(_src, lat, lon,
+      final a = await fetchWxAll(lat, lon,
           place: store.wxGps ? '' : store.wxCity);
       if (!mounted) return;
       setState(() {
-        _d = d;
+        _all = a;
         _loading = false;
+        _pickSel();
       });
     } catch (e) {
       if (!mounted) return;
       final t = e is WxError ? '${e.step}: ${e.detail}' : e.toString();
       setState(() {
         _loading = false;
-        _d = null;
+        _all = null;
+        _sel = null;
         _err = tx('Veri alınamadı: {0}', [t.length > 120 ? t.substring(0, 120) : t]);
       });
+    }
+  }
+
+  /// Seçili kaynağa göre "diğer başlıklar"ın verisini hazırlar
+  void _pickSel() {
+    final a = _all;
+    if (a == null) {
+      _sel = null;
+      return;
+    }
+    if (_src == 'auto') {
+      _sel = mergeWx([
+        for (final k in const ['mgm', 'om', 'met'])
+          if (a.by[k] != null) a.by[k]!
+      ]);
+    } else {
+      _sel = a.by[_src];
     }
   }
 
   Future<void> _loadMarine() async {
     final lat = store.wxLat;
     final lon = store.wxLon;
-    if (lat == null || lon == null) return;
+    if (lat == null || lon == null || _marineAsked) return;
     setState(() {
       _marineAsked = true;
       _marineLoading = true;
@@ -126,70 +239,255 @@ class _WxDetailPageState extends State<WxDetailPage> {
     }
   }
 
-  // ---------- parçalar ----------
-  Widget _stat(Pal p, IconData icon, String label, String value, String? src) {
-    final w = (MediaQuery.of(context).size.width - 32 - 10) / 2;
-    return Container(
-      width: w,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: p.card,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: p.line),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: p.accent, size: 26),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: TextStyle(color: p.soft, fontSize: 12)),
-                Text(value,
-                    style: TextStyle(
-                        color: p.ink,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600)),
-                if (src != null && src.isNotEmpty)
-                  Text(src, style: TextStyle(color: p.soft, fontSize: 10)),
-              ],
-            ),
+  // ---------- zaman penceresi ----------
+  bool _inWindow(DateTime t) {
+    final now = DateTime.now();
+    return !t.isBefore(now.subtract(const Duration(minutes: 90))) &&
+        !t.isAfter(now.add(const Duration(hours: 30)));
+  }
+
+  int get _dayCount => _tab == 1 ? 7 : 16;
+
+  String _dayLabel(DateTime t) =>
+      '${wdName(t.weekday)}\n${_two(t.day)}.${_two(t.month)}';
+
+  Widget _label(Pal p, String text, {double w = 52}) => SizedBox(
+        width: w,
+        child: Text(text,
+            style: TextStyle(
+                color: p.soft, fontSize: 12.5, fontWeight: FontWeight.w600)),
+      );
+
+  // ---------- Sıcaklık: kaynaklar yan yana ----------
+  Widget _tempSection(Pal p) {
+    final a = _all;
+    if (a == null) return const SizedBox.shrink();
+    final rows = <Widget>[];
+    if (_tab == 0) {
+      // saat saat: tüm kaynakların saatlerinin birleşimi
+      final times = <String, DateTime>{};
+      for (final d in a.by.values) {
+        for (final x in d.hourly) {
+          if (_inWindow(x.t)) times[wxHourKey(x.t)] = x.t;
+        }
+      }
+      final keys = times.keys.toList()..sort();
+      String lastDay = '';
+      for (final k in keys) {
+        final t = times[k]!;
+        final dk = wxDayKey(t);
+        if (dk != lastDay) {
+          lastDay = dk;
+          final now = DateTime.now();
+          rows.add(Padding(
+            padding: const EdgeInsets.only(top: 6, bottom: 2),
+            child: Text(
+                dk == wxDayKey(now) ? tx('Bugün') : wdName(t.weekday),
+                style: TextStyle(color: p.accent, fontWeight: FontWeight.w700)),
+          ));
+        }
+        final cells = <Widget>[];
+        for (final sk in wxSourceKeys) {
+          final d = a.by[sk];
+          if (d == null) continue;
+          WxPt? hit;
+          for (final x in d.hourly) {
+            if (wxHourKey(x.t) == k) {
+              hit = x;
+              break;
+            }
+          }
+          final v = hit?.v['temp'];
+          if (v != null) cells.add(_cell(p, wxSourceShort[sk]!, '${_n(v)}°'));
+        }
+        if (cells.isEmpty) continue;
+        rows.add(Padding(
+          padding: const EdgeInsets.symmetric(vertical: 5),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _label(p, '${_two(t.hour)}:00'),
+              Expanded(child: Wrap(spacing: 14, runSpacing: 4, children: cells)),
+            ],
           ),
+        ));
+      }
+    } else {
+      // gün gün: en yüksek / en düşük
+      final days = <String, DateTime>{};
+      final today = DateTime.now();
+      final t0 = DateTime(today.year, today.month, today.day);
+      for (final d in a.by.values) {
+        for (final x in d.daily) {
+          if (!x.t.isBefore(t0)) days[wxDayKey(x.t)] = x.t;
+        }
+      }
+      final keys = days.keys.toList()..sort();
+      for (final k in keys.take(_dayCount)) {
+        final t = days[k]!;
+        final cells = <Widget>[];
+        for (final sk in wxSourceKeys) {
+          final d = a.by[sk];
+          if (d == null) continue;
+          WxPt? hit;
+          for (final x in d.daily) {
+            if (wxDayKey(x.t) == k) {
+              hit = x;
+              break;
+            }
+          }
+          final hi = hit?.v['tmax'];
+          final lo = hit?.v['tmin'];
+          if (hi != null || lo != null) {
+            cells.add(_cell(p, wxSourceShort[sk]!,
+                '${hi == null ? '' : '${_n(hi)}°'}${lo == null ? '' : ' / ${_n(lo)}°'}'));
+          }
+        }
+        if (cells.isEmpty) continue;
+        rows.add(Padding(
+          padding: const EdgeInsets.symmetric(vertical: 5),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _label(p, _dayLabel(t), w: 56),
+              Expanded(child: Wrap(spacing: 14, runSpacing: 4, children: cells)),
+            ],
+          ),
+        ));
+      }
+    }
+    if (rows.isEmpty) return _empty(p);
+    return Column(children: rows);
+  }
+
+  Widget _cell(Pal p, String src, String value) => Text.rich(TextSpan(children: [
+        TextSpan(text: '$src ', style: TextStyle(color: p.soft, fontSize: 11)),
+        TextSpan(
+            text: value,
+            style: TextStyle(
+                color: p.ink, fontSize: 15, fontWeight: FontWeight.w600)),
+      ]));
+
+  Widget _empty(Pal p) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Text(tx('Seçili kaynakta bu veri yok.'),
+            style: TextStyle(color: p.soft)),
+      );
+
+  /// Diğer başlıklar: seçili kaynaktan tek değer; saat saat ya da gün gün
+  Widget _metricSection(Pal p, String Function(WxPt) fmt, {bool dailyToo = true}) {
+    final d = _sel;
+    if (d == null) return _empty(p);
+    final rows = <Widget>[];
+    if (_tab == 0) {
+      String lastDay = '';
+      for (final x in d.hourly) {
+        if (!_inWindow(x.t)) continue;
+        final s = fmt(x);
+        if (s.isEmpty) continue;
+        final dk = wxDayKey(x.t);
+        if (dk != lastDay) {
+          lastDay = dk;
+          rows.add(Padding(
+            padding: const EdgeInsets.only(top: 6, bottom: 2),
+            child: Text(
+                dk == wxDayKey(DateTime.now()) ? tx('Bugün') : wdName(x.t.weekday),
+                style: TextStyle(color: p.accent, fontWeight: FontWeight.w700)),
+          ));
+        }
+        rows.add(_metricRow(p, '${_two(x.t.hour)}:00', s, x));
+      }
+    } else {
+      final now = DateTime.now();
+      final t0 = DateTime(now.year, now.month, now.day);
+      var c = 0;
+      for (final x in d.daily) {
+        if (x.t.isBefore(t0)) continue;
+        if (c >= _dayCount) break;
+        final s = fmt(x);
+        if (s.isEmpty) continue;
+        c++;
+        rows.add(_metricRow(p, _dayLabel(x.t), s, x, w: 56));
+      }
+    }
+    if (rows.isEmpty) return _empty(p);
+    return Column(children: rows);
+  }
+
+  Widget _metricRow(Pal p, String label, String value, WxPt x, {double w = 52}) {
+    final set = <String>{
+      for (final v in x.s.values)
+        if (v.isNotEmpty) _short(v)
+    };
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _label(p, label, w: w),
+          Expanded(
+            child: Text(value,
+                style: TextStyle(
+                    color: p.ink, fontSize: 15, fontWeight: FontWeight.w600)),
+          ),
+          if (_src == 'auto' && set.length > 1)
+            Text(set.join('+'), style: TextStyle(color: p.soft, fontSize: 9)),
         ],
       ),
     );
   }
 
-  /// Şimdiki durum kartı: yalnızca verisi olan değerler gösterilir
-  Widget _nowCard(Pal p, WxPt n) {
-    final tiles = <Widget>[];
-    void add(IconData ic, String label, String key, String Function(double) fmtv) {
-      final x = n.v[key];
-      if (x == null) return;
-      tiles.add(_stat(p, ic, label, fmtv(x), _short(n.s[key] ?? '')));
-    }
+  // ---------- değer biçimleri ----------
+  String _fFeels(WxPt x) {
+    final v = x.v['feels'];
+    return v == null ? '' : '${_n(v)}°';
+  }
 
-    add(Icons.thermostat_rounded, tx('Hissedilen'), 'feels', (x) => '${_n(x)}°');
-    add(Icons.water_drop_outlined, tx('Nem'), 'hum', (x) => '%${_n(x)}');
-    // Rüzgar: hız + yön + hamle
-    final w = n.v['wind'];
-    if (w != null) {
-      final dir = n.v['dir'];
-      final g = n.v['gust'];
-      final txt = StringBuffer('${_n(w)} ${tx('km/sa')}');
-      if (dir != null) txt.write(' ${_compass(dir)}');
-      if (g != null) txt.write(' (${tx('hamle')} ${_n(g)})');
-      tiles.add(_stat(p, Icons.air_rounded, tx('Rüzgar'), txt.toString(),
-          _short(n.s['wind'] ?? '')));
-    }
-    add(Icons.speed_rounded, tx('Basınç'), 'press', (x) => '${_n(x)} hPa');
-    add(Icons.grain_rounded, tx('Yağış'), 'rain', (x) => '${_n(x, 1)} mm');
-    add(Icons.wb_sunny_outlined, tx('UV'), 'uv', (x) => _n(x, 1));
-    add(Icons.visibility_outlined, tx('Görüş'), 'vis', (x) => '${_n(x, 1)} km');
-    add(Icons.cloud_outlined, tx('Bulut'), 'cloud', (x) => '%${_n(x)}');
+  String _fHum(WxPt x) {
+    final v = x.v['hum'];
+    return v == null ? '' : '%${_n(v)}';
+  }
 
-    final temp = n.v['temp'];
+  String _fWind(WxPt x) {
+    final w = x.v['wind'];
+    if (w == null) return '';
+    final dir = x.v['dir'];
+    final g = x.v['gust'];
+    final b = StringBuffer('${_n(w)} ${tx('km/sa')}');
+    if (dir != null) b.write(' ${_compass(dir)}');
+    if (g != null) b.write('  (${tx('hamle')} ${_n(g)})');
+    return b.toString();
+  }
+
+  String _fPress(WxPt x) {
+    final v = x.v['press'];
+    return v == null ? '' : '${_n(v)} hPa';
+  }
+
+  String _fRain(WxPt x) {
+    final parts = <String>[];
+    final pop = x.v['pop'];
+    if (pop != null) parts.add('%${_n(pop)}');
+    final r = x.v['rain'];
+    if (r != null) parts.add('${_n(r, 1)} mm');
+    return parts.join('  •  ');
+  }
+
+  String _fUv(WxPt x) {
+    final v = x.v['uv'];
+    return v == null ? '' : _n(v, 1);
+  }
+
+  String _fVis(WxPt x) {
+    final v = x.v['vis'];
+    return v == null ? '' : '${_n(v, 1)} km';
+  }
+
+  // ---------- Şimdi kartı ----------
+  Widget _nowCard(Pal p) {
+    final n = _sel?.now ?? _all?.by.values.first.now;
+    if (n == null) return const SizedBox.shrink();
+    final t = n.v['temp'];
     final code = n.code;
     return Container(
       padding: const EdgeInsets.all(14),
@@ -198,179 +496,30 @@ class _WxDetailPageState extends State<WxDetailPage> {
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: p.line),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
+          if (code != null) Icon(wxIcon(code), size: 44, color: wxColor(code)),
+          const SizedBox(width: 12),
+          if (t != null)
+            Text('${_n(t)}°',
+                style: TextStyle(
+                    fontSize: 44, fontWeight: FontWeight.w300, color: p.ink)),
+          const Spacer(),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              if (code != null)
-                Icon(wxIcon(code), size: 46, color: wxColor(code)),
-              const SizedBox(width: 12),
-              if (temp != null)
-                Text('${_n(temp)}°',
-                    style: TextStyle(
-                        fontSize: 46,
-                        fontWeight: FontWeight.w300,
-                        color: p.ink)),
-              const Spacer(),
               Text(tx('Şimdi'), style: TextStyle(color: p.soft)),
+              if (n.v['feels'] != null)
+                Text('${tx('Hissedilen')} ${_n(n.v['feels']!)}°',
+                    style: TextStyle(color: p.soft, fontSize: 12)),
             ],
           ),
-          if (tiles.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Wrap(spacing: 10, runSpacing: 10, children: tiles),
-          ],
         ],
       ),
     );
   }
 
-  /// Satırdaki değerlerin kaynak kısaltmaları (tek kaynaksa gösterilmez)
-  String _srcOf(WxPt x) {
-    final set = <String>{for (final v in x.s.values) _short(v)};
-    return set.length > 1 ? set.join('+') : '';
-  }
-
-  List<String> _parts(WxPt x, {bool daily = false}) {
-    final o = <String>[];
-    final pop = x.v['pop'];
-    if (pop != null) o.add('%${_n(pop)} ${tx('yağış ihtimali')}');
-    final rain = x.v['rain'];
-    if (rain != null && rain > 0) o.add('${_n(rain, 1)} mm');
-    final w = x.v['wind'];
-    if (w != null) {
-      final dir = x.v['dir'];
-      o.add('${_n(w)} ${tx('km/sa')}${dir != null ? ' ${_compass(dir)}' : ''}');
-    }
-    final hum = x.v['hum'];
-    if (hum != null) o.add('${tx('nem')} %${_n(hum)}');
-    final uv = x.v['uv'];
-    if (uv != null) o.add('UV ${_n(uv, 1)}');
-    return o;
-  }
-
-  Widget _hourRow(Pal p, WxPt x) {
-    final t = x.v['temp'];
-    final code = x.code;
-    final parts = _parts(x);
-    final src = _srcOf(x);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 48,
-            child: Text('${x.t.hour.toString().padLeft(2, '0')}:00',
-                style: TextStyle(color: p.soft, fontWeight: FontWeight.w600)),
-          ),
-          SizedBox(
-            width: 30,
-            child: code == null
-                ? null
-                : Icon(wxIcon(code, night: x.t.hour < 6 || x.t.hour >= 20),
-                    size: 22, color: wxColor(code)),
-          ),
-          SizedBox(
-            width: 46,
-            child: Text(t == null ? '' : '${_n(t)}°',
-                style: TextStyle(
-                    color: p.ink, fontSize: 16, fontWeight: FontWeight.w600)),
-          ),
-          Expanded(
-            child: Text(parts.join(' • '),
-                style: TextStyle(color: p.soft, fontSize: 12)),
-          ),
-          if (src.isNotEmpty)
-            Text(src, style: TextStyle(color: p.soft, fontSize: 9)),
-        ],
-      ),
-    );
-  }
-
-  Widget _dayRow(Pal p, WxPt x) {
-    final hi = x.v['tmax'];
-    final lo = x.v['tmin'];
-    final code = x.code;
-    final parts = _parts(x, daily: true);
-    final src = _srcOf(x);
-    String two(int n) => n.toString().padLeft(2, '0');
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 74,
-            child: Text('${wdName(x.t.weekday)}\n${two(x.t.day)}.${two(x.t.month)}',
-                style: TextStyle(color: p.ink, fontSize: 13, height: 1.25)),
-          ),
-          SizedBox(
-            width: 30,
-            child: code == null
-                ? null
-                : Icon(wxIcon(code), size: 22, color: wxColor(code)),
-          ),
-          SizedBox(
-            width: 70,
-            child: Text(
-                '${hi == null ? '' : '${_n(hi)}°'}${lo == null ? '' : ' / ${_n(lo)}°'}',
-                style: TextStyle(
-                    color: p.ink, fontSize: 14, fontWeight: FontWeight.w600)),
-          ),
-          Expanded(
-            child: Text(parts.join(' • '),
-                style: TextStyle(color: p.soft, fontSize: 11.5)),
-          ),
-          if (src.isNotEmpty)
-            Text(src, style: TextStyle(color: p.soft, fontSize: 9)),
-        ],
-      ),
-    );
-  }
-
-  Widget _list(Pal p, WxDetail d) {
-    final now = DateTime.now();
-    final rows = <Widget>[];
-    if (_tab == 0) {
-      final from = now.subtract(const Duration(minutes: 90));
-      final to = now.add(const Duration(hours: 30));
-      String lastDay = '';
-      for (final x in d.hourly) {
-        if (x.t.isBefore(from) || x.t.isAfter(to)) continue;
-        final dk = dKey(DateTime(x.t.year, x.t.month, x.t.day));
-        if (dk != lastDay) {
-          lastDay = dk;
-          rows.add(Padding(
-            padding: const EdgeInsets.only(top: 8, bottom: 2),
-            child: Text(
-                dk == dKey(DateTime(now.year, now.month, now.day))
-                    ? tx('Bugün')
-                    : wdName(x.t.weekday),
-                style: TextStyle(
-                    color: p.accent, fontWeight: FontWeight.w700)),
-          ));
-        }
-        rows.add(_hourRow(p, x));
-      }
-    } else {
-      final today = DateTime(now.year, now.month, now.day);
-      final max = _tab == 1 ? 7 : 16;
-      var c = 0;
-      for (final x in d.daily) {
-        if (x.t.isBefore(today)) continue;
-        if (c++ >= max) break;
-        rows.add(_dayRow(p, x));
-      }
-    }
-    if (rows.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(16),
-        child: Text(tx('Bu görünüm için veri yok.'),
-            style: TextStyle(color: p.soft)),
-      );
-    }
-    return Column(children: rows);
-  }
-
+  // ---------- Deniz ----------
   String _seaState(double h) {
     if (h < 0.1) return tx('Aynalı');
     if (h < 0.5) return tx('Sakin');
@@ -389,63 +538,56 @@ class _WxDetailPageState extends State<WxDetailPage> {
     final m = _marine;
     if (m == null) {
       return Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         child: Text(_marineErr ?? tx('Bu konumda deniz verisi yok.'),
             style: TextStyle(color: p.soft)),
       );
     }
     final n = m.now;
-    final tiles = <Widget>[];
-    if (n != null) {
-      final h = n.v['wave'];
-      if (h != null) {
-        tiles.add(_stat(p, Icons.waves_rounded, tx('Dalga yüksekliği'),
-            '${_n(h, 1)} m • ${_seaState(h)}', _short(n.s['wave'] ?? '')));
-      }
-      final dir = n.v['wdir'];
-      if (dir != null) {
-        tiles.add(_stat(p, Icons.explore_outlined, tx('Dalga yönü'),
-            '${_compass(dir)} (${_n(dir)}°)', _short(n.s['wdir'] ?? '')));
-      }
-      final per = n.v['wper'];
-      if (per != null) {
-        tiles.add(_stat(p, Icons.timelapse_rounded, tx('Dalga periyodu'),
-            '${_n(per, 1)} ${tx('sn')}', _short(n.s['wper'] ?? '')));
-      }
-      final sst = n.v['sst'];
-      if (sst != null) {
-        tiles.add(_stat(p, Icons.thermostat_rounded, tx('Deniz suyu sıcaklığı'),
-            '${_n(sst, 1)}°', _short(n.s['sst'] ?? '')));
-      }
-      final sw = n.v['swell'];
-      if (sw != null) {
-        tiles.add(_stat(p, Icons.water_rounded, tx('Dalga (uzun)'),
-            '${_n(sw, 1)} m', _short(n.s['swell'] ?? '')));
-      }
-    }
-    String two(int n) => n.toString().padLeft(2, '0');
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (tiles.isNotEmpty)
-            Wrap(spacing: 10, runSpacing: 10, children: tiles),
-          if (m.daily.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(tx('Günlere göre en yüksek dalga'),
-                style: TextStyle(color: p.soft, fontSize: 12)),
-            for (final x in m.daily)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  children: [
-                    SizedBox(
-                        width: 80,
-                        child: Text(
-                            '${wdName(x.t.weekday)} ${two(x.t.day)}.${two(x.t.month)}',
-                            style: TextStyle(color: p.ink, fontSize: 13))),
-                    Text(
+    Widget line(String k, String v) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            children: [
+              Expanded(child: Text(k, style: TextStyle(color: p.soft))),
+              Text(v,
+                  style: TextStyle(
+                      color: p.ink, fontWeight: FontWeight.w600, fontSize: 15)),
+            ],
+          ),
+        );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (n != null) ...[
+          if (n.v['wave'] != null)
+            line(tx('Dalga yüksekliği'),
+                '${_n(n.v['wave']!, 1)} m • ${_seaState(n.v['wave']!)}'),
+          if (n.v['wdir'] != null)
+            line(tx('Dalga yönü'),
+                '${_compass(n.v['wdir']!)} (${_n(n.v['wdir']!)}°)'),
+          if (n.v['wper'] != null)
+            line(tx('Dalga periyodu'), '${_n(n.v['wper']!, 1)} ${tx('sn')}'),
+          if (n.v['sst'] != null)
+            line(tx('Deniz suyu sıcaklığı'), '${_n(n.v['sst']!, 1)}°'),
+          if (n.v['swell'] != null)
+            line(tx('Dalga (uzun)'), '${_n(n.v['swell']!, 1)} m'),
+        ],
+        if (m.daily.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Text(tx('Günlere göre en yüksek dalga'),
+              style: TextStyle(color: p.soft, fontSize: 12)),
+          for (final x in m.daily)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  SizedBox(
+                      width: 84,
+                      child: Text(
+                          '${wdName(x.t.weekday)} ${_two(x.t.day)}.${_two(x.t.month)}',
+                          style: TextStyle(color: p.ink, fontSize: 13))),
+                  Expanded(
+                    child: Text(
                         [
                           if (x.v['wave'] != null)
                             '${_n(x.v['wave']!, 1)} m • ${_seaState(x.v['wave']!)}',
@@ -454,117 +596,257 @@ class _WxDetailPageState extends State<WxDetailPage> {
                           if (x.v['wdir'] != null) _compass(x.v['wdir']!),
                         ].join(' • '),
                         style: TextStyle(color: p.soft, fontSize: 12)),
-                  ],
-                ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+
+  // ---------- Kaynaklar ve ayarlar (en altta, kapalı) ----------
+  Widget _settingsBody(Pal p) {
+    final a = _all;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(tx('Diğer başlıkların kaynağı'),
+            style: TextStyle(color: p.soft, fontSize: 12.5)),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            for (final s in _srcChoices)
+              ChoiceChip(
+                label: Text(s[0] == 'auto' ? tx(s[1]) : s[1]),
+                selected: _src == s[0],
+                onSelected: (_) => setState(() {
+                  _src = s[0];
+                  _pickSel();
+                }),
               ),
           ],
+        ),
+        if (a != null) ...[
+          const SizedBox(height: 8),
+          Text(
+              tx('Alınan kaynaklar: {0}', [
+                a.by.keys.map((k) => wxSourceShort[k] ?? k).join(', ')
+              ]) +
+                  (a.notes.isEmpty
+                      ? ''
+                      : '\n${tx('alınamayan')}: ${a.notes.join('; ')}'),
+              style: TextStyle(color: p.soft, fontSize: 11)),
         ],
-      ),
+        const Divider(height: 24),
+        Text(tx('Ana ekrandaki hava durumu'),
+            style: TextStyle(color: p.soft, fontSize: 12.5)),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(tx('Hava durumunu göster')),
+          subtitle: Text(store.wxGps
+              ? tx('Konumum')
+              : (store.wxCity.isEmpty ? tx('Önce bir şehir seç') : store.wxCity)),
+          value: store.wxOn,
+          onChanged: (v) async {
+            if (v && !store.wxGps && store.wxLat == null) {
+              await showCityDialog(context);
+              if (mounted) _load();
+            } else {
+              store.setWxOn(v);
+              if (v) weather.ensure();
+            }
+          },
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.cloud_queue_rounded),
+          title: Text(tx('Hava durumu servisi')),
+          subtitle: DropdownButton<String>(
+            isExpanded: true,
+            value: store.wxProvider,
+            underline: const SizedBox.shrink(),
+            items: [
+              for (final pr in wxProviders)
+                DropdownMenuItem(
+                    value: pr[0],
+                    child: Text(pr[1], style: const TextStyle(fontSize: 13))),
+            ],
+            onChanged: (v) async {
+              if (v == null) return;
+              store.setWxProvider(v);
+              if (v == 'owm' && store.wxOwmKey.isEmpty) {
+                final k = await askText(context, tx('OpenWeatherMap anahtarı'),
+                    label: tx('API anahtarı'));
+                if (k != null) store.setWxOwmKey(k.trim());
+              }
+              weather.reset();
+            },
+          ),
+        ),
+        if (store.wxProvider == 'owm')
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.key_rounded),
+            title: Text(tx('OpenWeatherMap anahtarı')),
+            subtitle:
+                Text(store.wxOwmKey.isEmpty ? tx('Girilmedi') : tx('Girildi')),
+            onTap: () async {
+              final k = await askText(context, tx('OpenWeatherMap anahtarı'),
+                  initial: store.wxOwmKey, label: tx('API anahtarı'));
+              if (k != null) {
+                store.setWxOwmKey(k.trim());
+                weather.reset();
+              }
+            },
+          ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.location_city_outlined),
+          title: Text(tx('Şehir adıyla seç')),
+          subtitle:
+              store.wxGps || store.wxCity.isEmpty ? null : Text(store.wxCity),
+          trailing:
+              store.wxGps ? null : const Icon(Icons.check_rounded, size: 20),
+          onTap: () async {
+            await showCityDialog(context);
+            if (mounted) _load();
+          },
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.my_location_rounded),
+          title: Text(tx('Konumumu kullan')),
+          trailing:
+              store.wxGps ? const Icon(Icons.check_rounded, size: 20) : null,
+          onTap: () {
+            store.setWxGps(true);
+            weather.reset();
+            _load();
+          },
+        ),
+        Text(
+          store.wxProvider == 'mgm'
+              ? tx('MGM verisi resmi olmayan yoldan alınır; çalışmazsa başka bir servis seç.')
+              : tx('Hava durumu internetten alınır. Bugünde şimdiki durum, tarihin yanındaki simgeye basınca saatlik hava açılır.'),
+          style: TextStyle(fontSize: 12.5, color: p.soft, height: 1.4),
+        ),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final p = palOf(context);
-    final d = _d;
-    return Scaffold(
-      backgroundColor: p.bg,
-      appBar: AppBar(
-        title: Text(tx('Ayrıntılı hava')),
-        actions: [
-          IconButton(
-              tooltip: tx('Yenile'),
-              onPressed: _loading
-                  ? null
-                  : () {
-                      _marineAsked = false;
-                      _marine = null;
-                      _load();
-                    },
-              icon: const Icon(Icons.refresh_rounded)),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        children: [
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            children: [
-              for (final s in _srcList)
-                ChoiceChip(
-                  label: Text(s[0] == 'auto' ? tx(s[1]) : s[1]),
-                  selected: _src == s[0],
-                  onSelected: (_) {
-                    if (_src == s[0]) return;
-                    setState(() => _src = s[0]);
-                    _load();
-                  },
-                ),
+    return ListenableBuilder(
+      listenable: store,
+      builder: (context, _) {
+        final p = palOf(context);
+        final has = _all != null && !_loading;
+        return Scaffold(
+          backgroundColor: p.bg,
+          endDrawer: const ToolsDrawer(replace: true),
+          appBar: AppBar(
+            title: Text(tx('Hava durumu')),
+            actions: [
+              const ToolsButton(),
+              IconButton(
+                  tooltip: tx('Yenile'),
+                  onPressed: _loading
+                      ? null
+                      : () {
+                          _marineAsked = false;
+                          _marine = null;
+                          _load();
+                        },
+                  icon: const Icon(Icons.refresh_rounded)),
             ],
           ),
-          const SizedBox(height: 10),
-          if (_loading)
-            const Padding(
-                padding: EdgeInsets.all(30),
-                child: Center(child: CircularProgressIndicator())),
-          if (_err != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Text(_err!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error)),
-            ),
-          if (d != null && !_loading) ...[
-            if (d.now != null) _nowCard(p, d.now!),
-            const SizedBox(height: 6),
-            Text(
-                tx('Kaynak: {0}', [d.used.join(', ')]) +
-                    (d.notes.isEmpty ? '' : '  •  ${tx('alınamayan')}: ${d.notes.join('; ')}'),
-                style: TextStyle(color: p.soft, fontSize: 11)),
-            const SizedBox(height: 12),
-            SegmentedButton<int>(
-              segments: [
-                ButtonSegment(value: 0, label: Text(tx('Günlük'))),
-                ButtonSegment(value: 1, label: Text(tx('Haftalık'))),
-                ButtonSegment(value: 2, label: Text(tx('15 gün'))),
-              ],
-              selected: {_tab},
-              showSelectedIcon: false,
-              onSelectionChanged: (s) => setState(() => _tab = s.first),
-            ),
-            const SizedBox(height: 4),
-            _list(p, d),
-            if (_tab == 2 && d.daily.length < 16)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text(tx('Seçili kaynak bu kadar gün veriyor.'),
-                    style: TextStyle(color: p.soft, fontSize: 11)),
+          body: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            children: [
+              SegmentedButton<int>(
+                segments: [
+                  ButtonSegment(value: 0, label: Text(tx('Günlük'))),
+                  ButtonSegment(value: 1, label: Text(tx('Haftalık'))),
+                  ButtonSegment(value: 2, label: Text(tx('15 gün'))),
+                ],
+                selected: {_tab},
+                showSelectedIcon: false,
+                onSelectionChanged: (s) => setState(() => _tab = s.first),
               ),
-            const SizedBox(height: 10),
-            // Deniz durumu: dokununca açılır, o zaman veri çekilir
-            Container(
-              decoration: BoxDecoration(
-                color: p.card,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: p.line),
-              ),
-              child: Theme(
-                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                child: ExpansionTile(
-                  leading: Icon(Icons.sailing_rounded, color: p.accent),
-                  title: Text(tx('Deniz durumu'),
+              const SizedBox(height: 10),
+              if (_loading)
+                const Padding(
+                    padding: EdgeInsets.all(30),
+                    child: Center(child: CircularProgressIndicator())),
+              if (_err != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(_err!,
                       style: TextStyle(
-                          color: p.ink, fontWeight: FontWeight.w600)),
-                  onExpansionChanged: (open) {
-                    if (open && !_marineAsked) _loadMarine();
-                  },
-                  children: [_marineBody(p)],
+                          color: Theme.of(context).colorScheme.error)),
                 ),
-              ),
-            ),
-          ],
-        ],
-      ),
+              if (has) ...[
+                _nowCard(p),
+                _Sec(
+                    key: const ValueKey('s_temp'),
+                    title: tx('Sıcaklık'),
+                    icon: Icons.thermostat_rounded,
+                    initOpen: true,
+                    child: _tempSection(p)),
+                _Sec(
+                    key: const ValueKey('s_feels'),
+                    title: tx('Hissedilen'),
+                    icon: Icons.device_thermostat_rounded,
+                    child: _metricSection(p, _fFeels)),
+                _Sec(
+                    key: const ValueKey('s_hum'),
+                    title: tx('Nem'),
+                    icon: Icons.water_drop_outlined,
+                    child: _metricSection(p, _fHum)),
+                _Sec(
+                    key: const ValueKey('s_wind'),
+                    title: tx('Rüzgar'),
+                    icon: Icons.air_rounded,
+                    child: _metricSection(p, _fWind)),
+                _Sec(
+                    key: const ValueKey('s_press'),
+                    title: tx('Basınç'),
+                    icon: Icons.speed_rounded,
+                    child: _metricSection(p, _fPress)),
+                _Sec(
+                    key: const ValueKey('s_rain'),
+                    title: tx('Yağış'),
+                    icon: Icons.grain_rounded,
+                    child: _metricSection(p, _fRain)),
+                _Sec(
+                    key: const ValueKey('s_uv'),
+                    title: tx('UV'),
+                    icon: Icons.wb_sunny_outlined,
+                    child: _metricSection(p, _fUv)),
+                _Sec(
+                    key: const ValueKey('s_vis'),
+                    title: tx('Görüş'),
+                    icon: Icons.visibility_outlined,
+                    child: _metricSection(p, _fVis)),
+                _Sec(
+                    key: const ValueKey('s_sea'),
+                    title: tx('Deniz durumu'),
+                    icon: Icons.sailing_rounded,
+                    onOpen: _loadMarine,
+                    child: _marineBody(p)),
+              ],
+              _Sec(
+                  key: const ValueKey('s_set'),
+                  title: tx('Kaynaklar ve ayarlar'),
+                  icon: Icons.tune_rounded,
+                  child: _settingsBody(p)),
+            ],
+          ),
+        );
+      },
     );
   }
 }

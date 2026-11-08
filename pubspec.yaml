@@ -1,7 +1,7 @@
 name: gunluk
 description: Daily Routine - günlük rutin, hedef, yapılacaklar ve günlük (not) uygulaması
 publish_to: 'none'
-version: 1.23.0+30
+version: 1.24.0+31
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -39,4 +39,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/splash.jpg   # açılış ekranı görseli
-    - assets/sounds/      # meditasyon: nefes al/ver ve gong sesleri
+    - assets/sounds/      # meditasyon: nefes tınısı, gong ve zil sesleri
