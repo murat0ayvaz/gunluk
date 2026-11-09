@@ -1,0 +1,42 @@
+name: gunluk
+description: Daily Routine - günlük rutin, hedef, yapılacaklar ve günlük (not) uygulaması
+publish_to: 'none'
+version: 1.25.0+33
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:   # Türkçe / English tarih seçici ve düğme metinleri için
+    sdk: flutter
+  intl: any                # flutter_localizations bunu ister
+  flutter_local_notifications: ^19.0.0   # hatırlatıcı bildirimleri
+  timezone: any            # bildirim zamanlaması için
+  record: '>=5.1.0 <7.0.0'   # ses kaydı (günlük, yapılacaklar)
+  flutter_tts: '>=4.0.0 <5.0.0'   # haberleri sesli okuma
+  url_launcher: '>=6.2.0 <7.0.0'   # haberi tarayıcıda aç
+  geolocator: '>=11.0.0 <15.0.0'   # telefonun konumu (hava durumu)
+  audioplayers: ^6.1.0     # meditasyonda nefes sesleri ve gong (müzikle üst üste çalar)
+  just_audio: '>=0.9.36 <0.11.0'   # müzik / radyo çalar
+  just_audio_background: ^0.0.1-beta.11   # arka planda çalma + bildirim kontrolü
+  file_picker: '>=8.0.0 <11.0.0'   # telefondan şarkı seçmek için
+  crypto: ^3.0.3           # şifre özeti (SHA-256) için; saf Dart paketi, eklenti değil
+
+dev_dependencies:
+  flutter_launcher_icons: ^0.14.1   # uygulama simgesini üretir
+
+# Uygulama simgesi (GitHub derlemesinde otomatik uygulanır)
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon.png"
+  adaptive_icon_background: "#FDF9ED"
+  adaptive_icon_foreground: "assets/icon_fg.png"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/splash.jpg   # açılış ekranı görseli
+    - assets/sounds/      # meditasyon: nefes tınısı, gong ve zil sesleri
