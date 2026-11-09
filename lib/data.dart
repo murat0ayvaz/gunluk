@@ -264,6 +264,144 @@ class StudyCard {
       (j['x'] ?? '').toString());
 }
 
+/// Alarm (belirli saat + günler)
+class AlarmItem {
+  final String id;
+  int h, m;
+  Set<int> days; // 1..7; boş = her gün
+  String label;
+  bool on;
+  int nid;
+  AlarmItem(this.id, this.h, this.m, this.days, this.label, this.on, this.nid);
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'h': h,
+        'm': m,
+        'd': days.toList(),
+        'l': label,
+        'o': on,
+        'n': nid,
+      };
+
+  factory AlarmItem.fromJson(Map<String, dynamic> j) => AlarmItem(
+      (j['id'] ?? '').toString(),
+      (j['h'] as num?)?.toInt() ?? 7,
+      (j['m'] as num?)?.toInt() ?? 0,
+      {for (final d in ((j['d'] as List?) ?? [])) (d as num).toInt()},
+      (j['l'] ?? '').toString(),
+      j['o'] != false,
+      (j['n'] as num?)?.toInt() ?? 0);
+
+  bool onDay(int weekday) => days.isEmpty || days.contains(weekday);
+}
+
+/// Başlatıcı: belirli saatte bildirim gelir, dokununca uygulama içindeki şey başlar
+class LaunchItem {
+  final String id;
+  int h, m;
+  Set<int> days;
+  String kind; // meditate | pomodoro | breath | radio | music | podcast
+  String ref; // radyo / liste / podcast kimliği
+  String label; // görünen ad
+  bool on;
+  int nid;
+  LaunchItem(this.id, this.h, this.m, this.days, this.kind, this.ref,
+      this.label, this.on, this.nid);
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'h': h,
+        'm': m,
+        'd': days.toList(),
+        'k': kind,
+        'r': ref,
+        'l': label,
+        'o': on,
+        'n': nid,
+      };
+
+  factory LaunchItem.fromJson(Map<String, dynamic> j) => LaunchItem(
+      (j['id'] ?? '').toString(),
+      (j['h'] as num?)?.toInt() ?? 7,
+      (j['m'] as num?)?.toInt() ?? 0,
+      {for (final d in ((j['d'] as List?) ?? [])) (d as num).toInt()},
+      (j['k'] ?? 'meditate').toString(),
+      (j['r'] ?? '').toString(),
+      (j['l'] ?? '').toString(),
+      j['o'] != false,
+      (j['n'] as num?)?.toInt() ?? 0);
+
+  bool onDay(int weekday) => days.isEmpty || days.contains(weekday);
+}
+
+/// Konuya yazılan not
+class StudyNote {
+  final String id;
+  final String topic;
+  String text;
+  int ms;
+  StudyNote(this.id, this.topic, this.text, this.ms);
+
+  Map<String, dynamic> toJson() => {'id': id, 't': topic, 'x': text, 'm': ms};
+
+  factory StudyNote.fromJson(Map<String, dynamic> j) => StudyNote(
+      (j['id'] ?? '').toString(),
+      (j['t'] ?? '').toString(),
+      (j['x'] ?? '').toString(),
+      (j['m'] as num?)?.toInt() ?? 0);
+}
+
+/// Konuya ait ses kaydı (dosya, voice klasöründe; yedeğe girmez)
+class StudyRec {
+  final String id;
+  final String topic;
+  final String file;
+  StudyRec(this.id, this.topic, this.file);
+
+  Map<String, dynamic> toJson() => {'id': id, 't': topic, 'f': file};
+
+  factory StudyRec.fromJson(Map<String, dynamic> j) => StudyRec(
+      (j['id'] ?? '').toString(),
+      (j['t'] ?? '').toString(),
+      (j['f'] ?? '').toString());
+}
+
+/// Haftalık çalışma programı satırı
+class StudyPlan {
+  final String id;
+  int day; // 1 = pazartesi ... 7 = pazar
+  String subj; // ders adı
+  int sh, sm, eh, em; // başlangıç ve bitiş saati
+  bool remind;
+  int nid;
+  StudyPlan(this.id, this.day, this.subj, this.sh, this.sm, this.eh, this.em,
+      this.remind, this.nid);
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'd': day,
+        's': subj,
+        'sh': sh,
+        'sm': sm,
+        'eh': eh,
+        'em': em,
+        'r': remind,
+        'n': nid,
+      };
+
+  factory StudyPlan.fromJson(Map<String, dynamic> j) => StudyPlan(
+      (j['id'] ?? '').toString(),
+      (j['d'] as num?)?.toInt() ?? 1,
+      (j['s'] ?? '').toString(),
+      (j['sh'] as num?)?.toInt() ?? 18,
+      (j['sm'] as num?)?.toInt() ?? 0,
+      (j['eh'] as num?)?.toInt() ?? 19,
+      (j['em'] as num?)?.toInt() ?? 0,
+      j['r'] == true,
+      (j['n'] as num?)?.toInt() ?? 0);
+}
+
 /// Kullanıcının eklediği konu başlığı
 class StudyTopicUser {
   final String id; // 'u:...'
@@ -923,6 +1061,22 @@ class AppStore extends ChangeNotifier {
   Map<String, List<int>> studySt = {}; // kart kimliği -> [kutu, tekrar zamanı (ms)]
   Set<String> studyHid = {}; // gizlenen hazır kartlar
   String studyTab = 'lgs';
+  Set<String> studyRev = {}; // tekrar listesine eklenen hazır bilgi kimlikleri
+  Set<String> studyPk = {}; // yüklü ders kimlikleri (LGS / dil paketi)
+  Set<String> studyAsked = {}; // paket sorusu sorulan gruplar ('lgs', 'dil')
+  List<StudyNote> studyNotes = [];
+  List<StudyRec> studyRecs = [];
+  List<StudyPlan> studyPlan = [];
+
+  static const studyAllSubjects = [
+    'lgs_tr',
+    'lgs_mat',
+    'lgs_fen',
+    'lgs_ink',
+    'lgs_din',
+    'lgs_ing',
+    'dil_en'
+  ];
 
   static const studyDays = [1, 3, 7, 14];
 
@@ -944,6 +1098,113 @@ class AppStore extends ChangeNotifier {
 
   void studyForget(String id) {
     studySt[id] = [0, 0];
+    _commit();
+  }
+
+  bool studyInRev(String id) => studyRev.contains(id);
+
+  void studyToggleRev(String id) {
+    if (!studyRev.remove(id)) studyRev.add(id);
+    _commit();
+  }
+
+  void studyAddRev(Iterable<String> ids) {
+    studyRev.addAll(ids);
+    _commit();
+  }
+
+  void studyRemoveRev(String id) {
+    studyRev.remove(id);
+    studySt.remove(id);
+    _commit();
+  }
+
+  void studyAsk(String group) {
+    studyAsked.add(group);
+    _commit();
+  }
+
+  void studyInstall(Iterable<String> subjIds) {
+    studyPk.addAll(subjIds);
+    _commit();
+  }
+
+  /// Dersi kaldırır; kullanıcının kartları, notları ve ses kayıtları kalır
+  void studyUninstall(Iterable<String> subjIds) {
+    studyPk.removeAll(subjIds);
+    _commit();
+  }
+
+  StudyNote addStudyNote(String topic, String text) {
+    final n = StudyNote(newId(), topic, text.trim(),
+        DateTime.now().millisecondsSinceEpoch);
+    studyNotes.add(n);
+    _commit();
+    return n;
+  }
+
+  void editStudyNote(String id, String text) {
+    for (final n in studyNotes) {
+      if (n.id == id) n.text = text.trim();
+    }
+    _commit();
+  }
+
+  void deleteStudyNote(String id) {
+    studyNotes.removeWhere((n) => n.id == id);
+    _commit();
+  }
+
+  void addStudyRec(String topic, String file) {
+    studyRecs.add(StudyRec(newId(), topic, file));
+    _commit();
+  }
+
+  void deleteStudyRec(String id) {
+    final r = studyRecs.where((x) => x.id == id).toList();
+    studyRecs.removeWhere((x) => x.id == id);
+    _commit();
+    for (final x in r) {
+      () async {
+        try {
+          final d = await voiceDir();
+          final f = File('${d.path}/${x.file}');
+          if (await f.exists()) await f.delete();
+        } catch (_) {}
+      }();
+    }
+  }
+
+  StudyPlan addStudyPlan(
+      int day, String subj, int sh, int sm, int eh, int em, bool remind) {
+    final p = StudyPlan(newId(), day, subj.trim(), sh, sm, eh, em, remind,
+        remind ? newNid() : 0);
+    studyPlan.add(p);
+    _commit();
+    return p;
+  }
+
+  void updateStudyPlan(StudyPlan p,
+      {int? day,
+      String? subj,
+      int? sh,
+      int? sm,
+      int? eh,
+      int? em,
+      bool? remind}) {
+    if (day != null) p.day = day;
+    if (subj != null) p.subj = subj.trim();
+    if (sh != null) p.sh = sh;
+    if (sm != null) p.sm = sm;
+    if (eh != null) p.eh = eh;
+    if (em != null) p.em = em;
+    if (remind != null) p.remind = remind;
+    if (p.remind && p.nid == 0) p.nid = newNid();
+    _commit();
+  }
+
+  void deleteStudyPlan(String id) {
+    studyPlan.removeWhere((p) => p.id == id);
     _commit();
   }
 
@@ -1015,6 +1276,44 @@ class AppStore extends ChangeNotifier {
       studySt.remove(c.id);
     }
     studyCards.removeWhere((c) => c.topic == id);
+    studyNotes.removeWhere((n) => n.topic == id);
+    for (final r in studyRecs.where((r) => r.topic == id).toList()) {
+      deleteStudyRec(r.id);
+    }
+    _commit();
+  }
+
+  // ----- Zamanlama: alarm ve başlatıcı -----
+  List<AlarmItem> alarms = [];
+  List<LaunchItem> launchers = [];
+
+  AlarmItem addAlarm(int h, int m, Set<int> days, String label) {
+    final a = AlarmItem(newId(), h, m, days, label.trim(), true, newNid());
+    alarms.add(a);
+    _commit();
+    return a;
+  }
+
+  void touchAlarm() => _commit();
+
+  void deleteAlarm(String id) {
+    alarms.removeWhere((a) => a.id == id);
+    _commit();
+  }
+
+  LaunchItem addLauncher(int h, int m, Set<int> days, String kind, String ref,
+      String label) {
+    final a =
+        LaunchItem(newId(), h, m, days, kind, ref, label.trim(), true, newNid());
+    launchers.add(a);
+    _commit();
+    return a;
+  }
+
+  void touchLauncher() => _commit();
+
+  void deleteLauncher(String id) {
+    launchers.removeWhere((a) => a.id == id);
     _commit();
   }
 
@@ -1816,7 +2115,33 @@ class AppStore extends ChangeNotifier {
       });
       studyHid = {for (final h in ((stj['hid'] as List?) ?? [])) h.toString()};
       studyTab = (stj['tab'] as String?) ?? 'lgs';
+      studyRev = {for (final h in ((stj['rev'] as List?) ?? [])) h.toString()};
+      studyNotes = ((stj['notes'] as List?) ?? [])
+          .map((e) => StudyNote.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+      studyRecs = ((stj['recs'] as List?) ?? [])
+          .map((e) => StudyRec.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+      studyPlan = ((stj['plan'] as List?) ?? [])
+          .map((e) => StudyPlan.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+      if (stj['pk'] is List) {
+        studyPk = {for (final h in (stj['pk'] as List)) h.toString()};
+        studyAsked = {for (final h in ((stj['ask'] as List?) ?? [])) h.toString()};
+      } else {
+        // eski sürümden gelen: hazır içerikler zaten yüklüydü
+        studyPk = {...studyAllSubjects};
+        studyAsked = {'lgs', 'dil'};
+        // daha önce çalışılan kartlar tekrar listesinde kalsın
+        studyRev = {...studyRev, ...studySt.keys};
+      }
     }
+    alarms = ((j['alarms'] as List?) ?? [])
+        .map((e) => AlarmItem.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+    launchers = ((j['launch'] as List?) ?? [])
+        .map((e) => LaunchItem.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
     if (j['onfavs'] is List) {
       onFavs = (j['onfavs'] as List)
           .map((e) => OnTrack.fromJson(Map<String, dynamic>.from(e as Map)))
@@ -2045,7 +2370,15 @@ class AppStore extends ChangeNotifier {
           'st': studySt,
           'hid': studyHid.toList(),
           'tab': studyTab,
+          'rev': studyRev.toList(),
+          'pk': studyPk.toList(),
+          'ask': studyAsked.toList(),
+          'notes': studyNotes.map((n) => n.toJson()).toList(),
+          'recs': studyRecs.map((r) => r.toJson()).toList(),
+          'plan': studyPlan.map((p) => p.toJson()).toList(),
         },
+        'alarms': alarms.map((a) => a.toJson()).toList(),
+        'launch': launchers.map((a) => a.toJson()).toList(),
         'eppos': epPos,
         'epdone': epDone.toList(),
         'rep': repeatMode,
@@ -2295,6 +2628,13 @@ class AppStore extends ChangeNotifier {
     s.rh = rh;
     s.rm = rm;
     if (rh >= 0 && s.nid == 0) s.nid = newNid();
+    _commit();
+  }
+
+  void setGoal(String subId, double? goal) {
+    final s = subById(subId);
+    if (s == null) return;
+    s.goal = goal;
     _commit();
   }
 

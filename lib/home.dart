@@ -5,6 +5,7 @@ import 'add_sheet.dart';
 import 'data.dart';
 import 'fireworks.dart';
 import 'tools.dart';
+import 'manage.dart' show editSubCategory;
 import 'media.dart';
 import 'drawer.dart';
 import 'notes.dart';
@@ -232,11 +233,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final sub = r.sub!;
     final res = await showRowEditDialog(context, sub: sub, entry: r.entry);
     if (res == null) return;
+    if (res.openSub) {
+      if (!mounted) return;
+      await editSubCategory(context, sub);
+      return;
+    }
     if (res.deleteEntry && r.entry != null) {
       store.deleteEntry(r.entry!.id);
     } else if (res.value != null) {
       store.setEntry(sub.id, dKey(day), res.value!);
     }
+    if (res.goalSet) store.setGoal(sub.id, res.goal);
     if (sub.routine) {
       store.setRoutineOptions(sub.id, days: res.days, rh: res.rh, rm: res.rm);
       if (res.rh >= 0) await permissionMessage();
@@ -621,7 +628,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       child: TodosBody(date: date),
                     ),
                     _HomeSection(
-                      icon: Icons.edit_note_rounded,
+                      icon: Icons.menu_book_rounded,
                       title: tx('Günlük'),
                       tone: const Color(0xFF9A6BF0),
                       badge: store.noteOf(date).isNotEmpty ? '•' : '',
@@ -702,7 +709,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                   tooltip: tx('Ders çalışma'),
-                  icon: const Icon(Icons.edit_note_rounded),
+                  icon: const Icon(Icons.menu_book_rounded),
                   onPressed: () => Navigator.of(context)
                       .push(slideFromRight(const StudyPage())),
                 ),

@@ -8,6 +8,7 @@ import 'media.dart';
 import 'notify.dart';
 import 'strings.dart';
 import 'theme.dart';
+import 'timing.dart';
 
 // ---------------------------------------------------------------
 // DAILY ROUTINE - günlük rutin, hedef, yapılacaklar ve günlük (not) uygulaması
@@ -94,6 +95,7 @@ class _GateState extends State<Gate> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     store.addListener(_onStore);
+    Notifier.tapped.addListener(_onTap);
     _boot();
   }
 
@@ -101,7 +103,17 @@ class _GateState extends State<Gate> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     store.removeListener(_onStore);
+    Notifier.tapped.removeListener(_onTap);
     super.dispose();
+  }
+
+  /// Başlatıcı bildirimine dokunuldu (uygulama açıkken)
+  void _onTap() {
+    final pl = Notifier.tapped.value;
+    if (pl == null || !_ready || store.locked) return;
+    Notifier.tapped.value = null;
+    final nav = navKey.currentState;
+    if (nav != null) handleNotifPayload(nav, pl);
   }
 
   Future<void> _boot() async {
@@ -117,6 +129,16 @@ class _GateState extends State<Gate> with WidgetsBindingObserver {
     // Hatırlatıcı bildirimlerini yeniden planla (arka planda, takılmaz)
     Notifier.init().then((_) => Notifier.rescheduleAll()).catchError((_) {});
     if (mounted) setState(() => _ready = true);
+    // Bildirime dokunarak açıldıysa (uygulama kapalıydı) başlatıcıyı çalıştır
+    final cold = await Notifier.coldStartPayload();
+    final pending = Notifier.tapped.value;
+    final pl = cold ?? pending;
+    if (pl != null && mounted) {
+      Notifier.tapped.value = null;
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      final nav = navKey.currentState;
+      if (nav != null) handleNotifPayload(nav, pl);
+    }
   }
 
   // Arka plana gidip 5 saniyeden uzun kalınca dönüşte kilitle

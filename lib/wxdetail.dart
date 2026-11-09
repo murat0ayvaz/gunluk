@@ -258,13 +258,16 @@ class _WxDetailPageState extends State<WxDetailPage> {
                 color: p.soft, fontSize: 12.5, fontWeight: FontWeight.w600)),
       );
 
-  // ---------- Sıcaklık: kaynaklar yan yana ----------
+  // ---------- Sıcaklık: kaynaklar sütun, değerler alt alta ----------
+  // Kaynak adları en üstte bir kez; her satırda ikon üstte, sıcaklık altta.
   Widget _tempSection(Pal p) {
     final a = _all;
     if (a == null) return const SizedBox.shrink();
+    final srcs = <String>[];
     final rows = <Widget>[];
+    // satır verisi: etiket, kaynak -> (ikon kodu, metin)
+    final data = <_TRow>[];
     if (_tab == 0) {
-      // saat saat: tüm kaynakların saatlerinin birleşimi
       final times = <String, DateTime>{};
       for (final d in a.by.values) {
         for (final x in d.hourly) {
@@ -276,17 +279,7 @@ class _WxDetailPageState extends State<WxDetailPage> {
       for (final k in keys) {
         final t = times[k]!;
         final dk = wxDayKey(t);
-        if (dk != lastDay) {
-          lastDay = dk;
-          final now = DateTime.now();
-          rows.add(Padding(
-            padding: const EdgeInsets.only(top: 6, bottom: 2),
-            child: Text(
-                dk == wxDayKey(now) ? tx('Bugün') : wdName(t.weekday),
-                style: TextStyle(color: p.accent, fontWeight: FontWeight.w700)),
-          ));
-        }
-        final cells = <Widget>[];
+        final cells = <String, _TCell>{};
         for (final sk in wxSourceKeys) {
           final d = a.by[sk];
           if (d == null) continue;
@@ -298,22 +291,19 @@ class _WxDetailPageState extends State<WxDetailPage> {
             }
           }
           final v = hit?.v['temp'];
-          if (v != null) cells.add(_cell(p, wxSourceShort[sk]!, '${_n(v)}°'));
+          if (v != null) {
+            cells[sk] = _TCell(hit!.code, '${_n(v)}°', t.hour < 6 || t.hour >= 20);
+          }
         }
         if (cells.isEmpty) continue;
-        rows.add(Padding(
-          padding: const EdgeInsets.symmetric(vertical: 5),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _label(p, '${_two(t.hour)}:00'),
-              Expanded(child: Wrap(spacing: 14, runSpacing: 4, children: cells)),
-            ],
-          ),
-        ));
+        String? head;
+        if (dk != lastDay) {
+          lastDay = dk;
+          head = dk == wxDayKey(DateTime.now()) ? tx('Bugün') : wdName(t.weekday);
+        }
+        data.add(_TRow(head, '${_two(t.hour)}:00', cells));
       }
     } else {
-      // gün gün: en yüksek / en düşük
       final days = <String, DateTime>{};
       final today = DateTime.now();
       final t0 = DateTime(today.year, today.month, today.day);
@@ -325,7 +315,7 @@ class _WxDetailPageState extends State<WxDetailPage> {
       final keys = days.keys.toList()..sort();
       for (final k in keys.take(_dayCount)) {
         final t = days[k]!;
-        final cells = <Widget>[];
+        final cells = <String, _TCell>{};
         for (final sk in wxSourceKeys) {
           final d = a.by[sk];
           if (d == null) continue;
@@ -339,34 +329,80 @@ class _WxDetailPageState extends State<WxDetailPage> {
           final hi = hit?.v['tmax'];
           final lo = hit?.v['tmin'];
           if (hi != null || lo != null) {
-            cells.add(_cell(p, wxSourceShort[sk]!,
-                '${hi == null ? '' : '${_n(hi)}°'}${lo == null ? '' : ' / ${_n(lo)}°'}'));
+            cells[sk] = _TCell(hit!.code,
+                '${hi == null ? '' : '${_n(hi)}°'}${lo == null ? '' : '/${_n(lo)}°'}',
+                false);
           }
         }
         if (cells.isEmpty) continue;
-        rows.add(Padding(
-          padding: const EdgeInsets.symmetric(vertical: 5),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _label(p, _dayLabel(t), w: 56),
-              Expanded(child: Wrap(spacing: 14, runSpacing: 4, children: cells)),
-            ],
-          ),
-        ));
+        data.add(_TRow(null, _dayLabel(t), cells));
       }
     }
-    if (rows.isEmpty) return _empty(p);
+    if (data.isEmpty) return _empty(p);
+    for (final sk in wxSourceKeys) {
+      if (data.any((r) => r.cells.containsKey(sk))) srcs.add(sk);
+    }
+    final line = Container(width: 1, color: p.soft.withOpacity(0.25));
+    const lw = 52.0;
+    // başlık: kaynak adları bir kez
+    rows.add(IntrinsicHeight(
+      child: Row(children: [
+        const SizedBox(width: lw),
+        for (var i = 0; i < srcs.length; i++) ...[
+          if (i > 0) line,
+          Expanded(
+              child: Center(
+                  child: Text(wxSourceShort[srcs[i]]!,
+                      style: TextStyle(
+                          color: p.soft,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700)))),
+        ],
+      ]),
+    ));
+    rows.add(Divider(height: 8, color: p.soft.withOpacity(0.25)));
+    for (final r in data) {
+      if (r.head != null) {
+        rows.add(Padding(
+          padding: const EdgeInsets.only(top: 6, bottom: 2),
+          child: Text(r.head!,
+              style: TextStyle(color: p.accent, fontWeight: FontWeight.w700)),
+        ));
+      }
+      rows.add(Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: IntrinsicHeight(
+          child: Row(children: [
+            SizedBox(
+                width: lw,
+                child: Text(r.label,
+                    style: TextStyle(
+                        color: p.soft,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600))),
+            for (var i = 0; i < srcs.length; i++) ...[
+              if (i > 0) line,
+              Expanded(child: _tcell(p, r.cells[srcs[i]])),
+            ],
+          ]),
+        ),
+      ));
+    }
     return Column(children: rows);
   }
 
-  Widget _cell(Pal p, String src, String value) => Text.rich(TextSpan(children: [
-        TextSpan(text: '$src ', style: TextStyle(color: p.soft, fontSize: 11)),
-        TextSpan(
-            text: value,
-            style: TextStyle(
-                color: p.ink, fontSize: 15, fontWeight: FontWeight.w600)),
-      ]));
+  Widget _tcell(Pal p, _TCell? c) {
+    if (c == null) {
+      return Center(child: Text('–', style: TextStyle(color: p.soft)));
+    }
+    return Column(mainAxisSize: MainAxisSize.min, children: [
+      if (c.code != null)
+        Icon(wxIcon(c.code!, night: c.night), size: 20, color: wxColor(c.code!)),
+      Text(c.text,
+          style: TextStyle(
+              color: p.ink, fontSize: 14, fontWeight: FontWeight.w600)),
+    ]);
+  }
 
   Widget _empty(Pal p) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
@@ -849,4 +885,19 @@ class _WxDetailPageState extends State<WxDetailPage> {
       },
     );
   }
+}
+
+
+class _TCell {
+  final int? code;
+  final String text;
+  final bool night;
+  _TCell(this.code, this.text, this.night);
+}
+
+class _TRow {
+  final String? head;
+  final String label;
+  final Map<String, _TCell> cells;
+  _TRow(this.head, this.label, this.cells);
 }

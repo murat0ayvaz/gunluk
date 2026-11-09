@@ -10,10 +10,14 @@ import 'version.dart';
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
       tx('Verilerin korundu.'),
-      tx('Yeni: Ders çalışma (üst çubukta sol). LGS dersleri ve İngilizce için hazır kartlar; kendi kartlarını ekle, Biliyorum/Bilmiyorum ile aralıklı tekrar yap.'),
-      tx('Hava durumu sayfası yenilendi: kaynaklar yan yana, açılır başlıklar. Hava ayarları buraya taşındı.'),
+      tx('Hava durumu sıcaklık tablosu yenilendi: kaynak adları bir kez en üstte, değerler alt alta; her değerin üstünde hava simgesi.'),
+      tx('Meditasyon ve Nefes\'te nefes al/ver tınısı Tibet çanı sesi oldu.'),
+      tx('Rutini sağa çekince Hedef girilebiliyor ve Alt kategoriyi düzenle düğmesi çıkıyor.'),
+      tx('Ders çalışma yenilendi: her derste Ders çalış ve Tekrar et. Ders çalış\'ta 8. sınıf konu özetleri (her bilgi ayrı, Tekrar et düğmesiyle tekrar listesine eklenir).'),
+      tx('Her konuda not yazabilir ve ses kaydı alabilirsin. LGS ve Yabancı dil paketleri isteğe bağlı yüklenir, dersler silinebilir.'),
+      tx('Haftalık çalışma programı: gün + ders + saat aralığı, isteğe bağlı hatırlatma.'),
+      tx('Araçlar\'a Zamanlama: Uyku zamanlayıcısı, Alarm ve Başlatıcı.'),
       tx('Ayarlar\'daki başlıklar açılır kapanır oldu.'),
-      tx('Meditasyon ve Nefes\'te nefes al/ver için tek tını sesi.'),
       tx('Araç sayfalarının sağ üstünde Araçlar simgesi; sayfadan çıkınca süre sayan araçlar duraklar.'),
       tx('Su sayacında Geri al bildirimi kaldırıldı.'),
     ];

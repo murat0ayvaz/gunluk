@@ -14,6 +14,7 @@ import 'podcast.dart';
 import 'reminders.dart' show dtLabel;
 import 'theme.dart' show Pal;
 import 'strings.dart';
+import 'timing.dart';
 import 'ui.dart';
 import 'wxdetail.dart';
 
@@ -31,7 +32,9 @@ class _ToolInfo {
   final String name;
   final Color tone;
   final Widget Function() page;
-  const _ToolInfo(this.id, this.icon, this.name, this.tone, this.page);
+  final String group; // boş: grupsuz; dolu: o grubun başlığı altında
+  const _ToolInfo(this.id, this.icon, this.name, this.tone, this.page,
+      {this.group = ''});
 }
 
 List<_ToolInfo> _tools() => [
@@ -53,6 +56,15 @@ List<_ToolInfo> _tools() => [
           const Color(0xFF3E9FD6), () => const WxDetailPage()),
       _ToolInfo('sleep', Icons.bedtime_outlined, tx('Uyku'),
           const Color(0xFF5C6BC0), () => const SleepPage()),
+      _ToolInfo('sleeptimer', Icons.bedtime_rounded, tx('Uyku zamanlayıcısı'),
+          const Color(0xFF7E57C2), () => const SleepTimerPage(),
+          group: tx('Zamanlama')),
+      _ToolInfo('alarm', Icons.alarm_rounded, tx('Alarm'),
+          const Color(0xFFEF6C57), () => const AlarmPage(),
+          group: tx('Zamanlama')),
+      _ToolInfo('launcher', Icons.rocket_launch_outlined, tx('Başlatıcı'),
+          const Color(0xFF26A69A), () => const LauncherPage(),
+          group: tx('Zamanlama')),
     ];
 
 /// Yumuşak geçişli sayfa (solarak + hafif yukarı kayarak)
@@ -119,7 +131,19 @@ class ToolsDrawer extends StatelessWidget {
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: [
-                  for (final t in _tools())
+                  for (final t in _tools()) ...[
+                    if (t.group.isNotEmpty &&
+                        _tools().firstWhere((x) => x.group == t.group).id ==
+                            t.id)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
+                        child: Text(t.group,
+                            style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.4,
+                                color: p.soft)),
+                      ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(14, 5, 14, 5),
                       child: Material(
@@ -174,6 +198,7 @@ class ToolsDrawer extends StatelessWidget {
                         ),
                       ),
                     ),
+                  ],
                 ],
               ),
             ),
@@ -817,7 +842,8 @@ int _pomoFocusSec = 0; // tamamlanan çalışma süresi (saniye)
 int _pomoStartLeft = 0; // bu çalışma turunun başındaki kalan (kısmi sayım için)
 
 class PomodoroPage extends StatefulWidget {
-  const PomodoroPage({super.key});
+  final bool autoStart;
+  const PomodoroPage({super.key, this.autoStart = false});
 
   @override
   State<PomodoroPage> createState() => _PomodoroPageState();
@@ -830,6 +856,11 @@ class _PomodoroPageState extends State<PomodoroPage> {
     _pomoCtl.addListener(_u);
     _pomoCtl.onFinish = _next;
     if (_pomoCtl.total == 0) _prepare();
+    if (widget.autoStart) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_pomoCtl.running) _pomoCtl.start();
+      });
+    }
   }
 
   @override
@@ -1108,7 +1139,8 @@ const _patterns = [
 ];
 
 class BreathPage extends StatefulWidget {
-  const BreathPage({super.key});
+  final bool autoStart;
+  const BreathPage({super.key, this.autoStart = false});
 
   @override
   State<BreathPage> createState() => _BreathPageState();
@@ -1122,6 +1154,16 @@ class _BreathPageState extends State<BreathPage> {
   double _inPhase = 0; // aşamada geçen saniye
   double _total = 0; // toplam saniye
   double _scale = 0; // 0..1 daire büyüklüğü
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.autoStart) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_on) _start();
+      });
+    }
+  }
 
   _Pattern get _p => _patterns[_pi];
 
@@ -1997,7 +2039,8 @@ class _EpPickPage extends StatelessWidget {
 }
 
 class MeditatePage extends StatefulWidget {
-  const MeditatePage({super.key});
+  final bool autoStart;
+  const MeditatePage({super.key, this.autoStart = false});
 
   @override
   State<MeditatePage> createState() => _MeditatePageState();
@@ -2019,6 +2062,11 @@ class _MeditatePageState extends State<MeditatePage>
     _br.addListener(_cueTick);
     if (_medCtl.total == 0) _medCtl.set(_medMin * 60);
     if (_medCtl.running) _br.repeat();
+    if (widget.autoStart) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_medCtl.running) _start();
+      });
+    }
   }
 
   @override

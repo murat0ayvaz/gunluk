@@ -1,3 +1,5 @@
+import 'dart:typed_data' show Int32List;
+import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
@@ -25,13 +27,35 @@ class Notifier {
       .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
 
+  /// Bildirime dokunulunca gelen yük (ör. 'launch:<id>'); uygulama açıkken dinlenir
+  static final ValueNotifier<String?> tapped = ValueNotifier<String?>(null);
+
+  /// Uygulama kapalıyken bildirime dokunularak açıldıysa o bildirimin yükü
+  static Future<String?> coldStartPayload() async {
+    try {
+      await init();
+      final d = await _p.getNotificationAppLaunchDetails();
+      if (d != null && d.didNotificationLaunchApp) {
+        final pl = d.notificationResponse?.payload;
+        if (pl != null && pl.isNotEmpty) return pl;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   static Future<void> init() async {
     if (_ready) return;
     tzdata.initializeTimeZones();
     const settings = InitializationSettings(
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
     );
-    await _p.initialize(settings);
+    await _p.initialize(
+      settings,
+      onDidReceiveNotificationResponse: (r) {
+        final pl = r.payload;
+        if (pl != null && pl.isNotEmpty) tapped.value = pl;
+      },
+    );
     _ready = true;
   }
 
@@ -66,7 +90,22 @@ class Notifier {
         ),
       );
 
-  static Future<void> _plan(int baseId, String body, List<DateTime> times) async {
+  /// Alarm: alarm sesi akışında, kapatılana kadar tekrarlayan ses
+  static NotificationDetails get _alarmDetails => NotificationDetails(
+        android: AndroidNotificationDetails(
+          'alarm',
+          tx('Alarm'),
+          channelDescription: tx('Alarm bildirimleri'),
+          importance: Importance.max,
+          priority: Priority.max,
+          category: AndroidNotificationCategory.alarm,
+          audioAttributesUsage: AudioAttributesUsage.alarm,
+          additionalFlags: Int32List.fromList(<int>[4]), // FLAG_INSISTENT
+        ),
+      );
+
+  static Future<void> _plan(int baseId, String body, List<DateTime> times,
+      {String? payload, NotificationDetails? details}) async {
     final a = _android;
     final exact = a == null ? true : (await a.canScheduleExactNotifications() ?? false);
     final mode = exact
@@ -80,8 +119,9 @@ class Notifier {
         'Daily Routine',
         body,
         when,
-        _details,
+        details ?? _details,
         androidScheduleMode: mode,
+        payload: payload,
       );
     }
   }
@@ -173,6 +213,90 @@ class Notifier {
     } catch (_) {}
   }
 
+  /// Haftalık çalışma programı: seçili günde başlangıç saatinde (önümüzdeki 8 hafta)
+  static Future<void> syncPlan(StudyPlan r) async {
+    if (r.nid == 0) return;
+    try {
+      await init();
+      await _cancelBase(r.nid);
+      if (!r.remind) return;
+      final now = DateTime.now();
+      final times = <DateTime>[];
+      for (var d = 0; d < 56; d++) {
+        final day = DateTime(now.year, now.month, now.day + d);
+        if (day.weekday != r.day) continue;
+        final t = DateTime(day.year, day.month, day.day, r.sh, r.sm);
+        if (t.isAfter(now)) times.add(t);
+      }
+      final hm =
+          '${r.sh.toString().padLeft(2, '0')}:${r.sm.toString().padLeft(2, '0')}';
+      await _plan(r.nid, '${r.subj} • $hm', times);
+    } catch (_) {}
+  }
+
+  static Future<void> cancelPlan(StudyPlan r) async {
+    if (r.nid == 0) return;
+    try {
+      await init();
+      await _cancelBase(r.nid);
+    } catch (_) {}
+  }
+
+  /// Önümüzdeki 14 günde seçili günlerin belirli saatleri
+  static List<DateTime> _dailyTimes(int h, int m, bool Function(int) onDay) {
+    final now = DateTime.now();
+    final out = <DateTime>[];
+    for (var d = 0; d < 14; d++) {
+      final day = DateTime(now.year, now.month, now.day + d);
+      final t = DateTime(day.year, day.month, day.day, h, m);
+      if (t.isAfter(now) && onDay(day.weekday)) out.add(t);
+    }
+    return out;
+  }
+
+  static String _hm(int h, int m) =>
+      '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+
+  static Future<void> syncAlarm(AlarmItem a) async {
+    if (a.nid == 0) return;
+    try {
+      await init();
+      await _cancelBase(a.nid);
+      if (!a.on) return;
+      final body = a.label.isEmpty ? _hm(a.h, a.m) : '${a.label} • ${_hm(a.h, a.m)}';
+      await _plan(a.nid, body, _dailyTimes(a.h, a.m, a.onDay),
+          details: _alarmDetails, payload: 'alarm:${a.id}');
+    } catch (_) {}
+  }
+
+  static Future<void> cancelAlarm(AlarmItem a) async {
+    if (a.nid == 0) return;
+    try {
+      await init();
+      await _cancelBase(a.nid);
+    } catch (_) {}
+  }
+
+  static Future<void> syncLauncher(LaunchItem a) async {
+    if (a.nid == 0) return;
+    try {
+      await init();
+      await _cancelBase(a.nid);
+      if (!a.on) return;
+      await _plan(a.nid, '${a.label} • ${tx('başlatmak için dokun')}',
+          _dailyTimes(a.h, a.m, a.onDay),
+          payload: 'launch:${a.id}');
+    } catch (_) {}
+  }
+
+  static Future<void> cancelLauncher(LaunchItem a) async {
+    if (a.nid == 0) return;
+    try {
+      await init();
+      await _cancelBase(a.nid);
+    } catch (_) {}
+  }
+
   /// Açılışta ve yedek yüklenince hepsini yeniden planlar
   static Future<void> rescheduleAll() async {
     try {
@@ -193,6 +317,15 @@ class Notifier {
         if (t.nid != 0 && !t.done && t.remindMs > 0) {
           await _plan(t.nid, t.text, todoRemindTimes(t, DateTime.now()));
         }
+      }
+      for (final r in store.studyPlan) {
+        if (r.remind && r.nid != 0) await syncPlan(r);
+      }
+      for (final a in store.alarms) {
+        if (a.on) await syncAlarm(a);
+      }
+      for (final a in store.launchers) {
+        if (a.on) await syncLauncher(a);
       }
     } catch (_) {}
   }

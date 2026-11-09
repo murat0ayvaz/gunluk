@@ -12,6 +12,27 @@ import 'ui.dart';
 // Silince ilgili geçmiş kayıtlar da silinir (önce onay istenir).
 // Kayıtlar kimliğe bağlı olduğu için ad değişince geçmiş bozulmaz.
 // ---------------------------------------------------------------
+/// Alt kategori düzenleme akışı (Kategorileri düzenle ve ana ekran satırından)
+Future<void> editSubCategory(BuildContext context, SubCat s) async {
+  final d = await showSubDialog(context,
+      sub: s, title: tx('Alt kategoriyi düzenle'));
+  if (d == null) return;
+  final count = store.entriesOf(s.id).length;
+  if (d.unit.trim() != s.unit && count > 0) {
+    if (!context.mounted) return;
+    final ok = await confirmDialog(
+      context,
+      tx('Birim değişiyor'),
+      tx('Eski kayıtlar çevrilmez. Örneğin “3 lt” olarak girilmiş bir kayıt, yeni birimle “3 {0}” olarak görünür. Devam edilsin mi?',
+          [d.unit.trim()]),
+      okLabel: tx('Devam'),
+    );
+    if (!ok) return;
+  }
+  store.updateSub(s.id, d);
+  Notifier.syncSub(s);
+}
+
 class ManagePage extends StatefulWidget {
   const ManagePage({super.key});
 
@@ -59,27 +80,8 @@ class _ManagePageState extends State<ManagePage> {
     store.addSub(c.id, d);
   }
 
-  Future<void> _editSub(BuildContext context, SubCat s) async {
-    final d = await showSubDialog(context,
-        sub: s, title: tx('Alt kategoriyi düzenle'));
-    if (d == null) return;
-
-    // Birim değişirse eski sayılar çevrilmez: önce uyar
-    final count = store.entriesOf(s.id).length;
-    if (d.unit.trim() != s.unit && count > 0) {
-      if (!context.mounted) return;
-      final ok = await confirmDialog(
-        context,
-        tx('Birim değişiyor'),
-        tx('Eski kayıtlar çevrilmez. Örneğin “3 lt” olarak girilmiş bir kayıt, yeni birimle “3 {0}” olarak görünür. Devam edilsin mi?',
-            [d.unit.trim()]),
-        okLabel: tx('Devam'),
-      );
-      if (!ok) return;
-    }
-    store.updateSub(s.id, d);
-    Notifier.syncSub(s);
-  }
+  Future<void> _editSub(BuildContext context, SubCat s) =>
+      editSubCategory(context, s);
 
   Future<void> _deleteSub(BuildContext context, SubCat s) async {
     final count = store.entriesOf(s.id).length;

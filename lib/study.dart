@@ -2,17 +2,23 @@ import 'dart:math' show Random;
 import 'package:flutter/material.dart';
 import 'data.dart';
 import 'media.dart' show slideFromRight;
+import 'notify.dart';
+import 'reminders.dart' show dtLabel, permissionMessage;
 import 'strings.dart';
 import 'theme.dart' show Pal;
 import 'studydata.dart';
+import 'studysum.dart';
 import 'ui.dart';
+import 'voice.dart';
 
 // ---------------------------------------------------------------
 // DERS ÇALIŞMA
-// Sekmeler: LGS / Yabancı dil. Ders -> konu -> kartlar.
-// Kartlar: ön yüz (kelime, deyim...), açıklama, örnek cümle.
-// "Tekrar et": Biliyorum -> kart 1, 3, 7, 14 gün sonra tekrar gelir.
-//              Bilmiyorum -> açıklama ve örnek gösterilir, kart sıfırlanır.
+// Sekmeler: LGS / Yabancı dil. Paketler isteğe bağlı yüklenir / silinir.
+// Ders -> iki bölüm:
+//   Ders çalış : konular; her konuda bilgi parçaları, notlar, ses kayıtları.
+//                Bilginin yanındaki "Tekrar et" düğmesi onu tekrar listesine ekler.
+//   Tekrar et  : tekrar listesindeki kartlar; Biliyorum -> 1, 3, 7, 14 gün sonra.
+// Haftalık çalışma programı: gün + ders + saat aralığı (isteğe bağlı hatırlatma).
 // ---------------------------------------------------------------
 
 class _Item {
@@ -39,7 +45,14 @@ class _TopicRef {
   const _TopicRef(this.id, this.name, this.custom);
 }
 
+bool _isSum(String topicId) {
+  final i = topicId.indexOf('.');
+  return i > 0 && topicId.startsWith('s', i + 1);
+}
+
 List<_TopicRef> _topicsOf(StudySubjectDef s) => [
+      for (final t in studySummaries)
+        if (t.subj == s.id) _TopicRef(t.id, t.name, false),
       for (final t in s.topics) _TopicRef(t.id, t.name, false),
       for (final t in store.studyTopics)
         if (t.subj == s.id) _TopicRef(t.id, t.name, true),
@@ -47,17 +60,27 @@ List<_TopicRef> _topicsOf(StudySubjectDef s) => [
 
 List<_Item> _itemsOf(String topicId) {
   final out = <_Item>[];
-  final sid = topicId.startsWith('u:') ? null : topicId.split('.').first;
-  if (sid != null) {
-    final s = _subj(sid);
-    if (s != null) {
-      for (final t in s.topics) {
+  if (!topicId.startsWith('u:')) {
+    if (_isSum(topicId)) {
+      for (final t in studySummaries) {
         if (t.id != topicId) continue;
-        for (var i = 0; i < t.cards.length; i++) {
+        for (var i = 0; i < t.pieces.length; i++) {
           final id = '$topicId#$i';
           if (store.studyHid.contains(id)) continue;
-          final c = t.cards[i];
-          out.add(_Item(id, topicId, c[0], c[1], c[2], true));
+          out.add(_Item(id, topicId, t.pieces[i][0], t.pieces[i][1], '', true));
+        }
+      }
+    } else {
+      final s = _subj(topicId.split('.').first);
+      if (s != null) {
+        for (final t in s.topics) {
+          if (t.id != topicId) continue;
+          for (var i = 0; i < t.cards.length; i++) {
+            final id = '$topicId#$i';
+            if (store.studyHid.contains(id)) continue;
+            final c = t.cards[i];
+            out.add(_Item(id, topicId, c[0], c[1], c[2], true));
+          }
         }
       }
     }
@@ -73,13 +96,84 @@ List<_Item> _itemsOf(String topicId) {
 List<_Item> _itemsOfSubject(StudySubjectDef s) =>
     [for (final t in _topicsOf(s)) ..._itemsOf(t.id)];
 
+/// Tekrar listesinde mi? Kendi kartların her zaman listededir.
+bool _inRev(_Item i) => !i.builtin || store.studyInRev(i.id);
+
+List<_Item> _revOf(StudySubjectDef s) =>
+    _itemsOfSubject(s).where(_inRev).toList();
+
 int _dueCount(List<_Item> l) => l.where((i) => store.studyIsDue(i.id)).length;
+
+String _groupName(String g) => g == 'dil' ? tx('Yabancı dil') : tx('LGS');
 
 // ---------------------------------------------------------------
 // Ana sayfa: sekmeler ve dersler
 // ---------------------------------------------------------------
-class StudyPage extends StatelessWidget {
+class StudyPage extends StatefulWidget {
   const StudyPage({super.key});
+
+  @override
+  State<StudyPage> createState() => _StudyPageState();
+}
+
+class _StudyPageState extends State<StudyPage> {
+  bool _asking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeAsk());
+  }
+
+  String get _tab => store.studyTab == 'dil' ? 'dil' : 'lgs';
+
+  Future<void> _maybeAsk() async {
+    if (!mounted || _asking) return;
+    final g = _tab;
+    if (store.studyAsked.contains(g)) return;
+    _asking = true;
+    final yes = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(tx('{0} paketini yükleyelim mi?', [_groupName(g)])),
+        content: Text(tx(
+            'Konu özetleri ve kartlar yüklenir. İstediğin zaman dersleri silebilir ya da paketi yeniden yükleyebilirsin. Kendi kartların, notların ve ses kayıtların silinmez.')),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(tx('Şimdi değil'))),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(tx('Yükle'))),
+        ],
+      ),
+    );
+    _asking = false;
+    store.studyAsk(g);
+    if (yes == true) {
+      store.studyInstall(
+          studySubjects.where((s) => s.group == g).map((s) => s.id));
+    }
+  }
+
+  void _setTab(String t) {
+    store.setStudyTab(t);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeAsk());
+  }
+
+  Future<void> _deletePackage() async {
+    final g = _tab;
+    final ok = await confirmDialog(
+        context,
+        tx('{0} paketi silinsin mi?', [_groupName(g)]),
+        tx('Hazır dersler kaldırılır. Kendi kartların, notların ve ses kayıtların silinmez. İstediğin zaman yeniden yükleyebilirsin.'),
+        okLabel: tx('Sil'));
+    if (ok) {
+      store.studyUninstall(
+          studySubjects.where((s) => s.group == g).map((s) => s.id));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -87,11 +181,35 @@ class StudyPage extends StatelessWidget {
       listenable: store,
       builder: (context, _) {
         final p = palOf(context);
-        final tab = store.studyTab == 'dil' ? 'dil' : 'lgs';
-        final list = studySubjects.where((s) => s.group == tab).toList();
+        final tab = _tab;
+        final all = studySubjects.where((s) => s.group == tab).toList();
+        final list = all.where((s) => store.studyPk.contains(s.id)).toList();
+        final missing = all.where((s) => !store.studyPk.contains(s.id)).toList();
         return Scaffold(
           backgroundColor: p.bg,
-          appBar: AppBar(title: Text(tx('Ders çalışma'))),
+          appBar: AppBar(
+            title: Text(tx('Ders çalışma')),
+            actions: [
+              PopupMenuButton<String>(
+                onSelected: (v) {
+                  if (v == 'del') _deletePackage();
+                  if (v == 'inst') {
+                    store.studyInstall(all.map((s) => s.id));
+                  }
+                },
+                itemBuilder: (_) => [
+                  if (missing.isNotEmpty)
+                    PopupMenuItem(
+                        value: 'inst',
+                        child: Text(tx('{0} paketini yükle', [_groupName(tab)]))),
+                  if (list.isNotEmpty)
+                    PopupMenuItem(
+                        value: 'del',
+                        child: Text(tx('{0} paketini sil', [_groupName(tab)]))),
+                ],
+              ),
+            ],
+          ),
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
@@ -102,10 +220,38 @@ class StudyPage extends StatelessWidget {
                 ],
                 selected: {tab},
                 showSelectedIcon: false,
-                onSelectionChanged: (s) => store.setStudyTab(s.first),
+                onSelectionChanged: (s) => _setTab(s.first),
               ),
               const SizedBox(height: 10),
+              _planCard(context, p),
+              const SizedBox(height: 10),
               for (final s in list) _subjectCard(context, p, s),
+              if (missing.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                if (list.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                        tx('{0} paketi yüklü değil.', [_groupName(tab)]),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: p.soft)),
+                  ),
+                for (final s in missing)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: OutlinedButton.icon(
+                      onPressed: () => store.studyInstall([s.id]),
+                      icon: const Icon(Icons.download_rounded, size: 18),
+                      label: Text(tx('{0} dersini yükle', [s.name])),
+                    ),
+                  ),
+                if (missing.length > 1)
+                  FilledButton.icon(
+                    onPressed: () => store.studyInstall(all.map((s) => s.id)),
+                    icon: const Icon(Icons.download_done_rounded),
+                    label: Text(tx('{0} paketini yükle', [_groupName(tab)])),
+                  ),
+              ],
               const SizedBox(height: 12),
               Text(
                 tx('Hazır içerikler yardımcı notlardır; kaynaklarla tek tek doğrulanmamıştır. Düzenleyebilir, silebilir ve kendi kartlarını ekleyebilirsin.'),
@@ -118,9 +264,54 @@ class StudyPage extends StatelessWidget {
     );
   }
 
+  Widget _planCard(BuildContext context, Pal p) {
+    final n = store.studyPlan.length;
+    return Material(
+      color: p.card,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => Navigator.of(context).push(slideFromRight(const _PlanPage())),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: p.line),
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: p.accent.withOpacity(0.15),
+                child: Icon(Icons.calendar_month_rounded, color: p.accent),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(tx('Haftalık çalışma programı'),
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: p.ink)),
+                    const SizedBox(height: 2),
+                    Text(tx('{0} ders saati', ['$n']),
+                        style: TextStyle(color: p.soft, fontSize: 12.5)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _subjectCard(BuildContext context, Pal p, StudySubjectDef s) {
-    final all = _itemsOfSubject(s);
-    final due = _dueCount(all);
+    final rev = _revOf(s);
+    final due = _dueCount(rev);
+    final topics = _topicsOf(s).length;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
@@ -131,7 +322,7 @@ class StudyPage extends StatelessWidget {
           onTap: () =>
               Navigator.of(context).push(slideFromRight(_SubjectPage(s.id))),
           child: Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.fromLTRB(14, 14, 4, 14),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: p.line),
@@ -158,13 +349,25 @@ class StudyPage extends StatelessWidget {
                               color: p.ink)),
                       const SizedBox(height: 2),
                       Text(
-                          tx('{0} kart • {1} tekrar bekliyor',
-                              ['${all.length}', '$due']),
+                          tx('{0} konu • {1} tekrar bekliyor',
+                              ['$topics', '$due']),
                           style: TextStyle(color: p.soft, fontSize: 12.5)),
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right_rounded),
+                PopupMenuButton<String>(
+                  onSelected: (v) async {
+                    final ok = await confirmDialog(
+                        context,
+                        tx('{0} dersi silinsin mi?', [s.name]),
+                        tx('Hazır konular kaldırılır. Kendi kartların, notların ve ses kayıtların silinmez. İstediğin zaman yeniden yükleyebilirsin.'),
+                        okLabel: tx('Sil'));
+                    if (ok) store.studyUninstall([s.id]);
+                  },
+                  itemBuilder: (_) => [
+                    PopupMenuItem(value: 'del', child: Text(tx('Dersi sil'))),
+                  ],
+                ),
               ],
             ),
           ),
@@ -175,7 +378,7 @@ class StudyPage extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------
-// Ders: konu başlıkları
+// Ders: iki başlık (Ders çalış / Tekrar et)
 // ---------------------------------------------------------------
 class _SubjectPage extends StatelessWidget {
   final String sid;
@@ -188,12 +391,102 @@ class _SubjectPage extends StatelessWidget {
       listenable: store,
       builder: (context, _) {
         final p = palOf(context);
-        final topics = _topicsOf(s);
-        final all = _itemsOfSubject(s);
-        final due = _dueCount(all);
+        final topics = _topicsOf(s).length;
+        final rev = _revOf(s);
+        final due = _dueCount(rev);
         return Scaffold(
           backgroundColor: p.bg,
           appBar: AppBar(title: Text(s.name, maxLines: 1)),
+          body: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            children: [
+              _big(context, p, Icons.auto_stories_rounded, tx('Ders çalış'),
+                  tx('{0} konu', ['$topics']),
+                  () => Navigator.of(context)
+                      .push(slideFromRight(_TopicListPage(sid)))),
+              const SizedBox(height: 12),
+              _big(context, p, Icons.replay_rounded, tx('Tekrar et'),
+                  tx('{0} kart • {1} tekrar bekliyor', ['${rev.length}', '$due']),
+                  () => Navigator.of(context)
+                      .push(slideFromRight(_RevPage(sid)))),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _big(BuildContext context, Pal p, IconData icon, String title,
+      String sub, VoidCallback onTap) {
+    return Material(
+      color: p.card,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: p.line),
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 26,
+                backgroundColor: p.accent.withOpacity(0.15),
+                child: Icon(icon, color: p.accent, size: 28),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w700,
+                            color: p.ink)),
+                    const SizedBox(height: 3),
+                    Text(sub, style: TextStyle(color: p.soft, fontSize: 13)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+void _startReview(BuildContext context, String title, List<_Item> items,
+    {bool all = false}) {
+  final now = items.where((i) => store.studyIsDue(i.id)).toList();
+  final use = all || now.isEmpty ? items : now;
+  if (use.isEmpty) return;
+  Navigator.of(context).push(slideFromRight(_ReviewPage(title, use)));
+}
+
+// ---------------------------------------------------------------
+// Ders çalış: konu başlıkları
+// ---------------------------------------------------------------
+class _TopicListPage extends StatelessWidget {
+  final String sid;
+  const _TopicListPage(this.sid);
+
+  @override
+  Widget build(BuildContext context) {
+    final s = _subj(sid)!;
+    return ListenableBuilder(
+      listenable: store,
+      builder: (context, _) {
+        final p = palOf(context);
+        final topics = _topicsOf(s);
+        return Scaffold(
+          backgroundColor: p.bg,
+          appBar: AppBar(title: Text(tx('Ders çalış'), maxLines: 1)),
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () async {
               final n = await askText(context, tx('Yeni konu'),
@@ -208,14 +501,6 @@ class _SubjectPage extends StatelessWidget {
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
             children: [
-              FilledButton.icon(
-                onPressed: all.isEmpty
-                    ? null
-                    : () => _startReview(context, s.name, all),
-                icon: const Icon(Icons.replay_rounded),
-                label: Text(tx('Tüm konuları tekrar et ({0})', ['$due'])),
-              ),
-              const SizedBox(height: 10),
               for (final t in topics) _topicTile(context, p, t),
             ],
           ),
@@ -226,7 +511,7 @@ class _SubjectPage extends StatelessWidget {
 
   Widget _topicTile(BuildContext context, Pal p, _TopicRef t) {
     final items = _itemsOf(t.id);
-    final due = _dueCount(items);
+    final inRev = items.where(_inRev).length;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
@@ -255,8 +540,8 @@ class _SubjectPage extends StatelessWidget {
                               color: p.ink)),
                       const SizedBox(height: 2),
                       Text(
-                          tx('{0} kart • {1} tekrar bekliyor',
-                              ['${items.length}', '$due']),
+                          tx('{0} bilgi • {1} tekrar listesinde',
+                              ['${items.length}', '$inRev']),
                           style: TextStyle(color: p.soft, fontSize: 12)),
                     ],
                   ),
@@ -297,16 +582,8 @@ class _SubjectPage extends StatelessWidget {
   }
 }
 
-void _startReview(BuildContext context, String title, List<_Item> items,
-    {bool all = false}) {
-  final now = items.where((i) => store.studyIsDue(i.id)).toList();
-  final use = all || now.isEmpty ? items : now;
-  if (use.isEmpty) return;
-  Navigator.of(context).push(slideFromRight(_ReviewPage(title, use)));
-}
-
 // ---------------------------------------------------------------
-// Konu: kart listesi
+// Konu: bilgi parçaları + notlar + ses kayıtları
 // ---------------------------------------------------------------
 class _TopicPage extends StatelessWidget {
   final String sid;
@@ -329,10 +606,20 @@ class _TopicPage extends StatelessWidget {
     }
   }
 
-  String _status(_Item i) {
-    final b = store.studyBox(i.id);
-    if (b == 0) return tx('Yeni');
-    return store.studyIsDue(i.id) ? tx('Tekrar zamanı') : tx('Öğrenildi');
+  Future<void> _note(BuildContext context, StudyNote? n) async {
+    final t = await showDialog<String>(
+        context: context, builder: (_) => _NoteDialog(text: n?.text ?? ''));
+    if (t == null || t.trim().isEmpty) return;
+    if (n == null) {
+      store.addStudyNote(topicId, t);
+    } else {
+      store.editStudyNote(n.id, t);
+    }
+  }
+
+  Future<void> _record(BuildContext context) async {
+    final f = await recordVoice(context);
+    if (f != null) store.addStudyRec(topicId, f);
   }
 
   @override
@@ -342,9 +629,12 @@ class _TopicPage extends StatelessWidget {
       builder: (context, _) {
         final p = palOf(context);
         final items = _itemsOf(topicId);
-        final due = _dueCount(items);
+        final notes = store.studyNotes.where((n) => n.topic == topicId).toList();
+        final recs = store.studyRecs.where((r) => r.topic == topicId).toList();
         final hasHidden =
             store.studyHid.any((h) => h.startsWith('$topicId#'));
+        final notInRev =
+            items.where((i) => i.builtin && !store.studyInRev(i.id)).toList();
         return Scaffold(
           backgroundColor: p.bg,
           appBar: AppBar(
@@ -366,9 +656,264 @@ class _TopicPage extends StatelessWidget {
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
             children: [
+              if (notInRev.length > 1)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: () =>
+                        store.studyAddRev(notInRev.map((i) => i.id)),
+                    icon: const Icon(Icons.playlist_add_rounded, size: 18),
+                    label: Text(tx('Hepsini tekrar listesine ekle')),
+                  ),
+                ),
+              if (items.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(tx('Henüz bilgi yok. Kart ekle düğmesiyle başla.'),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: p.soft)),
+                ),
+              for (final i in items) _piece(context, p, i),
+              const SizedBox(height: 14),
+              _header(p, tx('Notlar'), Icons.sticky_note_2_outlined,
+                  () => _note(context, null)),
+              if (notes.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Text(tx('Bu konuya henüz not yazılmadı.'),
+                      style: TextStyle(color: p.soft, fontSize: 13)),
+                ),
+              for (final n in notes)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: p.card,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: p.line),
+                  ),
+                  child: ListTile(
+                    onTap: () => _note(context, n),
+                    title: Text(n.text, style: TextStyle(color: p.ink)),
+                    subtitle: Text(dtLabel(n.ms),
+                        style: TextStyle(color: p.soft, fontSize: 11.5)),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded),
+                      onPressed: () async {
+                        final ok = await confirmDialog(
+                            context, tx('Not silinsin mi?'), n.text);
+                        if (ok) store.deleteStudyNote(n.id);
+                      },
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 10),
+              _header(p, tx('Ses kayıtları'), Icons.mic_none_rounded,
+                  () => _record(context)),
+              if (recs.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Text(tx('Bu konuya henüz ses kaydı yok.'),
+                      style: TextStyle(color: p.soft, fontSize: 13)),
+                ),
+              for (final r in recs)
+                VoiceTile(
+                  name: r.file,
+                  onDelete: () async {
+                    final ok = await confirmDialog(context,
+                        tx('Ses kaydı silinsin mi?'), tx('Kayıt kalıcı olarak silinir.'));
+                    if (ok) store.deleteStudyRec(r.id);
+                  },
+                ),
+              if (recs.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                      tx('Ses kayıtları yedek dosyasına girmez; yalnız bu telefonda durur.'),
+                      style: TextStyle(color: p.soft, fontSize: 11.5)),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _header(Pal p, String text, IconData icon, VoidCallback onAdd) => Row(
+        children: [
+          Icon(icon, size: 20, color: p.accent),
+          const SizedBox(width: 8),
+          Expanded(
+              child: Text(text,
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700, color: p.ink))),
+          TextButton.icon(
+              onPressed: onAdd,
+              icon: Icon(
+                  icon == Icons.mic_none_rounded
+                      ? Icons.fiber_manual_record_rounded
+                      : Icons.add_rounded,
+                  size: 18),
+              label: Text(icon == Icons.mic_none_rounded
+                  ? tx('Kaydet')
+                  : tx('Not ekle'))),
+        ],
+      );
+
+  Widget _piece(BuildContext context, Pal p, _Item i) {
+    final inRev = _inRev(i);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.fromLTRB(14, 12, 6, 6),
+      decoration: BoxDecoration(
+        color: p.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: p.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2, right: 6),
+                  child: Text(i.front,
+                      style: TextStyle(
+                          color: p.ink,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15)),
+                ),
+              ),
+              PopupMenuButton<String>(
+                padding: EdgeInsets.zero,
+                onSelected: (v) async {
+                  if (v == 'edit') {
+                    _edit(context, i);
+                  } else {
+                    final ok = await confirmDialog(
+                        context, tx('Kart silinsin mi?'), i.front);
+                    if (ok) store.deleteStudyCard(i.id);
+                  }
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem(value: 'edit', child: Text(tx('Düzenle'))),
+                  PopupMenuItem(value: 'del', child: Text(tx('Sil'))),
+                ],
+              ),
+            ],
+          ),
+          if (i.exp.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 8, top: 2),
+              child: Text(i.exp,
+                  style: TextStyle(color: p.ink, fontSize: 14, height: 1.4)),
+            ),
+          if (i.ex.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 8, top: 4),
+              child: Text(i.ex,
+                  style: TextStyle(
+                      color: p.soft,
+                      fontSize: 13,
+                      fontStyle: FontStyle.italic,
+                      height: 1.4)),
+            ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: i.builtin
+                ? TextButton.icon(
+                    onPressed: () => store.studyToggleRev(i.id),
+                    icon: Icon(
+                        inRev
+                            ? Icons.check_circle_rounded
+                            : Icons.replay_rounded,
+                        size: 18),
+                    label: Text(inRev ? tx('Tekrar listesinde') : tx('Tekrar et')),
+                  )
+                : Padding(
+                    padding: const EdgeInsets.only(right: 8, bottom: 6),
+                    child: Text(tx('Kendi kartın • tekrar listesinde'),
+                        style: TextStyle(color: p.soft, fontSize: 11.5)),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NoteDialog extends StatefulWidget {
+  final String text;
+  const _NoteDialog({required this.text});
+
+  @override
+  State<_NoteDialog> createState() => _NoteDialogState();
+}
+
+class _NoteDialogState extends State<_NoteDialog> {
+  late final TextEditingController _c = TextEditingController(text: widget.text);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.text.isEmpty ? tx('Yeni not') : tx('Notu düzenle')),
+      content: TextField(
+        controller: _c,
+        autofocus: true,
+        minLines: 3,
+        maxLines: 8,
+        textCapitalization: TextCapitalization.sentences,
+        decoration: InputDecoration(labelText: tx('Not')),
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context), child: Text(tx('Vazgeç'))),
+        FilledButton(
+            onPressed: () => Navigator.pop(context, _c.text),
+            child: Text(tx('Kaydet'))),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------
+// Tekrar et: tekrar listesindeki kartlar
+// ---------------------------------------------------------------
+class _RevPage extends StatelessWidget {
+  final String sid;
+  const _RevPage(this.sid);
+
+  String _status(_Item i) {
+    final b = store.studyBox(i.id);
+    if (b == 0) return tx('Yeni');
+    return store.studyIsDue(i.id) ? tx('Tekrar zamanı') : tx('Öğrenildi');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = _subj(sid)!;
+    return ListenableBuilder(
+      listenable: store,
+      builder: (context, _) {
+        final p = palOf(context);
+        final items = _revOf(s);
+        final due = _dueCount(items);
+        return Scaffold(
+          backgroundColor: p.bg,
+          appBar: AppBar(title: Text(tx('Tekrar et'), maxLines: 1)),
+          body: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            children: [
               FilledButton.icon(
                 onPressed:
-                    items.isEmpty ? null : () => _startReview(context, name, items),
+                    items.isEmpty ? null : () => _startReview(context, s.name, items),
                 icon: const Icon(Icons.replay_rounded),
                 label: Text(due > 0
                     ? tx('Tekrar et ({0})', ['$due'])
@@ -384,7 +929,8 @@ class _TopicPage extends StatelessWidget {
               if (items.isEmpty)
                 Padding(
                   padding: const EdgeInsets.all(24),
-                  child: Text(tx('Henüz kart yok. Kart ekle düğmesiyle başla.'),
+                  child: Text(
+                      tx('Tekrar listesi boş. Ders çalış bölümünde bir bilginin yanındaki Tekrar et düğmesine bas.'),
                       textAlign: TextAlign.center,
                       style: TextStyle(color: p.soft)),
                 ),
@@ -397,22 +943,24 @@ class _TopicPage extends StatelessWidget {
                     border: Border.all(color: p.line),
                   ),
                   child: ListTile(
-                    onTap: () => _edit(context, i),
                     title: Text(i.front,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                             color: p.ink, fontWeight: FontWeight.w600)),
-                    subtitle: Text(
-                        '${i.exp}\n${_status(i)}${i.builtin ? ' • ${tx('hazır')}' : ''}',
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
+                    subtitle: Text(_status(i),
                         style: TextStyle(color: p.soft, fontSize: 12.5)),
-                    isThreeLine: true,
                     trailing: IconButton(
-                      icon: const Icon(Icons.delete_outline_rounded),
+                      tooltip: tx('Listeden çıkar'),
+                      icon: const Icon(Icons.close_rounded),
                       onPressed: () async {
-                        final ok = await confirmDialog(context,
-                            tx('Kart silinsin mi?'), i.front);
-                        if (ok) store.deleteStudyCard(i.id);
+                        if (i.builtin) {
+                          store.studyRemoveRev(i.id);
+                        } else {
+                          final ok = await confirmDialog(context,
+                              tx('Kart silinsin mi?'), i.front);
+                          if (ok) store.deleteStudyCard(i.id);
+                        }
                       },
                     ),
                   ),
@@ -421,6 +969,275 @@ class _TopicPage extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+// ---------------------------------------------------------------
+// Haftalık çalışma programı
+// ---------------------------------------------------------------
+String _hm2(int h, int m) =>
+    '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+
+Future<TimeOfDay?> _pick(BuildContext context, int h, int m) => showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: h, minute: m),
+      builder: (ctx, child) => MediaQuery(
+        data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true),
+        child: child!,
+      ),
+    );
+
+class _PlanPage extends StatelessWidget {
+  const _PlanPage();
+
+  Future<void> _edit(BuildContext context, StudyPlan? row, {int day = 1}) async {
+    final r = await showDialog<StudyPlan>(
+        context: context, builder: (_) => _PlanDialog(row: row, day: day));
+    if (r == null) return;
+    if (row == null) {
+      final n = store.addStudyPlan(
+          r.day, r.subj, r.sh, r.sm, r.eh, r.em, r.remind);
+      await Notifier.syncPlan(n);
+    } else {
+      store.updateStudyPlan(row,
+          day: r.day,
+          subj: r.subj,
+          sh: r.sh,
+          sm: r.sm,
+          eh: r.eh,
+          em: r.em,
+          remind: r.remind);
+      await Notifier.syncPlan(row);
+    }
+    if (r.remind) await permissionMessage();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: store,
+      builder: (context, _) {
+        final p = palOf(context);
+        return Scaffold(
+          backgroundColor: p.bg,
+          appBar: AppBar(title: Text(tx('Haftalık çalışma programı'))),
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: () => _edit(context, null),
+            icon: const Icon(Icons.add_rounded),
+            label: Text(tx('Ders ekle')),
+          ),
+          body: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
+            children: [
+              for (var d = 1; d <= 7; d++) ..._day(context, p, d),
+              const SizedBox(height: 8),
+              Text(
+                  tx('Hatırlatma isteğe bağlıdır; açık olan derslerin başlangıç saatinde bildirim gelir.'),
+                  style: TextStyle(color: p.soft, fontSize: 12)),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  List<Widget> _day(BuildContext context, Pal p, int d) {
+    final rows = store.studyPlan.where((r) => r.day == d).toList()
+      ..sort((a, b) => (a.sh * 60 + a.sm).compareTo(b.sh * 60 + b.sm));
+    return [
+      Padding(
+        padding: const EdgeInsets.only(top: 12, bottom: 4),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(wdName(d),
+                  style: TextStyle(
+                      color: p.accent,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15)),
+            ),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              tooltip: tx('Ders ekle'),
+              icon: const Icon(Icons.add_circle_outline_rounded),
+              onPressed: () => _edit(context, null, day: d),
+            ),
+          ],
+        ),
+      ),
+      if (rows.isEmpty)
+        Text('—', style: TextStyle(color: p.soft)),
+      for (final r in rows)
+        Container(
+          margin: const EdgeInsets.only(bottom: 6),
+          decoration: BoxDecoration(
+            color: p.card,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: p.line),
+          ),
+          child: ListTile(
+            dense: true,
+            onTap: () => _edit(context, r),
+            title: Text(r.subj,
+                style: TextStyle(color: p.ink, fontWeight: FontWeight.w600)),
+            subtitle: Text('${_hm2(r.sh, r.sm)}–${_hm2(r.eh, r.em)}',
+                style: TextStyle(color: p.soft)),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.notifications_none_rounded,
+                    size: 18, color: p.soft),
+                Switch(
+                  value: r.remind,
+                  onChanged: (v) async {
+                    store.updateStudyPlan(r, remind: v);
+                    await Notifier.syncPlan(r);
+                    if (v) await permissionMessage();
+                  },
+                ),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  onPressed: () async {
+                    final ok = await confirmDialog(context,
+                        tx('Satır silinsin mi?'), '${wdName(r.day)} ${r.subj}');
+                    if (ok) {
+                      await Notifier.cancelPlan(r);
+                      store.deleteStudyPlan(r.id);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+    ];
+  }
+}
+
+class _PlanDialog extends StatefulWidget {
+  final StudyPlan? row;
+  final int day;
+  const _PlanDialog({required this.row, required this.day});
+
+  @override
+  State<_PlanDialog> createState() => _PlanDialogState();
+}
+
+class _PlanDialogState extends State<_PlanDialog> {
+  late int _day = widget.row?.day ?? widget.day;
+  late final TextEditingController _s =
+      TextEditingController(text: widget.row?.subj ?? '');
+  late int _sh = widget.row?.sh ?? 18;
+  late int _sm = widget.row?.sm ?? 0;
+  late int _eh = widget.row?.eh ?? 18;
+  late int _em = widget.row?.em ?? 45;
+  late bool _rem = widget.row?.remind ?? false;
+
+  @override
+  void dispose() {
+    _s.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palOf(context);
+    return AlertDialog(
+      title: Text(widget.row == null ? tx('Ders ekle') : tx('Dersi düzenle')),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 6,
+              children: [
+                for (var d = 1; d <= 7; d++)
+                  ChoiceChip(
+                    label: Text(wdName(d)),
+                    selected: _day == d,
+                    onSelected: (_) => setState(() => _day = d),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _s,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(labelText: tx('Ders')),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              children: [
+                for (final s in studySubjects)
+                  ActionChip(
+                    label: Text(s.name, style: const TextStyle(fontSize: 12)),
+                    onPressed: () => setState(() => _s.text = s.name),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () async {
+                      final t = await _pick(context, _sh, _sm);
+                      if (t != null) {
+                        setState(() {
+                          _sh = t.hour;
+                          _sm = t.minute;
+                        });
+                      }
+                    },
+                    child: Text(_hm2(_sh, _sm)),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Text('–', style: TextStyle(color: p.soft)),
+                ),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () async {
+                      final t = await _pick(context, _eh, _em);
+                      if (t != null) {
+                        setState(() {
+                          _eh = t.hour;
+                          _em = t.minute;
+                        });
+                      }
+                    },
+                    child: Text(_hm2(_eh, _em)),
+                  ),
+                ),
+              ],
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(tx('Başlangıçta hatırlat')),
+              value: _rem,
+              onChanged: (v) => setState(() => _rem = v),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context), child: Text(tx('Vazgeç'))),
+        FilledButton(
+          onPressed: () {
+            if (_s.text.trim().isEmpty) return;
+            Navigator.pop(
+                context,
+                StudyPlan('', _day, _s.text.trim(), _sh, _sm, _eh, _em, _rem, 0));
+          },
+          child: Text(tx('Kaydet')),
+        ),
+      ],
     );
   }
 }

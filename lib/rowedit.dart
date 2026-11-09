@@ -29,7 +29,11 @@ class RowEditResult {
   final Set<int> days;
   final int rh; // -1: hatırlatma yok
   final int rm;
-  const RowEditResult(this.value, this.deleteEntry, this.days, this.rh, this.rm);
+  final double? goal; // yeni hedef (goalSet true ise geçerli)
+  final bool goalSet;
+  final bool openSub; // "Alt kategoriyi düzenle" istendi
+  const RowEditResult(this.value, this.deleteEntry, this.days, this.rh, this.rm,
+      {this.goal, this.goalSet = false, this.openSub = false});
 }
 
 Future<RowEditResult?> showRowEditDialog(BuildContext context,
@@ -55,11 +59,15 @@ class _RowEditDialogState extends State<_RowEditDialog> {
   late Set<int> _days = Set<int>.from(widget.sub.days);
   late int _rh = widget.sub.rh;
   late int _rm = widget.sub.rm;
+  late final TextEditingController _g = TextEditingController(
+      text: widget.sub.goal == null ? '' : plain(widget.sub.goal!));
   String? _err;
+  String? _gerr;
 
   @override
   void dispose() {
     _c.dispose();
+    _g.dispose();
     super.dispose();
   }
 
@@ -72,7 +80,20 @@ class _RowEditDialogState extends State<_RowEditDialog> {
         return;
       }
     }
-    Navigator.pop(context, RowEditResult(v, false, _days, _rh, _rm));
+    double? g;
+    if (widget.sub.routine) {
+      if (_g.text.trim().isNotEmpty) {
+        g = parseNum(_g.text);
+        if (g == null || g < 0) {
+          setState(() => _gerr = tx('Geçerli bir sayı gir'));
+          return;
+        }
+      }
+    }
+    Navigator.pop(
+        context,
+        RowEditResult(v, false, _days, _rh, _rm,
+            goal: g, goalSet: widget.sub.routine));
   }
 
   @override
@@ -99,6 +120,17 @@ class _RowEditDialogState extends State<_RowEditDialog> {
               onSubmitted: (_) => _ok(),
             ),
             if (sub.routine) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _g,
+                keyboardType: numberKeyboard,
+                inputFormatters: numberFormatters,
+                decoration: InputDecoration(
+                  labelText: tx('Hedef'),
+                  suffixText: sub.unit,
+                  errorText: _gerr,
+                ),
+              ),
               const SizedBox(height: 16),
               Text(tx('Hangi günler?'),
                   style: TextStyle(fontSize: 12.5, color: p.soft)),
@@ -139,6 +171,18 @@ class _RowEditDialogState extends State<_RowEditDialog> {
                 ],
               ),
             ],
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => Navigator.pop(
+                    context,
+                    RowEditResult(null, false, _days, _rh, _rm,
+                        openSub: true)),
+                icon: const Icon(Icons.tune_rounded, size: 18),
+                label: Text(tx('Alt kategoriyi düzenle')),
+              ),
+            ),
           ],
         ),
       ),
