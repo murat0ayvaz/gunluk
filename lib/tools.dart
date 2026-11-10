@@ -32,40 +32,79 @@ class _ToolInfo {
   final String name;
   final Color tone;
   final Widget Function() page;
-  final String group; // boş: grupsuz; dolu: o grubun başlığı altında
+  final String group; // grup kimliği: health | time | weather
   const _ToolInfo(this.id, this.icon, this.name, this.tone, this.page,
-      {this.group = ''});
+      {required this.group});
 }
 
-List<_ToolInfo> _tools() => [
+String _groupTitle(String g) {
+  switch (g) {
+    case 'health':
+      return tx('Sağlık ve denge');
+    case 'time':
+      return tx('Zaman ve sayaçlar');
+    default:
+      return tx('Hava durumu');
+  }
+}
+
+const _defaultGroupOrder = ['health', 'time', 'weather'];
+
+/// Hazır sıra (varsayılan); kullanıcının sıralaması bunun üstüne uygulanır
+List<_ToolInfo> _allTools() => [
       _ToolInfo('meditate', Icons.self_improvement_rounded, tx('Meditasyon'),
-          const Color(0xFF8E6CEF), () => const MeditatePage()),
+          const Color(0xFF8E6CEF), () => const MeditatePage(),
+          group: 'health'),
       _ToolInfo('breath', Icons.air_rounded, tx('Nefes'),
-          const Color(0xFF2BA7C9), () => const BreathPage()),
-      _ToolInfo('pomodoro', Icons.local_fire_department_outlined,
-          tx('Pomodoro'), const Color(0xFFE8674A), () => const PomodoroPage()),
-      _ToolInfo('timer', Icons.hourglass_bottom_rounded, tx('Sayaç'),
-          const Color(0xFFE9A23B), () => const TimerPage()),
-      _ToolInfo('stopwatch', Icons.timer_outlined, tx('Kronometre'),
-          const Color(0xFF4F8EF7), () => const StopwatchPage()),
-      _ToolInfo('zikir', Icons.touch_app_outlined, tx('Zikirmatik'),
-          const Color(0xFF2FB38A), () => const ZikirPage()),
+          const Color(0xFF2BA7C9), () => const BreathPage(),
+          group: 'health'),
       _ToolInfo('water', Icons.water_drop_outlined, tx('Su sayacı'),
-          const Color(0xFF3BA3E8), () => const WaterPage()),
-      _ToolInfo('wxdetail', Icons.thermostat_rounded, tx('Hava durumu'),
-          const Color(0xFF3E9FD6), () => const WxDetailPage()),
-      _ToolInfo('sleep', Icons.bedtime_outlined, tx('Uyku'),
-          const Color(0xFF5C6BC0), () => const SleepPage()),
-      _ToolInfo('sleeptimer', Icons.bedtime_rounded, tx('Uyku zamanlayıcısı'),
-          const Color(0xFF7E57C2), () => const SleepTimerPage(),
-          group: tx('Zamanlama')),
-      _ToolInfo('alarm', Icons.alarm_rounded, tx('Alarm'),
-          const Color(0xFFEF6C57), () => const AlarmPage(),
-          group: tx('Zamanlama')),
-      _ToolInfo('launcher', Icons.rocket_launch_outlined, tx('Başlatıcı'),
-          const Color(0xFF26A69A), () => const LauncherPage(),
-          group: tx('Zamanlama')),
+          const Color(0xFF3BA3E8), () => const WaterPage(),
+          group: 'health'),
+      _ToolInfo('timer', Icons.hourglass_bottom_rounded, tx('Sayaç'),
+          const Color(0xFFE9A23B), () => const TimerPage(),
+          group: 'time'),
+      _ToolInfo('pomodoro', Icons.local_fire_department_outlined,
+          tx('Pomodoro'), const Color(0xFFE8674A), () => const PomodoroPage(),
+          group: 'time'),
+      _ToolInfo('stopwatch', Icons.timer_outlined, tx('Kronometre'),
+          const Color(0xFF4F8EF7), () => const StopwatchPage(),
+          group: 'time'),
+      _ToolInfo('zikir', Icons.touch_app_outlined, tx('Zikirmatik'),
+          const Color(0xFF2FB38A), () => const ZikirPage(),
+          group: 'time'),
+      _ToolInfo('zamanlama', Icons.alarm_rounded, tx('Zamanlama'),
+          const Color(0xFF7E57C2), () => const ZamanlamaPage(),
+          group: 'time'),
+      _ToolInfo('wxhourly', Icons.schedule_rounded, tx('Saatlik'),
+          const Color(0xFF3E9FD6), () => const WxDetailPage(),
+          group: 'weather'),
+      _ToolInfo('wxdaily', Icons.calendar_view_week_rounded, tx('Günlük'),
+          const Color(0xFF3E9FD6), () => const WxDetailPage(daily: true),
+          group: 'weather'),
     ];
+
+/// Kullanıcının sıralamasına göre gruplar ve içindeki araçlar
+List<(String, List<_ToolInfo>)> _grouped() {
+  final all = _allTools();
+  final gOrder = [
+    ...store.toolGroupOrder.where(_defaultGroupOrder.contains),
+    ..._defaultGroupOrder.where((g) => !store.toolGroupOrder.contains(g)),
+  ];
+  int rank(_ToolInfo t) {
+    final i = store.toolOrder.indexOf(t.id);
+    return i < 0 ? 1000 + all.indexOf(t) : i;
+  }
+
+  return [
+    for (final g in gOrder)
+      (
+        g,
+        (all.where((t) => t.group == g).toList()
+          ..sort((a, b) => rank(a).compareTo(rank(b))))
+      ),
+  ];
+}
 
 /// Yumuşak geçişli sayfa (solarak + hafif yukarı kayarak)
 Route<void> _route(Widget page) => PageRouteBuilder<void>(
@@ -100,109 +139,198 @@ class ToolsButton extends StatelessWidget {
       );
 }
 
-class ToolsDrawer extends StatelessWidget {
+class ToolsDrawer extends StatefulWidget {
   /// replace: bir araç sayfasının içinden açıldı; seçilen araç bu sayfanın yerine geçer
   final bool replace;
   const ToolsDrawer({super.key, this.replace = false});
 
   @override
+  State<ToolsDrawer> createState() => _ToolsDrawerState();
+}
+
+class _ToolsDrawerState extends State<ToolsDrawer> {
+  bool _edit = false; // sıralama kipi
+
+  void _open(_ToolInfo t) {
+    final nav = Navigator.of(context);
+    nav.pop(); // menüyü kapat
+    if (widget.replace) {
+      nav.pushReplacement(_route(t.page()));
+    } else {
+      nav.push(_route(t.page()));
+    }
+  }
+
+  Widget _tile(Pal p, _ToolInfo t, {Widget? handle}) {
+    return Padding(
+      key: ValueKey('t_${t.id}'),
+      padding: const EdgeInsets.fromLTRB(14, 5, 14, 5),
+      child: Material(
+        color: Color.alphaBlend(t.tone.withOpacity(p.dark ? 0.22 : 0.14), p.card),
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: _edit ? null : () => _open(t),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [t.tone, t.tone.withOpacity(0.65)],
+                    ),
+                  ),
+                  child: Icon(t.icon, color: Colors.white, size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(t.name,
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: p.ink)),
+                ),
+                handle ?? Icon(Icons.chevron_right_rounded, color: t.tone),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _groupHeader(Pal p, String g, int i, int n) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 8, 2),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(_groupTitle(g),
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.4,
+                    color: p.soft)),
+          ),
+          if (_edit) ...[
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              tooltip: tx('Yukarı'),
+              onPressed: i == 0 ? null : () => _moveGroup(i, i - 1),
+              icon: const Icon(Icons.keyboard_arrow_up_rounded),
+            ),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              tooltip: tx('Aşağı'),
+              onPressed: i >= n - 1 ? null : () => _moveGroup(i, i + 1),
+              icon: const Icon(Icons.keyboard_arrow_down_rounded),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _moveGroup(int from, int to) {
+    final ids = [for (final g in _grouped()) g.$1];
+    final x = ids.removeAt(from);
+    ids.insert(to, x);
+    store.setToolGroupOrder(ids);
+  }
+
+  void _moveTool(String group, int oldI, int newI) {
+    final list = [for (final t in _grouped().firstWhere((g) => g.$1 == group).$2) t.id];
+    if (newI > oldI) newI -= 1;
+    final x = list.removeAt(oldI);
+    list.insert(newI, x);
+    // diğer gruplardaki sıra korunur; bu grubun sırası yenilenir
+    final rest = [
+      for (final g in _grouped())
+        if (g.$1 != group)
+          for (final t in g.$2) t.id
+    ];
+    store.setToolOrder([...rest, ...list]);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final p = palOf(context);
-    final nav = Navigator.of(context);
     return Drawer(
       backgroundColor: p.bg,
       child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-              child: Text(tx('Araçlar'),
-                  style: TextStyle(
-                      fontSize: 22, fontWeight: FontWeight.w700, color: p.ink)),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Text(
-                  tx('Süre ve sayıları tek dokunuşla rutinlerine ekle.'),
-                  style: TextStyle(color: p.soft, fontSize: 13)),
-            ),
-            Expanded(
-              child: ListView(
-                padding: EdgeInsets.zero,
-                children: [
-                  for (final t in _tools()) ...[
-                    if (t.group.isNotEmpty &&
-                        _tools().firstWhere((x) => x.group == t.group).id ==
-                            t.id)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
-                        child: Text(t.group,
+        child: ListenableBuilder(
+          listenable: store,
+          builder: (context, _) {
+            final groups = _grouped();
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 8, 0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(tx('Araçlar'),
                             style: TextStyle(
-                                fontSize: 13,
+                                fontSize: 22,
                                 fontWeight: FontWeight.w700,
-                                letterSpacing: 0.4,
-                                color: p.soft)),
+                                color: p.ink)),
                       ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 5, 14, 5),
-                      child: Material(
-                        color: Color.alphaBlend(
-                            t.tone.withOpacity(p.dark ? 0.22 : 0.14), p.card),
-                        borderRadius: BorderRadius.circular(16),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(16),
-                          onTap: () {
-                            nav.pop(); // menüyü kapat
-                            if (replace) {
-                              nav.pushReplacement(_route(t.page()));
-                            } else {
-                              nav.push(_route(t.page()));
-                            }
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 12),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 42,
-                                  height: 42,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: [
-                                        t.tone,
-                                        t.tone.withOpacity(0.65)
-                                      ],
-                                    ),
-                                  ),
-                                  child: Icon(t.icon,
-                                      color: Colors.white, size: 22),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Text(t.name,
-                                      style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w700,
-                                          color: p.ink)),
-                                ),
-                                Icon(Icons.chevron_right_rounded,
-                                    color: t.tone),
-                              ],
-                            ),
-                          ),
-                        ),
+                      TextButton.icon(
+                        onPressed: () => setState(() => _edit = !_edit),
+                        icon: Icon(
+                            _edit ? Icons.check_rounded : Icons.swap_vert_rounded,
+                            size: 18),
+                        label: Text(_edit ? tx('Tamam') : tx('Sırala')),
                       ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+                  child: Text(
+                      _edit
+                          ? tx('Araçları tutup sürükle; grupları oklarla taşı.')
+                          : tx('Süre ve sayıları tek dokunuşla rutinlerine ekle.'),
+                      style: TextStyle(color: p.soft, fontSize: 13)),
+                ),
+                Expanded(
+                  child: ListView(
+                    padding: EdgeInsets.zero,
+                    children: [
+                      for (var gi = 0; gi < groups.length; gi++) ...[
+                        _groupHeader(p, groups[gi].$1, gi, groups.length),
+                        if (_edit)
+                          ReorderableListView(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            buildDefaultDragHandles: false,
+                            onReorder: (o, n) => _moveTool(groups[gi].$1, o, n),
+                            children: [
+                              for (var i = 0; i < groups[gi].$2.length; i++)
+                                _tile(p, groups[gi].$2[i],
+                                    handle: ReorderableDragStartListener(
+                                        index: i,
+                                        child: Icon(Icons.drag_handle_rounded,
+                                            color: groups[gi].$2[i].tone))),
+                            ],
+                          )
+                        else
+                          for (final t in groups[gi].$2) _tile(p, t),
+                      ],
+                      const SizedBox(height: 16),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

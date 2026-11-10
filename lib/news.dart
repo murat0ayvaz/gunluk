@@ -22,10 +22,22 @@ Future<List<NewsItem>> _news(String url, {bool fresh = false}) {
 }
 
 // ---------- Sesli okuma ----------
+class NewsBatch {
+  final String name;
+  final List<String> items;
+  NewsBatch(this.name, this.items);
+}
+
 class NewsReader extends ChangeNotifier {
   FlutterTts? _tts;
   bool reading = false;
+  bool paused = false;
   String label = '';
+  final List<String> _texts = [];
+  final List<int> _srcOf = [];
+  final List<bool> _head = [];
+  final List<String> _names = [];
+  int _idx = 0;
   int _gen = 0;
 
   Future<FlutterTts> _engine() async {
@@ -34,42 +46,206 @@ class NewsReader extends ChangeNotifier {
       _tts = t;
       try {
         await t.setLanguage('tr-TR');
-        await t.setSpeechRate(0.5);
         await t.awaitSpeakCompletion(true);
       } catch (_) {}
+    }
+    try {
+      await t.setSpeechRate(store.ttsRate);
+    } catch (_) {}
+    final v = store.ttsVoice;
+    if (v.isNotEmpty) {
+      final p = v.split('|');
+      if (p.length == 2) {
+        try {
+          await t.setVoice({'name': p[0], 'locale': p[1]});
+        } catch (_) {}
+      }
     }
     return t;
   }
 
-  Future<void> stop() async {
+  /// Telefondaki Türkçe sesler: (ad, dil)
+  Future<List<(String, String)>> turkishVoices() async {
+    final out = <(String, String)>[];
+    try {
+      final t = await _engine();
+      final v = await t.getVoices;
+      if (v is List) {
+        for (final e in v) {
+          if (e is! Map) continue;
+          final name = (e['name'] ?? '').toString();
+          final loc = (e['locale'] ?? '').toString();
+          if (name.isEmpty) continue;
+          if (loc.toLowerCase().replaceAll('_', '-').startsWith('tr')) {
+            out.add((name, loc));
+          }
+        }
+      }
+    } catch (_) {}
+    out.sort((a, b) => a.$1.compareTo(b.$1));
+    return out;
+  }
+
+  /// Bir sesi kısa bir cümleyle dener
+  Future<void> testVoice(String name, String locale) async {
+    try {
+      await _tts?.stop();
+      final t = await _engine();
+      if (name.isNotEmpty) {
+        await t.setVoice({'name': name, 'locale': locale});
+      }
+      await t.speak('Merhaba, haberleri bu sesle okuyabilirim.');
+    } catch (_) {}
+  }
+
+  Future<void> stop({bool keepMedia = false}) async {
     _gen++;
+    final was = reading;
     reading = false;
+    paused = false;
     notifyListeners();
     try {
       await _tts?.stop();
     } catch (_) {}
+    if (was && !keepMedia && media.isNews) await media.stop();
   }
 
-  /// Metinleri sırayla okur (örn. her haber için "başlık. özet")
-  Future<void> read(String name, List<String> texts) async {
-    if (texts.isEmpty) return;
-    await stop();
-    if (media.playing) await media.stop();
-    final g = ++_gen;
+  /// Kaynakları sırayla okur: her kaynak için "Şimdi {ad}" ve haberler
+  Future<void> readBatches(String name, List<NewsBatch> bs) async {
+    _texts.clear();
+    _srcOf.clear();
+    _head.clear();
+    _names.clear();
+    for (final b in bs) {
+      if (b.items.isEmpty) continue;
+      final si = _names.length;
+      _names.add(b.name);
+      _texts.add(tx('Şimdi {0}', [b.name]));
+      _srcOf.add(si);
+      _head.add(true);
+      for (final it in b.items) {
+        _texts.add(it);
+        _srcOf.add(si);
+        _head.add(false);
+      }
+    }
+    if (_texts.isEmpty) return;
+    await stop(keepMedia: true);
+    if (media.playing && !media.isNews) await media.stop();
     reading = true;
+    paused = false;
     label = name;
+    _idx = 0;
     notifyListeners();
+    await media.startNewsSession(tx('Haber okuma'));
+    _go();
+  }
+
+  void _go() {
+    final g = ++_gen;
+    _run(g);
+  }
+
+  Future<void> _run(int g) async {
     try {
       final t = await _engine();
-      for (final s in texts) {
+      while (g == _gen && _idx < _texts.length) {
+        label = _names[_srcOf[_idx]];
+        notifyListeners();
+        media.newsIgnoreUntil =
+            DateTime.now().add(const Duration(milliseconds: 1500));
+        await t.speak(_texts[_idx]);
         if (g != _gen) return;
-        await t.speak(s);
+        _idx++;
       }
     } catch (_) {}
-    if (g == _gen) {
-      reading = false;
-      notifyListeners();
+    if (g == _gen) await _finish();
+  }
+
+  Future<void> _finish() async {
+    _gen++;
+    reading = false;
+    paused = false;
+    notifyListeners();
+    if (media.isNews) await media.stop();
+  }
+
+  Future<void> pause({bool fromMedia = false}) async {
+    if (!reading || paused) return;
+    paused = true;
+    _gen++;
+    notifyListeners();
+    try {
+      await _tts?.stop();
+    } catch (_) {}
+    if (!fromMedia) media.player.pause();
+  }
+
+  void resume({bool fromMedia = false}) {
+    if (!reading || !paused) return;
+    paused = false;
+    notifyListeners();
+    if (!fromMedia) media.player.play();
+    _go();
+  }
+
+  void togglePause() {
+    if (paused) {
+      resume();
+    } else {
+      pause();
     }
+  }
+
+  void _jump(int i) {
+    if (!reading || _texts.isEmpty) return;
+    _idx = i.clamp(0, _texts.length - 1).toInt();
+    label = _names[_srcOf[_idx]];
+    _gen++;
+    notifyListeners();
+    try {
+      _tts?.stop();
+    } catch (_) {}
+    if (!paused) _go();
+  }
+
+  void nextItem() {
+    if (!reading) return;
+    if (_idx + 1 >= _texts.length) {
+      _finish();
+      return;
+    }
+    _jump(_idx + 1);
+  }
+
+  void prevItem() => _jump(_idx - 1);
+
+  void nextSource() {
+    if (!reading) return;
+    for (var j = _idx + 1; j < _texts.length; j++) {
+      if (_head[j]) {
+        _jump(j);
+        return;
+      }
+    }
+    _finish();
+  }
+
+  void prevSource() {
+    if (!reading) return;
+    var k = _idx;
+    while (k > 0 && !_head[k]) {
+      k--;
+    }
+    if (_idx - k > 1 || k == 0) {
+      _jump(k);
+      return;
+    }
+    var j = k - 1;
+    while (j > 0 && !_head[j]) {
+      j--;
+    }
+    _jump(j);
   }
 }
 
@@ -126,10 +302,10 @@ class NewsTab extends StatelessWidget {
         () => store.restoreNewsSrc(c.id, s, index));
   }
 
-  /// Bir kaynağın ilk [n] haberini okunacak metne çevirir
-  Future<List<String>> _collect(
+  /// Kaynakların ilk [n] haberini okunacak metne çevirir
+  Future<List<NewsBatch>> _collect(
       BuildContext context, List<NewsSrc> srcs, int n) async {
-    final texts = <String>[];
+    final out = <NewsBatch>[];
     final messenger = ScaffoldMessenger.of(context);
     messenger.clearSnackBars();
     messenger.showSnackBar(SnackBar(
@@ -139,27 +315,30 @@ class NewsTab extends StatelessWidget {
       try {
         final items = await _news(s.url);
         if (items.isEmpty) continue;
-        texts.add(s.name);
-        for (final it in items.take(n)) {
-          texts.add(_speakText(it));
-        }
+        out.add(NewsBatch(s.name, [for (final it in items.take(n)) _speakText(it)]));
       } catch (_) {}
     }
-    if (texts.isEmpty) {
+    if (out.isEmpty) {
       messenger.showSnackBar(
           SnackBar(content: Text(tx('Haberler alınamadı. İnternetini kontrol et.'))));
     }
-    return texts;
+    return out;
   }
 
   Future<void> _readSrc(BuildContext context, NewsSrc s) async {
     final t = await _collect(context, [s], 8);
-    await newsReader.read(s.name, t);
+    await newsReader.readBatches(s.name, t);
   }
 
   Future<void> _readCat(BuildContext context, NewsCat c) async {
     final t = await _collect(context, c.srcs, 4);
-    await newsReader.read(c.name, t);
+    await newsReader.readBatches(c.name, t);
+  }
+
+  Future<void> _readAll(BuildContext context) async {
+    final srcs = [for (final c in store.newsCats) ...c.srcs];
+    final t = await _collect(context, srcs, store.newsN);
+    await newsReader.readBatches(tx('Tüm kaynaklar'), t);
   }
 
   Widget _srcs(BuildContext context, NewsCat c) {
@@ -257,23 +436,99 @@ class NewsTab extends StatelessWidget {
             if (newsReader.reading)
               Container(
                 color: p.card,
-                padding: const EdgeInsets.fromLTRB(16, 4, 4, 4),
-                child: Row(
+                padding: const EdgeInsets.fromLTRB(16, 2, 4, 2),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.record_voice_over_rounded, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(tx('Okunuyor: {0}', [newsReader.label]),
-                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Row(children: [
+                        const Icon(Icons.record_voice_over_rounded, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(tx('Okunuyor: {0}', [newsReader.label]),
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ),
+                      ]),
                     ),
-                    TextButton.icon(
-                      onPressed: newsReader.stop,
-                      icon: const Icon(Icons.stop_rounded),
-                      label: Text(tx('Durdur')),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        IconButton(
+                            tooltip: tx('Önceki kaynak'),
+                            onPressed: newsReader.prevSource,
+                            icon: const Icon(Icons.fast_rewind_rounded)),
+                        IconButton(
+                            tooltip: tx('Önceki haber'),
+                            onPressed: newsReader.prevItem,
+                            icon: const Icon(Icons.skip_previous_rounded)),
+                        IconButton(
+                            tooltip: newsReader.paused
+                                ? tx('Devam')
+                                : tx('Duraklat'),
+                            onPressed: newsReader.togglePause,
+                            icon: Icon(newsReader.paused
+                                ? Icons.play_arrow_rounded
+                                : Icons.pause_rounded)),
+                        IconButton(
+                            tooltip: tx('Sonraki haber'),
+                            onPressed: newsReader.nextItem,
+                            icon: const Icon(Icons.skip_next_rounded)),
+                        IconButton(
+                            tooltip: tx('Sonraki kaynak'),
+                            onPressed: newsReader.nextSource,
+                            icon: const Icon(Icons.fast_forward_rounded)),
+                        IconButton(
+                            tooltip: tx('Durdur'),
+                            onPressed: newsReader.stop,
+                            icon: const Icon(Icons.stop_rounded)),
+                      ],
                     ),
                   ],
                 ),
               ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.tonalIcon(
+                      onPressed: () => _readAll(context),
+                      icon: const Icon(Icons.play_circle_outline_rounded),
+                      label: Text(tx('Oku')),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  PopupMenuButton<int>(
+                    tooltip: tx('Her kaynaktan kaç haber'),
+                    onSelected: (v) => store.setTts(n: v),
+                    itemBuilder: (_) => [
+                      for (final v in [3, 5, 10])
+                        CheckedPopupMenuItem<int>(
+                            value: v,
+                            checked: store.newsN == v,
+                            child: Text(tx('{0} haber', ['$v']))),
+                    ],
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                          border: Border.all(color: p.line),
+                          borderRadius: BorderRadius.circular(20)),
+                      child: Text(tx('{0} haber', ['${store.newsN}']),
+                          style: const TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: tx('Ses ve hız'),
+                    onPressed: () => showDialog<void>(
+                        context: context,
+                        builder: (_) => const _VoiceDialog()),
+                    icon: const Icon(Icons.tune_rounded),
+                  ),
+                ],
+              ),
+            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: Row(
@@ -405,7 +660,7 @@ class _HeadlinesState extends State<_Headlines> {
           TextButton(
               onPressed: () {
                 Navigator.pop(ctx);
-                newsReader.read(widget.src.name, [_speakText(n)]);
+                newsReader.readBatches(widget.src.name, [NewsBatch(widget.src.name, [_speakText(n)])]);
               },
               child: Text(tx('Oku'))),
           if (n.link.isNotEmpty)
@@ -584,6 +839,126 @@ class _SrcDialogState extends State<_SrcDialog> {
             onPressed: () => Navigator.pop(context), child: Text(tx('Vazgeç'))),
         FilledButton(onPressed: _ok, child: Text(tx('Kaydet'))),
       ],
+    );
+  }
+}
+
+
+// ---------- Ses ve hız ayarı ----------
+class _VoiceDialog extends StatefulWidget {
+  const _VoiceDialog();
+
+  @override
+  State<_VoiceDialog> createState() => _VoiceDialogState();
+}
+
+class _VoiceDialogState extends State<_VoiceDialog> {
+  List<(String, String)>? _voices;
+
+  @override
+  void initState() {
+    super.initState();
+    newsReader.turkishVoices().then((v) {
+      if (mounted) setState(() => _voices = v);
+    });
+  }
+
+  /// Android sesin cinsiyetini bildirmez; addan tahmin edilir
+  String _guess(String name) {
+    final n = name.toLowerCase();
+    if (n.contains('female') || n.contains('kadin') || n.contains('kadın')) {
+      return tx('kadın');
+    }
+    if (n.contains('male') || n.contains('erkek')) return tx('erkek');
+    return '';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palOf(context);
+    return ListenableBuilder(
+      listenable: store,
+      builder: (context, _) {
+        final v = _voices;
+        final cur = store.ttsVoice;
+        return AlertDialog(
+          title: Text(tx('Ses ve hız')),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(tx('Okuma hızı: {0}x',
+                      [(store.ttsRate * 2).toStringAsFixed(1)])),
+                  Slider(
+                    value: store.ttsRate.clamp(0.2, 1.0).toDouble(),
+                    min: 0.2,
+                    max: 1.0,
+                    divisions: 16,
+                    onChanged: (x) => store.setTts(rate: x),
+                  ),
+                  Text(tx('Ses'),
+                      style: const TextStyle(fontWeight: FontWeight.w700)),
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                        cur.isEmpty
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_off,
+                        color: p.accent),
+                    title: Text(tx('Varsayılan')),
+                    onTap: () => store.setTts(voice: ''),
+                    trailing: IconButton(
+                        icon: const Icon(Icons.volume_up_rounded),
+                        onPressed: () => newsReader.testVoice('', '')),
+                  ),
+                  if (v == null)
+                    const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (v.isEmpty)
+                    Text(
+                        tx('Telefonda ek Türkçe ses bulunamadı. Ayarlar > Metin okuma bölümünden yeni ses indirebilirsin.'),
+                        style: TextStyle(color: p.soft, fontSize: 13))
+                  else
+                    for (var i = 0; i < v.length; i++)
+                      ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                            cur == '${v[i].$1}|${v[i].$2}'
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_off,
+                            color: p.accent),
+                        title: Text(_guess(v[i].$1).isEmpty
+                            ? tx('Ses {0}', ['${i + 1}'])
+                            : tx('Ses {0} ({1})', ['${i + 1}', _guess(v[i].$1)])),
+                        onTap: () =>
+                            store.setTts(voice: '${v[i].$1}|${v[i].$2}'),
+                        trailing: IconButton(
+                            icon: const Icon(Icons.volume_up_rounded),
+                            onPressed: () =>
+                                newsReader.testVoice(v[i].$1, v[i].$2)),
+                      ),
+                  const SizedBox(height: 8),
+                  Text(
+                      tx('Android sesin kadın mı erkek mi olduğunu bildirmez; dinleyerek seç.'),
+                      style: TextStyle(color: p.soft, fontSize: 12.5)),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(tx('Kapat'))),
+          ],
+        );
+      },
     );
   }
 }

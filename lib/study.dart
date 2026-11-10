@@ -42,21 +42,84 @@ class _TopicRef {
   final String id;
   final String name;
   final bool custom;
-  const _TopicRef(this.id, this.name, this.custom);
+  final String grp;
+  const _TopicRef(this.id, this.name, this.custom, [this.grp = '']);
 }
+
+// Hazır kart setleri, ilgili ünite/konunun içine taşınır (kart kimlikleri değişmez)
+const _under = <String, String>{
+  'lgs_tr.0': 'lgs_tr.s8', 'lgs_tr.1': 'lgs_tr.s8',
+  'lgs_tr.2': 'lgs_tr.s10', 'lgs_tr.8': 'lgs_tr.s10',
+  'lgs_tr.3': 'lgs_tr.s9', 'lgs_tr.4': 'lgs_tr.s4', 'lgs_tr.5': 'lgs_tr.s4',
+  'lgs_tr.6': 'lgs_tr.s4', 'lgs_tr.7': 'lgs_tr.s4', 'lgs_tr.9': 'lgs_tr.s11',
+  'lgs_mat.0': 'lgs_mat.s1', 'lgs_mat.1': 'lgs_mat.s5',
+  'lgs_mat.2': 'lgs_mat.s7', 'lgs_mat.3': 'lgs_mat.s4',
+  'lgs_fen.0': 'lgs_fen.s0', 'lgs_fen.1': 'lgs_fen.s1',
+  'lgs_fen.2': 'lgs_fen.s2', 'lgs_fen.3': 'lgs_fen.s3',
+  'lgs_fen.4': 'lgs_fen.s6',
+  'lgs_ink.2': 'lgs_ink.s3',
+  'lgs_din.0': 'lgs_din.s0', 'lgs_din.1': 'lgs_din.s3', 'lgs_din.2': 'lgs_din.s2',
+  'lgs_ing.3': 'lgs_ing.s1', 'lgs_ing.4': 'lgs_ing.s1',
+  'lgs_ing.5': 'lgs_ing.s2', 'lgs_ing.6': 'lgs_ing.s2',
+  'lgs_ing.7': 'lgs_ing.s3', 'lgs_ing.8': 'lgs_ing.s3',
+  'lgs_ing.9': 'lgs_ing.s4', 'lgs_ing.10': 'lgs_ing.s4',
+  'lgs_ing.11': 'lgs_ing.s5', 'lgs_ing.12': 'lgs_ing.s5',
+  'lgs_ing.13': 'lgs_ing.s6', 'lgs_ing.14': 'lgs_ing.s6',
+  'lgs_ing.15': 'lgs_ing.s7', 'lgs_ing.16': 'lgs_ing.s7',
+  'lgs_ing.17': 'lgs_ing.s8', 'lgs_ing.18': 'lgs_ing.s8',
+  'lgs_ing.19': 'lgs_ing.s9', 'lgs_ing.20': 'lgs_ing.s9',
+  'lgs_ing.21': 'lgs_ing.s10', 'lgs_ing.22': 'lgs_ing.s10',
+};
+
+// Taşınmayan kart setlerinin grubu
+const _cardGrp = <String, String>{
+  'lgs_ink.0': 'Genel tekrar', 'lgs_ink.1': 'Genel tekrar',
+  'lgs_ing.0': 'Genel tekrar', 'lgs_ing.1': 'Gramer ve kalıplar',
+  'lgs_ing.2': 'Gramer ve kalıplar',
+  'lgs_ing.23': 'LGS sınav dili', 'lgs_ing.24': 'LGS sınav dili',
+  'dil_en.0': 'Kelime ve deyimler', 'dil_en.3': 'Kelime ve deyimler',
+  'dil_en.1': 'Gramer ve kalıplar', 'dil_en.2': 'Gramer ve kalıplar',
+  'dil_en.4': 'Gramer ve kalıplar', 'dil_en.5': 'Gramer ve kalıplar',
+  'dil_en.6': 'Gramer ve kalıplar', 'dil_en.7': 'Gramer ve kalıplar',
+  'dil_en.8': 'Gramer ve kalıplar', 'dil_en.9': 'Gramer ve kalıplar',
+};
+
+List<String> _underOf(String sumId) =>
+    [for (final e in _under.entries) if (e.value == sumId) e.key];
 
 bool _isSum(String topicId) {
   final i = topicId.indexOf('.');
   return i > 0 && topicId.startsWith('s', i + 1);
 }
 
-List<_TopicRef> _topicsOf(StudySubjectDef s) => [
-      for (final t in studySummaries)
-        if (t.subj == s.id) _TopicRef(t.id, t.name, false),
-      for (final t in s.topics) _TopicRef(t.id, t.name, false),
-      for (final t in store.studyTopics)
-        if (t.subj == s.id) _TopicRef(t.id, t.name, true),
-    ];
+List<_TopicRef> _topicsOf(StudySubjectDef s) {
+  final raw = <_TopicRef>[
+    for (final t in studySummaries)
+      if (t.subj == s.id ||
+          (s.id == 'dil_en' &&
+              t.subj == 'lgs_ing' &&
+              (t.grp == 'Gramer ve kalıplar' ||
+                  t.grp.startsWith('Okuma'))))
+        _TopicRef(t.id, t.name, false, t.grp),
+    for (final t in s.topics)
+      if (!_under.containsKey(t.id))
+        _TopicRef(t.id, t.name, false, _cardGrp[t.id] ?? 'Diğer'),
+  ];
+  // gruplar ilk görüldükleri sırayla; grup içinde özgün sıra korunur
+  final order = <String>[];
+  for (final r in raw) {
+    if (!order.contains(r.grp)) order.add(r.grp);
+  }
+  final out = <_TopicRef>[
+    for (final g in order)
+      for (final r in raw)
+        if (r.grp == g) r,
+  ];
+  for (final t in store.studyTopics) {
+    if (t.subj == s.id) out.add(_TopicRef(t.id, t.name, true, 'Kendi konuların'));
+  }
+  return out;
+}
 
 List<_Item> _itemsOf(String topicId) {
   final out = <_Item>[];
@@ -68,6 +131,19 @@ List<_Item> _itemsOf(String topicId) {
           final id = '$topicId#$i';
           if (store.studyHid.contains(id)) continue;
           out.add(_Item(id, topicId, t.pieces[i][0], t.pieces[i][1], '', true));
+        }
+      }
+      for (final cid in _underOf(topicId)) {
+        final s = _subj(cid.split('.').first);
+        if (s == null) continue;
+        for (final t in s.topics) {
+          if (t.id != cid) continue;
+          for (var i = 0; i < t.cards.length; i++) {
+            final id = '$cid#$i';
+            if (store.studyHid.contains(id)) continue;
+            final c = t.cards[i];
+            out.add(_Item(id, cid, c[0], c[1], c[2], true));
+          }
         }
       }
     } else {
@@ -501,7 +577,19 @@ class _TopicListPage extends StatelessWidget {
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
             children: [
-              for (final t in topics) _topicTile(context, p, t),
+              for (var i = 0; i < topics.length; i++) ...[
+                if (topics[i].grp.isNotEmpty &&
+                    (i == 0 || topics[i - 1].grp != topics[i].grp))
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(2, i == 0 ? 2 : 14, 2, 8),
+                    child: Text(tx(topics[i].grp),
+                        style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: p.ink)),
+                  ),
+                _topicTile(context, p, topics[i]),
+              ],
             ],
           ),
         );
@@ -631,8 +719,9 @@ class _TopicPage extends StatelessWidget {
         final items = _itemsOf(topicId);
         final notes = store.studyNotes.where((n) => n.topic == topicId).toList();
         final recs = store.studyRecs.where((r) => r.topic == topicId).toList();
-        final hasHidden =
-            store.studyHid.any((h) => h.startsWith('$topicId#'));
+        final hidIds = [topicId, ..._underOf(topicId)];
+        final hasHidden = store.studyHid
+            .any((h) => hidIds.any((t) => h.startsWith('$t#')));
         final notInRev =
             items.where((i) => i.builtin && !store.studyInRev(i.id)).toList();
         return Scaffold(
@@ -644,7 +733,11 @@ class _TopicPage extends StatelessWidget {
                 IconButton(
                   tooltip: tx('Silinen hazır kartları geri getir'),
                   icon: const Icon(Icons.restore_rounded),
-                  onPressed: () => store.restoreStudyHidden(topicId),
+                  onPressed: () {
+                    for (final t in hidIds) {
+                      store.restoreStudyHidden(t);
+                    }
+                  },
                 ),
             ],
           ),
@@ -806,8 +899,13 @@ class _TopicPage extends StatelessWidget {
           if (i.exp.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(right: 8, top: 2),
-              child: Text(i.exp,
-                  style: TextStyle(color: p.ink, fontSize: 14, height: 1.4)),
+              child: i.exp.contains('||')
+                  ? _Reveal(
+                      key: ValueKey('rv_${i.id}'),
+                      text: i.exp.split('||').first.trim(),
+                      answer: i.exp.substring(i.exp.indexOf('||') + 2).trim())
+                  : Text(i.exp,
+                      style: TextStyle(color: p.ink, fontSize: 14, height: 1.4)),
             ),
           if (i.ex.isNotEmpty)
             Padding(
@@ -1468,6 +1566,58 @@ class _ReviewPageState extends State<_ReviewPage> {
           SizedBox(
             height: 54,
             child: FilledButton(onPressed: _next, child: Text(tx('Anladım, devam'))),
+          ),
+      ],
+    );
+  }
+}
+
+
+/// Soru + dokununca açılan cevap ("soru || cevap" biçimindeki bilgiler)
+class _Reveal extends StatefulWidget {
+  final String text;
+  final String answer;
+  const _Reveal({super.key, required this.text, required this.answer});
+
+  @override
+  State<_Reveal> createState() => _RevealState();
+}
+
+class _RevealState extends State<_Reveal> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palOf(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(widget.text,
+            style: TextStyle(color: p.ink, fontSize: 14, height: 1.4)),
+        const SizedBox(height: 4),
+        if (_open)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: p.accent.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(widget.answer,
+                style: TextStyle(
+                    color: p.ink,
+                    fontSize: 14,
+                    height: 1.4,
+                    fontWeight: FontWeight.w600)),
+          )
+        else
+          TextButton(
+            style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(0, 30),
+                alignment: Alignment.centerLeft),
+            onPressed: () => setState(() => _open = true),
+            child: Text(tx('Cevabı göster')),
           ),
       ],
     );

@@ -370,8 +370,15 @@ Future<void> showCityDialog(BuildContext context) {
       context: context, builder: (_) => const _CityDialog());
 }
 
+/// Şehir arar; seçileni döndürür (ayarları değiştirmez). Favori yer eklemek için.
+Future<GeoCity?> pickGeoCity(BuildContext context) {
+  return showDialog<GeoCity>(
+      context: context, builder: (_) => const _CityDialog(forFav: true));
+}
+
 class _CityDialog extends StatefulWidget {
-  const _CityDialog();
+  final bool forFav;
+  const _CityDialog({this.forFav = false});
 
   @override
   State<_CityDialog> createState() => _CityDialogState();
@@ -416,6 +423,10 @@ class _CityDialogState extends State<_CityDialog> {
   }
 
   void _pick(GeoCity c) {
+    if (widget.forFav) {
+      Navigator.pop(context, c);
+      return;
+    }
     store.setWeatherCity(c.label, c.lat, c.lon);
     weather.reset();
     Navigator.pop(context);

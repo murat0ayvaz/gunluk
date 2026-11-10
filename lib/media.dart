@@ -32,7 +32,7 @@ Future<void> initAudio() async {
       androidNotificationChannelId: 'com.example.gunluk.audio',
       androidNotificationChannelName: 'Daily Routine müzik',
       androidNotificationOngoing: false,
-      androidStopForegroundOnPause: true, // duraklatınca bildirim kaydırılıp kapatılabilir
+      androidStopForegroundOnPause: false, // duraklatınca medya oturumu açık kalır (direksiyon tuşları için)
     ).timeout(const Duration(seconds: 5));
   } catch (_) {
     // başlatılamazsa çalar yine çalışır, sadece bildirim kontrolü olmaz
@@ -58,6 +58,7 @@ const _kRadio = 'radio';
 const _kPod = 'pod';
 const _kVoice = 'voice';
 const _kOnline = 'online';
+const _kNews = 'news';
 
 class MediaCtl extends ChangeNotifier {
   final AudioPlayer player = AudioPlayer();
@@ -78,13 +79,36 @@ class MediaCtl extends ChangeNotifier {
   bool get isPod => nowKind == _kPod;
   bool get isVoice => nowKind == _kVoice;
   bool get isOnline => nowKind == _kOnline;
+  bool get isNews => nowKind == _kNews;
+  // Direksiyon / kulaklık tuşları için: asıl parça iki sessiz "nöbetçi" parça
+  // arasına konur; ileri/geri tuşu nöbetçiye geçişi tetikler.
+  bool _guarded = false;
+  DateTime newsIgnoreUntil = DateTime(2000);
+  int _srcGen = 0;
+  Duration _realPos = Duration.zero;
+  Duration? _realDur;
+
+  AudioSource _guard(String id, String title) => AudioSource.asset(
+      'assets/sounds/silence.wav',
+      tag: MediaItem(id: 'g_$id', title: title, artist: 'Daily Routine'));
   List<OnTrack> onQueue = []; // online çalma sırası
 
   void _start() {
     if (_started) return;
     _started = true;
+    player.currentIndexStream.listen((i) {
+      if (_guarded && i != null && i != 1) _onGuard(i);
+    });
+    player.playingStream.listen((pl) {
+      if (!isNews || DateTime.now().isBefore(newsIgnoreUntil)) return;
+      if (pl) {
+        newsReader.resume(fromMedia: true);
+      } else {
+        newsReader.pause(fromMedia: true);
+      }
+    });
     player.playerStateStream.listen((s) {
-      if (s.processingState == ProcessingState.completed) {
+      if (s.processingState == ProcessingState.completed && !_guarded) {
         _onCompleted();
       } else if (!s.playing && isPod) {
         _savePod();
@@ -93,6 +117,10 @@ class MediaCtl extends ChangeNotifier {
     });
     // Podcast konumunu 15 saniyede bir kaydet
     player.positionStream.listen((pos) {
+      if (_guarded && player.currentIndex == 1) {
+        _realPos = pos;
+        _realDur = player.duration;
+      }
       if (isPod && player.playing) {
         final now = DateTime.now().millisecondsSinceEpoch;
         if (now - _lastSave > 15000) {
@@ -142,6 +170,7 @@ class MediaCtl extends ChangeNotifier {
   Future<void> _play(String id, String title, Uri uri, String kind,
       {Duration? start, String? album, String? art, String? pKey}) async {
     _start();
+    if (newsReader.reading) newsReader.stop(keepMedia: true);
     _savePod(); // önceki podcast bölümünün konumunu kaydet
     try {
       await player.setLoopMode(LoopMode.off);
@@ -154,15 +183,28 @@ class MediaCtl extends ChangeNotifier {
     loading = true;
     notifyListeners();
     try {
-      await player.setAudioSource(
-          AudioSource.uri(uri,
-              tag: MediaItem(
-                  id: id,
-                  title: title,
-                  album: album,
-                  artist: 'Daily Routine',
-                  artUri: (art == null || art.isEmpty) ? null : Uri.tryParse(art))),
-          initialPosition: start);
+      final real = AudioSource.uri(uri,
+          tag: MediaItem(
+              id: id,
+              title: title,
+              album: album,
+              artist: 'Daily Routine',
+              artUri: (art == null || art.isEmpty) ? null : Uri.tryParse(art)));
+      _srcGen++;
+      _realPos = start ?? Duration.zero;
+      _realDur = null;
+      if (kind == _kVoice) {
+        _guarded = false;
+        await player.setAudioSource(real, initialPosition: start);
+      } else {
+        _guarded = false;
+        await player.setAudioSource(
+            ConcatenatingAudioSource(
+                children: [_guard('p', title), real, _guard('n', title)]),
+            initialIndex: 1,
+            initialPosition: start);
+        _guarded = true;
+      }
       loading = false;
       notifyListeners();
       player.play(); // çalma bitene kadar tamamlanmaz, beklenmez
@@ -247,6 +289,114 @@ class MediaCtl extends ChangeNotifier {
     playOnline(onQueue, n);
   }
 
+  Future<void> _backToReal(int gen, {Duration? pos, bool play = true}) async {
+    if (gen != _srcGen || !_guarded) return;
+    try {
+      await player.seek(pos ?? _realPos, index: 1);
+      if (play) {
+        player.play();
+      } else {
+        await player.pause();
+      }
+    } catch (_) {}
+  }
+
+  void _radioStep(int d) {
+    for (final c in store.radCats) {
+      final i = c.stations.indexWhere((x) => x.id == nowId);
+      if (i < 0) continue;
+      final n = (i + d) % c.stations.length;
+      playStation(c.stations[n < 0 ? n + c.stations.length : n]);
+      return;
+    }
+  }
+
+  /// Nöbetçi parçaya geçildi: 0 = geri tuşu, 2 = ileri tuşu (ya da parça bitti)
+  void _onGuard(int i) {
+    final gen = _srcGen;
+    if (isNews) {
+      if (i == 2) {
+        newsReader.nextItem();
+      } else {
+        newsReader.prevItem();
+      }
+      _backToReal(gen, pos: Duration.zero);
+      return;
+    }
+    final dur = _realDur;
+    final ended = i == 2 &&
+        dur != null &&
+        _realPos >= dur - const Duration(seconds: 2);
+    if (ended && (isSong || isOnline) && store.repeatMode == 2) {
+      _backToReal(gen, pos: Duration.zero);
+      return;
+    }
+    if (i == 2) {
+      if (ended) {
+        _onCompleted();
+      } else if (isSong) {
+        next();
+      } else if (isOnline) {
+        nextOnline(step: 1);
+      } else if (isRadio) {
+        _radioStep(1);
+      } else if (isPod) {
+        _backToReal(gen, pos: _realPos + const Duration(seconds: 30));
+        return;
+      }
+    } else {
+      if (isSong) {
+        if (_realPos > const Duration(seconds: 3)) {
+          _backToReal(gen, pos: Duration.zero);
+          return;
+        }
+        prev();
+      } else if (isOnline) {
+        nextOnline(step: -1);
+      } else if (isRadio) {
+        _radioStep(-1);
+      } else if (isPod) {
+        final t = _realPos - const Duration(seconds: 15);
+        _backToReal(gen, pos: t < Duration.zero ? Duration.zero : t);
+        return;
+      }
+    }
+    // Kaynak değişmediyse (liste bitti vb.) asıl parçaya dön
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (gen == _srcGen) _backToReal(gen, play: !ended);
+    });
+  }
+
+  /// Haber okurken medya oturumunu (bildirim + direksiyon tuşları) açık tutar
+  Future<void> startNewsSession(String title) async {
+    _start();
+    _savePod();
+    podKey = null;
+    error = null;
+    nowKind = _kNews;
+    nowId = 'news';
+    nowTitle = title;
+    notifyListeners();
+    try {
+      await player.setLoopMode(LoopMode.off);
+      _srcGen++;
+      _guarded = false;
+      _realPos = Duration.zero;
+      final src = AudioSource.asset('assets/sounds/silence.wav',
+          tag: MediaItem(id: 'news', title: title, artist: 'Daily Routine'));
+      await player.setAudioSource(
+          ConcatenatingAudioSource(children: [
+            _guard('p', title),
+            src,
+            _guard('n', title),
+          ]),
+          initialIndex: 1);
+      _guarded = true;
+      await player.setLoopMode(LoopMode.one);
+      player.play();
+    } catch (_) {}
+  }
+
   /// Günlük / yapılacaklardaki ses kaydını çalar (id = dosya adı)
   Future<void> playVoice(String path, String id, String title) async {
     if (!File(path).existsSync()) {
@@ -262,6 +412,10 @@ class MediaCtl extends ChangeNotifier {
   }
 
   void toggle() {
+    if (isNews) {
+      newsReader.togglePause();
+      return;
+    }
     if (player.playing) {
       player.pause();
       _savePod();
@@ -323,6 +477,8 @@ class MediaCtl extends ChangeNotifier {
 
   Future<void> stop() async {
     _savePod();
+    _guarded = false;
+    _srcGen++;
     nowId = null;
     nowTitle = '';
     nowKind = '';

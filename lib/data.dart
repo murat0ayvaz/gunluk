@@ -264,6 +264,20 @@ class StudyCard {
       (j['x'] ?? '').toString());
 }
 
+/// Hava durumunda favori yer
+class WxFav {
+  final String name;
+  final double lat, lon;
+  const WxFav(this.name, this.lat, this.lon);
+
+  Map<String, dynamic> toJson() => {'n': name, 'a': lat, 'o': lon};
+
+  factory WxFav.fromJson(Map<String, dynamic> j) => WxFav(
+      (j['n'] ?? '').toString(),
+      (j['a'] as num?)?.toDouble() ?? 0,
+      (j['o'] as num?)?.toDouble() ?? 0);
+}
+
 /// Alarm (belirli saat + günler)
 class AlarmItem {
   final String id;
@@ -1012,6 +1026,34 @@ class AppStore extends ChangeNotifier {
     _persist();
   }
 
+  List<WxFav> wxFavs = [];
+
+  // Araçlar menüsü sırası (boşsa hazır sıra)
+  List<String> toolOrder = [];
+  List<String> toolGroupOrder = [];
+
+  void setToolOrder(List<String> ids) {
+    toolOrder = ids;
+    _commit();
+  }
+
+  void setToolGroupOrder(List<String> ids) {
+    toolGroupOrder = ids;
+    _commit();
+  }
+
+  void addWxFav(String name, double lat, double lon) {
+    if (wxFavs.any((f) => f.name == name)) return;
+    wxFavs.add(WxFav(name, lat, lon));
+    _commit();
+  }
+
+  void removeWxFav(int i) {
+    if (i < 0 || i >= wxFavs.length) return;
+    wxFavs.removeAt(i);
+    _commit();
+  }
+
   void setWxOn(bool v) {
     wxOn = v;
     _commit();
@@ -1502,6 +1544,9 @@ class AppStore extends ChangeNotifier {
   Set<String> epDone = {}; // bitirilen bölümler
   int repeatMode = 0; // 0 kapalı, 1 sürekli tekrar (liste), 2 tek parça tekrar
   bool shuffleOn = false; // karışık çalma
+  double ttsRate = 0.5; // haber okuma hızı
+  String ttsVoice = ''; // seçilen ses ("ad|dil"), boş = varsayılan
+  int newsN = 5; // "Oku": her kaynaktan okunacak haber sayısı
 
   /// Radyo kategorileri hiç yoksa (ilk kurulum) hazır listeyi kurar
   void _mediaDefaults() {
@@ -1559,6 +1604,13 @@ class AppStore extends ChangeNotifier {
 
   void setRepeat(int m) {
     repeatMode = m.clamp(0, 2).toInt();
+    _commit();
+  }
+
+  void setTts({double? rate, String? voice, int? n}) {
+    if (rate != null) ttsRate = rate.clamp(0.2, 1.0).toDouble();
+    if (voice != null) ttsVoice = voice;
+    if (n != null) newsN = n;
     _commit();
   }
 
@@ -2136,6 +2188,11 @@ class AppStore extends ChangeNotifier {
         studyRev = {...studyRev, ...studySt.keys};
       }
     }
+    toolOrder = [for (final x in ((j['tord'] as List?) ?? [])) x.toString()];
+    toolGroupOrder = [for (final x in ((j['tgord'] as List?) ?? [])) x.toString()];
+    wxFavs = ((j['wxfavs'] as List?) ?? [])
+        .map((e) => WxFav.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
     alarms = ((j['alarms'] as List?) ?? [])
         .map((e) => AlarmItem.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
@@ -2177,6 +2234,9 @@ class AppStore extends ChangeNotifier {
     if (j['epdone'] is List) {
       epDone = (j['epdone'] as List).map((e) => e as String).toSet();
     }
+    ttsRate = ((j['ttsr'] as num?) ?? 0.5).toDouble();
+    ttsVoice = (j['ttsv'] as String?) ?? '';
+    newsN = (j['newsn'] as int?) ?? 5;
     if (j['rep'] is int) {
       repeatMode = ((j['rep'] as int).clamp(0, 2)).toInt();
       shuffleOn = (j['shuf'] as bool?) ?? false;
@@ -2377,12 +2437,18 @@ class AppStore extends ChangeNotifier {
           'recs': studyRecs.map((r) => r.toJson()).toList(),
           'plan': studyPlan.map((p) => p.toJson()).toList(),
         },
+        'tord': toolOrder,
+        'tgord': toolGroupOrder,
+        'wxfavs': wxFavs.map((f) => f.toJson()).toList(),
         'alarms': alarms.map((a) => a.toJson()).toList(),
         'launch': launchers.map((a) => a.toJson()).toList(),
         'eppos': epPos,
         'epdone': epDone.toList(),
         'rep': repeatMode,
         'shuf': shuffleOn,
+        'ttsr': ttsRate,
+        'ttsv': ttsVoice,
+        'newsn': newsN,
         'weather': {
           'on': wxOn,
           'city': wxCity,

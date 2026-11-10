@@ -123,6 +123,74 @@ Widget _toolScaffold(BuildContext context, String title, Widget body,
   );
 }
 
+/// Araçlar > Zamanlama: tek kutu; içinde satır satır başlıklar
+class ZamanlamaPage extends StatelessWidget {
+  const ZamanlamaPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palOf(context);
+    Widget row(IconData icon, Color tone, String name, String sub,
+        Widget Function() page) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Material(
+          color: Color.alphaBlend(tone.withOpacity(p.dark ? 0.22 : 0.14), p.card),
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => Navigator.of(context)
+                .push(MaterialPageRoute<void>(builder: (_) => page())),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                      backgroundColor: tone,
+                      child: Icon(icon, color: Colors.white)),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(name,
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: p.ink)),
+                        Text(sub, style: TextStyle(color: p.soft, fontSize: 12.5)),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right_rounded, color: tone),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return _toolScaffold(
+      context,
+      tx('Zamanlama'),
+      ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        children: [
+          row(Icons.bedtime_rounded, const Color(0xFF7E57C2),
+              tx('Uyku zamanlayıcısı'), tx('Süre bitince sesi durdur'),
+              () => const SleepTimerPage()),
+          row(Icons.alarm_rounded, const Color(0xFFEF6C57), tx('Alarm'),
+              tx('Saat ve günlere göre çalar'), () => const AlarmPage()),
+          row(Icons.rocket_launch_outlined, const Color(0xFF26A69A),
+              tx('Başlatıcı'), tx('Saati gelince seçtiğin şeyi başlat'),
+              () => const LauncherPage()),
+        ],
+      ),
+    );
+  }
+}
+
 class SleepTimerPage extends StatefulWidget {
   const SleepTimerPage({super.key});
 

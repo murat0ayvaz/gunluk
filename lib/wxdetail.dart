@@ -131,7 +131,9 @@ class _SecState extends State<_Sec> {
 }
 
 class WxDetailPage extends StatefulWidget {
-  const WxDetailPage({super.key});
+  /// false: Saatlik sayfa (saat saat); true: Günlük sayfa (16 gün)
+  final bool daily;
+  const WxDetailPage({super.key, this.daily = false});
 
   @override
   State<WxDetailPage> createState() => _WxDetailPageState();
@@ -143,7 +145,8 @@ class _WxDetailPageState extends State<WxDetailPage> {
   WxDetail? _sel;
   bool _loading = false;
   String? _err;
-  int _tab = 0; // 0 günlük (saatlik), 1 haftalık, 2 15 gün
+  late final int _tab = widget.daily ? 2 : 0; // 0 saatlik, 2 günlük (16 gün)
+  int _fav = -1; // -1: Konumum / ayarlı yer; 0..: favori yer
 
   WxMarine? _marine;
   bool _marineAsked = false;
@@ -156,16 +159,28 @@ class _WxDetailPageState extends State<WxDetailPage> {
     _load();
   }
 
+  /// Şu an gösterilen yerin (konum, enlem, boylam, ad); favori seçiliyse o
+  (double?, double?, String) _pos() {
+    if (_fav >= 0 && _fav < store.wxFavs.length) {
+      final f = store.wxFavs[_fav];
+      return (f.lat, f.lon, f.name);
+    }
+    return (store.wxLat, store.wxLon, store.wxGps ? '' : store.wxCity);
+  }
+
   Future<void> _load() async {
-    if ((store.wxLat == null || store.wxLon == null) && store.wxGps) {
+    if (_fav < 0 &&
+        (store.wxLat == null || store.wxLon == null) &&
+        store.wxGps) {
       setState(() => _loading = true);
       try {
         await weather.ensure(force: true); // telefonun konumunu bulup kaydeder
       } catch (_) {}
       if (!mounted) return;
     }
-    final lat = store.wxLat;
-    final lon = store.wxLon;
+    final pos = _pos();
+    final lat = pos.$1;
+    final lon = pos.$2;
     if (lat == null || lon == null) {
       setState(() => _loading = false);
       setState(() => _err = tx('Konum yok. Aşağıdaki Kaynaklar ve ayarlar bölümünden konum ya da şehir seç.'));
@@ -176,8 +191,7 @@ class _WxDetailPageState extends State<WxDetailPage> {
       _err = null;
     });
     try {
-      final a = await fetchWxAll(lat, lon,
-          place: store.wxGps ? '' : store.wxCity);
+      final a = await fetchWxAll(lat, lon, place: pos.$3);
       if (!mounted) return;
       setState(() {
         _all = a;
@@ -214,8 +228,9 @@ class _WxDetailPageState extends State<WxDetailPage> {
   }
 
   Future<void> _loadMarine() async {
-    final lat = store.wxLat;
-    final lon = store.wxLon;
+    final pos = _pos();
+    final lat = pos.$1;
+    final lon = pos.$2;
     if (lat == null || lon == null || _marineAsked) return;
     setState(() {
       _marineAsked = true;
@@ -246,10 +261,30 @@ class _WxDetailPageState extends State<WxDetailPage> {
         !t.isAfter(now.add(const Duration(hours: 30)));
   }
 
-  int get _dayCount => _tab == 1 ? 7 : 16;
+  int get _dayCount => 16;
 
+  static const _shortTr = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+  static const _shortEn = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  /// Kısa gün adı + tarih (iki satır; sütuna hep sığar)
   String _dayLabel(DateTime t) =>
-      '${wdName(t.weekday)}\n${_two(t.day)}.${_two(t.month)}';
+      '${(appLang == 'en' ? _shortEn : _shortTr)[t.weekday - 1]}\n${_two(t.day)}.${_two(t.month)}';
+
+  /// Gün başlığı: büyük, koyu
+  Widget _dayHead(Pal p, String text) => Padding(
+        padding: const EdgeInsets.only(top: 10, bottom: 4),
+        child: Text(text,
+            style: TextStyle(
+                color: p.ink, fontSize: 19, fontWeight: FontWeight.w800)),
+      );
+
+  String _headFor(DateTime t) {
+    final now = DateTime.now();
+    final k = wxDayKey(t);
+    if (k == wxDayKey(now)) return tx('Bugün');
+    if (k == wxDayKey(now.add(const Duration(days: 1)))) return tx('Yarın');
+    return wdName(t.weekday);
+  }
 
   Widget _label(Pal p, String text, {double w = 52}) => SizedBox(
         width: w,
@@ -299,7 +334,7 @@ class _WxDetailPageState extends State<WxDetailPage> {
         String? head;
         if (dk != lastDay) {
           lastDay = dk;
-          head = dk == wxDayKey(DateTime.now()) ? tx('Bugün') : wdName(t.weekday);
+          head = _headFor(t);
         }
         data.add(_TRow(head, '${_two(t.hour)}:00', cells));
       }
@@ -329,9 +364,8 @@ class _WxDetailPageState extends State<WxDetailPage> {
           final hi = hit?.v['tmax'];
           final lo = hit?.v['tmin'];
           if (hi != null || lo != null) {
-            cells[sk] = _TCell(hit!.code,
-                '${hi == null ? '' : '${_n(hi)}°'}${lo == null ? '' : '/${_n(lo)}°'}',
-                false);
+            cells[sk] = _TCell(hit!.code, hi == null ? '–' : '${_n(hi)}°', false,
+                sub: lo == null ? '' : '${_n(lo)}°');
           }
         }
         if (cells.isEmpty) continue;
@@ -343,7 +377,7 @@ class _WxDetailPageState extends State<WxDetailPage> {
       if (data.any((r) => r.cells.containsKey(sk))) srcs.add(sk);
     }
     final line = Container(width: 1, color: p.soft.withOpacity(0.25));
-    const lw = 52.0;
+    const lw = 44.0;
     // başlık: kaynak adları bir kez
     rows.add(IntrinsicHeight(
       child: Row(children: [
@@ -362,24 +396,21 @@ class _WxDetailPageState extends State<WxDetailPage> {
     ));
     rows.add(Divider(height: 8, color: p.soft.withOpacity(0.25)));
     for (final r in data) {
-      if (r.head != null) {
-        rows.add(Padding(
-          padding: const EdgeInsets.only(top: 6, bottom: 2),
-          child: Text(r.head!,
-              style: TextStyle(color: p.accent, fontWeight: FontWeight.w700)),
-        ));
-      }
+      if (r.head != null) rows.add(_dayHead(p, r.head!));
+      rows.add(Divider(height: 1, color: p.soft.withOpacity(0.3)));
       rows.add(Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
+        padding: const EdgeInsets.symmetric(vertical: 6),
         child: IntrinsicHeight(
           child: Row(children: [
             SizedBox(
                 width: lw,
                 child: Text(r.label,
+                    maxLines: 2,
                     style: TextStyle(
-                        color: p.soft,
+                        color: p.ink,
                         fontSize: 12,
-                        fontWeight: FontWeight.w600))),
+                        height: 1.25,
+                        fontWeight: FontWeight.w700))),
             for (var i = 0; i < srcs.length; i++) ...[
               if (i > 0) line,
               Expanded(child: _tcell(p, r.cells[srcs[i]])),
@@ -399,8 +430,14 @@ class _WxDetailPageState extends State<WxDetailPage> {
       if (c.code != null)
         Icon(wxIcon(c.code!, night: c.night), size: 20, color: wxColor(c.code!)),
       Text(c.text,
+          maxLines: 1,
           style: TextStyle(
-              color: p.ink, fontSize: 14, fontWeight: FontWeight.w600)),
+              color: p.ink, fontSize: 15, fontWeight: FontWeight.w700)),
+      if (c.sub.isNotEmpty)
+        Text(c.sub,
+            maxLines: 1,
+            style: TextStyle(
+                color: p.soft, fontSize: 13, fontWeight: FontWeight.w500)),
     ]);
   }
 
@@ -424,12 +461,7 @@ class _WxDetailPageState extends State<WxDetailPage> {
         final dk = wxDayKey(x.t);
         if (dk != lastDay) {
           lastDay = dk;
-          rows.add(Padding(
-            padding: const EdgeInsets.only(top: 6, bottom: 2),
-            child: Text(
-                dk == wxDayKey(DateTime.now()) ? tx('Bugün') : wdName(x.t.weekday),
-                style: TextStyle(color: p.accent, fontWeight: FontWeight.w700)),
-          ));
+          rows.add(_dayHead(p, _headFor(x.t)));
         }
         rows.add(_metricRow(p, '${_two(x.t.hour)}:00', s, x));
       }
@@ -443,7 +475,8 @@ class _WxDetailPageState extends State<WxDetailPage> {
         final s = fmt(x);
         if (s.isEmpty) continue;
         c++;
-        rows.add(_metricRow(p, _dayLabel(x.t), s, x, w: 56));
+        rows.add(Divider(height: 1, color: p.soft.withOpacity(0.3)));
+        rows.add(_metricRow(p, _dayLabel(x.t), s, x, w: 46));
       }
     }
     if (rows.isEmpty) return _empty(p);
@@ -773,6 +806,79 @@ class _WxDetailPageState extends State<WxDetailPage> {
     );
   }
 
+  /// Üstte favori yerler: Konumum + eklenen yerler + (+)
+  Widget _favRow(Pal p) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              avatar: const Icon(Icons.my_location_rounded, size: 16),
+              label: Text(tx('Konumum')),
+              selected: _fav < 0,
+              onSelected: (_) {
+                if (_fav == -1) return;
+                setState(() => _fav = -1);
+                _marineAsked = false;
+                _marine = null;
+                _load();
+              },
+            ),
+          ),
+          for (var i = 0; i < store.wxFavs.length; i++)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: GestureDetector(
+                onLongPress: () async {
+                  final f = store.wxFavs[i];
+                  final ok = await confirmDialog(
+                      context,
+                      tx('Favoriden çıkarılsın mı?'),
+                      f.name,
+                      okLabel: tx('Çıkar'));
+                  if (!ok) return;
+                  store.removeWxFav(i);
+                  if (_fav >= store.wxFavs.length || _fav == i) {
+                    setState(() => _fav = -1);
+                  } else if (_fav > i) {
+                    setState(() => _fav -= 1);
+                  }
+                  _marineAsked = false;
+                  _marine = null;
+                  _load();
+                },
+                child: ChoiceChip(
+                  label: Text(store.wxFavs[i].name),
+                  selected: _fav == i,
+                  onSelected: (_) {
+                    setState(() => _fav = i);
+                    _marineAsked = false;
+                    _marine = null;
+                    _load();
+                  },
+                ),
+              ),
+            ),
+          ActionChip(
+            avatar: const Icon(Icons.add_rounded, size: 18),
+            label: Text(tx('Yer ekle')),
+            onPressed: () async {
+              final c = await pickGeoCity(context);
+              if (c == null) return;
+              store.addWxFav(c.label, c.lat, c.lon);
+              setState(() => _fav = store.wxFavs.length - 1);
+              _marineAsked = false;
+              _marine = null;
+              _load();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -784,7 +890,9 @@ class _WxDetailPageState extends State<WxDetailPage> {
           backgroundColor: p.bg,
           endDrawer: const ToolsDrawer(replace: true),
           appBar: AppBar(
-            title: Text(tx('Hava durumu')),
+            title: Text(widget.daily
+                ? tx('Hava durumu: Günlük')
+                : tx('Hava durumu: Saatlik')),
             actions: [
               const ToolsButton(),
               IconButton(
@@ -802,16 +910,7 @@ class _WxDetailPageState extends State<WxDetailPage> {
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
-              SegmentedButton<int>(
-                segments: [
-                  ButtonSegment(value: 0, label: Text(tx('Günlük'))),
-                  ButtonSegment(value: 1, label: Text(tx('Haftalık'))),
-                  ButtonSegment(value: 2, label: Text(tx('15 gün'))),
-                ],
-                selected: {_tab},
-                showSelectedIcon: false,
-                onSelectionChanged: (s) => setState(() => _tab = s.first),
-              ),
+              _favRow(p),
               const SizedBox(height: 10),
               if (_loading)
                 const Padding(
@@ -892,7 +991,8 @@ class _TCell {
   final int? code;
   final String text;
   final bool night;
-  _TCell(this.code, this.text, this.night);
+  final String sub; // ikinci satır (günlükte en düşük sıcaklık)
+  _TCell(this.code, this.text, this.night, {this.sub = ''});
 }
 
 class _TRow {

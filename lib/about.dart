@@ -10,16 +10,11 @@ import 'version.dart';
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
       tx('Verilerin korundu.'),
-      tx('Hava durumu sıcaklık tablosu yenilendi: kaynak adları bir kez en üstte, değerler alt alta; her değerin üstünde hava simgesi.'),
-      tx('Meditasyon ve Nefes\'te nefes al/ver tınısı Tibet çanı sesi oldu.'),
-      tx('Rutini sağa çekince Hedef girilebiliyor ve Alt kategoriyi düzenle düğmesi çıkıyor.'),
-      tx('Ders çalışma yenilendi: her derste Ders çalış ve Tekrar et. Ders çalış\'ta 8. sınıf konu özetleri (her bilgi ayrı, Tekrar et düğmesiyle tekrar listesine eklenir).'),
-      tx('Her konuda not yazabilir ve ses kaydı alabilirsin. LGS ve Yabancı dil paketleri isteğe bağlı yüklenir, dersler silinebilir.'),
-      tx('Haftalık çalışma programı: gün + ders + saat aralığı, isteğe bağlı hatırlatma.'),
-      tx('Araçlar\'a Zamanlama: Uyku zamanlayıcısı, Alarm ve Başlatıcı.'),
-      tx('Ayarlar\'daki başlıklar açılır kapanır oldu.'),
-      tx('Araç sayfalarının sağ üstünde Araçlar simgesi; sayfadan çıkınca süre sayan araçlar duraklar.'),
-      tx('Su sayacında Geri al bildirimi kaldırıldı.'),
+      tx('Haber okuma: üstteki Oku düğmesi tüm kaynakları sırayla okur (her kaynaktan 3/5/10 haber); okuma hızı ve ses seçilebilir.'),
+      tx('Direksiyon / kulaklık ileri-geri tuşları müzik, radyo, podcast ve haber okumada çalışacak şekilde düzenlendi (araca göre değişebilir).'),
+      tx('Hava durumu: Saatlik ve Günlük ayrıldı; favori yerler üstte; günler siyah büyük başlık, çizgilerle ayrık.'),
+      tx('Araçlar gruplandı ve sıralanabilir; Uyku aracı menüden kalktı; Zamanlama tek kutuda.'),
+      tx('LGS: dersler ünite ünite düzenlendi; İngilizce için Gramer ve kalıplar, 24 seviyeli okuma parçası; Türkçe için paragraf soru kalıpları ve 15 okuma parçası; Söz sanatları, Noktalama, Anlatım biçimleri, Yazı türleri.'),
     ];
 
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {

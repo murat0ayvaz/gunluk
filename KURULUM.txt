@@ -1,16 +1,14 @@
-DAILY ROUTINE v29 (1.25.0) - TAM PAKET
+DAILY ROUTINE v29.1 (1.25.1) - TAM PAKET
 
 Bu zipte projenin TAMAMI var: .github, assets, lib, debug.keystore, pubspec.yaml.
 1) Zipi çıkar. GitHub'da "gunluk" reposunun ANA sayfasında: Add file > Upload files.
 2) Çıkan klasörlerin ve dosyaların HEPSİNİ (.github, assets, lib, debug.keystore, pubspec.yaml) sürükle-bırak > Commit changes.
-   (assets/sounds/tone.wav yeni Tibet çanı sesiyle değişti; lib içinde yeni dosyalar: studysum.dart, timing.dart.)
+   (Yeni ses dosyası: assets/sounds/silence.wav; lib/studysum.dart büyüdü.)
 3) Actions > yeşil tik > Artifacts > gunluk-apk indir, telefona kur (veriler kalır).
 
-v29 yenilikleri:
-- Hava durumu: sıcaklık tablosu (kaynak adları bir kez üstte, değerler alt alta, hava simgeli).
-- Nefes/Meditasyon: Tibet çanı tınısı.
-- Rutini sağa çekince: Hedef + "Alt kategoriyi düzenle".
-- Ders çalışma: her derste "Ders çalış" ve "Tekrar et"; 8. sınıf konu özetleri (her bilgi ayrı, Tekrar et düğmesi);
-  her konuda Notlar ve Ses kayıtları; LGS / Yabancı dil paketi isteğe bağlı (silinebilir, yeniden yüklenir);
-  Haftalık çalışma programı (gün + ders + saat aralığı, isteğe bağlı hatırlatma).
-- Araçlar > Zamanlama: Uyku zamanlayıcısı, Alarm, Başlatıcı (bildirime dokununca meditasyon/pomodoro/nefes/radyo/müzik/podcast başlar).
+v29.1 yenilikleri:
+- Haber: üstte "Oku" (tüm kaynakları sırayla, her kaynaktan 3/5/10 haber), hız ayarı, ses seçimi (Ses 1, Ses 2...), duraklat / sonraki haber / sonraki kaynak.
+- Direksiyon / kulaklık tuşları: müzik, radyo, podcast ve haber okumada ileri-geri-duraklat (araca göre değişebilir, test et).
+- Hava durumu: Saatlik ve Günlük ayrı araç; favori yerler; günler büyük siyah başlık; tablo düzeni.
+- Araçlar: gruplu, "Sırala" ile sıralanabilir; Uyku aracı menüden kalktı; Zamanlama tek kutuda.
+- LGS: ünite ünite düzen; İngilizce "Gramer ve kalıplar" + seviyeli okuma parçaları (A1-B2); Türkçe paragraf soru kalıpları + 15 okuma parçası; Söz sanatları, Noktalama, Anlatım biçimleri, Yazı türleri; Matematik'e Eşlik-benzerlik, Dönüşüm geometrisi, Geometrik cisimler.
