@@ -23,9 +23,10 @@ class WeatherCtl extends ChangeNotifier {
   /// Veri yoksa veya 30 dakikadan eskiyse (ya da şehir değiştiyse) yeniler
   Future<void> ensure({bool force = false}) async {
     if (!store.wxOn) return;
-    if (!store.wxGps && (store.wxLat == null || store.wxLon == null)) return;
+    final sel = store.wxSel;
+    final fav = (sel >= 0 && sel < store.wxFavs.length) ? store.wxFavs[sel] : null;
     final key0 =
-        '${store.wxProvider}|${store.wxGps ? 'gps' : '${store.wxLat},${store.wxLon}'}';
+        '${store.wxProvider}|${fav == null ? 'gps' : '${fav.lat},${fav.lon}'}';
     final fresh = _at != null &&
         _key == key0 &&
         DateTime.now().difference(_at!) < const Duration(minutes: 30);
@@ -36,17 +37,20 @@ class WeatherCtl extends ChangeNotifier {
     errText = null;
     notifyListeners();
     try {
-      double? lat = store.wxLat;
-      double? lon = store.wxLon;
-      if (store.wxGps) {
-        final pos = await _locate();
-        lat = pos.latitude;
-        lon = pos.longitude;
-        store.setWxPos(lat, lon);
+      final double lat;
+      final double lon;
+      if (fav != null) {
+        lat = fav.lat;
+        lon = fav.lon;
+      } else {
+        final pos = await locate();
+        if (pos == null) throw Exception('gpsoff');
+        lat = pos.$1;
+        lon = pos.$2;
       }
       final d = await fetchWeatherFor(
-          store.wxProvider, lat!, lon!, store.wxOwmKey,
-          place: store.wxGps ? '' : store.wxCity);
+          store.wxProvider, lat, lon, store.wxOwmKey,
+          place: fav?.name ?? '');
       data = d;
       _at = DateTime.now();
       _key = key0;
@@ -56,6 +60,20 @@ class WeatherCtl extends ChangeNotifier {
     }
     loading = false;
     notifyListeners();
+  }
+
+  /// Telefonun konumu: bulunursa kaydeder; bulunamazsa son bilinen konum (yoksa hata)
+  Future<(double, double)?> locate() async {
+    try {
+      final pos = await _locate();
+      store.setWxPos(pos.latitude, pos.longitude);
+      return (pos.latitude, pos.longitude);
+    } catch (e) {
+      final la = store.wxLat;
+      final lo = store.wxLon;
+      if (la != null && lo != null) return (la, lo);
+      rethrow;
+    }
   }
 
   String? errText;

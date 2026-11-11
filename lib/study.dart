@@ -584,7 +584,7 @@ class _TopicListPage extends StatelessWidget {
                     padding: EdgeInsets.fromLTRB(2, i == 0 ? 2 : 14, 2, 8),
                     child: Text(tx(topics[i].grp),
                         style: TextStyle(
-                            fontSize: 17,
+                            fontSize: 21,
                             fontWeight: FontWeight.w800,
                             color: p.ink)),
                   ),
@@ -838,7 +838,7 @@ class _TopicPage extends StatelessWidget {
           Expanded(
               child: Text(text,
                   style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w700, color: p.ink))),
+                      fontSize: 20, fontWeight: FontWeight.w800, color: p.ink))),
           TextButton.icon(
               onPressed: onAdd,
               icon: Icon(
@@ -1145,15 +1145,15 @@ class _PlanPage extends StatelessWidget {
       ..sort((a, b) => (a.sh * 60 + a.sm).compareTo(b.sh * 60 + b.sm));
     return [
       Padding(
-        padding: const EdgeInsets.only(top: 12, bottom: 4),
+        padding: const EdgeInsets.only(top: 16, bottom: 4),
         child: Row(
           children: [
             Expanded(
               child: Text(wdName(d),
                   style: TextStyle(
-                      color: p.accent,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15)),
+                      color: p.ink,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 22)),
             ),
             IconButton(
               visualDensity: VisualDensity.compact,

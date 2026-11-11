@@ -1,14 +1,16 @@
-DAILY ROUTINE v29.1 (1.25.1) - TAM PAKET
+DAILY ROUTINE v29.2 (1.25.2) - TAM PAKET
 
 Bu zipte projenin TAMAMI var: .github, assets, lib, debug.keystore, pubspec.yaml.
 1) Zipi çıkar. GitHub'da "gunluk" reposunun ANA sayfasında: Add file > Upload files.
 2) Çıkan klasörlerin ve dosyaların HEPSİNİ (.github, assets, lib, debug.keystore, pubspec.yaml) sürükle-bırak > Commit changes.
-   (Yeni ses dosyası: assets/sounds/silence.wav; lib/studysum.dart büyüdü.)
+   (Yeni dosya: lib/newspresets.dart.)
 3) Actions > yeşil tik > Artifacts > gunluk-apk indir, telefona kur (veriler kalır).
 
-v29.1 yenilikleri:
-- Haber: üstte "Oku" (tüm kaynakları sırayla, her kaynaktan 3/5/10 haber), hız ayarı, ses seçimi (Ses 1, Ses 2...), duraklat / sonraki haber / sonraki kaynak.
-- Direksiyon / kulaklık tuşları: müzik, radyo, podcast ve haber okumada ileri-geri-duraklat (araca göre değişebilir, test et).
-- Hava durumu: Saatlik ve Günlük ayrı araç; favori yerler; günler büyük siyah başlık; tablo düzeni.
-- Araçlar: gruplu, "Sırala" ile sıralanabilir; Uyku aracı menüden kalktı; Zamanlama tek kutuda.
-- LGS: ünite ünite düzen; İngilizce "Gramer ve kalıplar" + seviyeli okuma parçaları (A1-B2); Türkçe paragraf soru kalıpları + 15 okuma parçası; Söz sanatları, Noktalama, Anlatım biçimleri, Yazı türleri; Matematik'e Eşlik-benzerlik, Dönüşüm geometrisi, Geometrik cisimler.
+v29.2 yenilikleri:
+- Araçlar: büyük, açılıp kapanan grup başlıkları; Hava durumu tek araç.
+- Hava durumu: tek sayfada Saatlik / Günlük sekmeleri; bölümler "Sırala" ile sıralanır; yer çiplerinde ilk kelime (Serdivan, Karasu);
+  konum buradan seçilir (Konumum = telefonun konumu); ana ekran seçili yeri gösterir; ayarlardaki şehir/konum seçimi kalktı.
+- Haber: hız - / + ile; sesler Erkek 1-2, Bayan 1-2 (listedeki 2., 10., 4., 6. ses); "Hepsi" seçeneği (varsayılan);
+  "Hazır kaynaklar" (uygulama adayları dener, yalnız çalışanları listeler).
+- Online müzik: Audius önde ve seçili; çalan parça en üstte; Adet kutusu + Daha fazla.
+- Ders: haftalık programda gün başlıkları büyük ve siyah.

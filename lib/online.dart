@@ -28,11 +28,12 @@ const _genres = <List<String>>[
 
 String _s(dynamic x) => x == null ? '' : x.toString();
 
-Future<List<OnTrack>> _jamendo(String key, String query, String tag) async {
+Future<List<OnTrack>> _jamendo(String key, String query, String tag,
+    int limit) async {
   final q = <String, String>{
     'client_id': key,
     'format': 'json',
-    'limit': '30',
+    'limit': '${limit.clamp(1, 200)}',
     'audioformat': 'mp32',
     'order': 'popularity_week',
   };
@@ -60,12 +61,13 @@ Future<List<OnTrack>> _jamendo(String key, String query, String tag) async {
   return out;
 }
 
-Future<List<OnTrack>> _audius(String query) async {
+Future<List<OnTrack>> _audius(String query, int limit) async {
+  final lim = '${limit.clamp(1, 100)}';
   final j = query.isEmpty
       ? await httpGetJson(Uri.https('api.audius.co', '/v1/tracks/trending',
-          {'app_name': _audiusApp, 'time': 'week', 'limit': '30'}))
+          {'app_name': _audiusApp, 'time': 'week', 'limit': lim}))
       : await httpGetJson(Uri.https('api.audius.co', '/v1/tracks/search',
-          {'query': query, 'app_name': _audiusApp, 'limit': '30'}));
+          {'query': query, 'app_name': _audiusApp, 'limit': lim}));
   if (j is! Map) throw const FormatException('biçim');
   final out = <OnTrack>[];
   for (final e in (j['data'] as List? ?? [])) {
@@ -93,7 +95,9 @@ class OnlineTab extends StatefulWidget {
 
 class _OnlineTabState extends State<OnlineTab>
     with AutomaticKeepAliveClientMixin {
-  String _src = 'jam'; // jam | aud | fav
+  String _src = 'aud'; // aud | jam | fav (Audius önde ve seçili)
+  int _limit = 30; // en çok kaç sonuç istenecek
+  final _lim = TextEditingController(text: '30');
   final _q = TextEditingController();
   int _genre = -1;
   bool _loading = false;
@@ -107,6 +111,7 @@ class _OnlineTabState extends State<OnlineTab>
   @override
   void dispose() {
     _q.dispose();
+    _lim.dispose();
     super.dispose();
   }
 
@@ -122,12 +127,12 @@ class _OnlineTabState extends State<OnlineTab>
       final List<OnTrack> r;
       if (_src == 'jam') {
         r = await _jamendo(store.jamendoKey, query,
-            _genre >= 0 ? _genres[_genre][1] : '');
+            _genre >= 0 ? _genres[_genre][1] : '', _limit);
       } else {
         final word = query.isNotEmpty
             ? query
             : (_genre >= 0 ? _genres[_genre][2] : '');
-        r = await _audius(word);
+        r = await _audius(word, _limit);
       }
       if (!mounted) return;
       setState(() {
@@ -147,6 +152,32 @@ class _OnlineTabState extends State<OnlineTab>
         ]);
       });
     }
+  }
+
+  /// Sonuç sayısı kutusu: yazılan sayıyı alır (Audius en çok 100, Jamendo 200)
+  void _applyLimit(String v) {
+    final n = int.tryParse(v.trim());
+    if (n == null || n < 1) {
+      _lim.text = '$_limit';
+      return;
+    }
+    _limit = n > 200 ? 200 : n;
+    _lim.text = '$_limit';
+    _search();
+  }
+
+  void _more() {
+    _limit = (_limit + 30) > 200 ? 200 : _limit + 30;
+    _lim.text = '$_limit';
+    _search();
+  }
+
+  /// Çalan parça varsa listenin başına alınır
+  List<OnTrack> _top(List<OnTrack> l) {
+    final id = media.nowId;
+    final k = id == null ? -1 : l.indexWhere((t) => t.id == id);
+    if (k <= 0) return l;
+    return [l[k], ...l.sublist(0, k), ...l.sublist(k + 1)];
   }
 
   Future<void> _setKey() async {
@@ -176,7 +207,7 @@ class _OnlineTabState extends State<OnlineTab>
       listenable: Listenable.merge([store, media]),
       builder: (context, _) {
         final needKey = _src == 'jam' && store.jamendoKey.isEmpty;
-        final list = _src == 'fav' ? store.onFavs : _res;
+        final list = _top(_src == 'fav' ? store.onFavs : _res);
         if (!_loaded && !_loading && _err == null && !needKey && _src != 'fav') {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted && !_loaded && !_loading && _err == null) _search();
@@ -191,13 +222,13 @@ class _OnlineTabState extends State<OnlineTab>
                 spacing: 8,
                 children: [
                   ChoiceChip(
-                      label: const Text('Jamendo'),
-                      selected: _src == 'jam',
-                      onSelected: (_) => _pickSrc('jam')),
-                  ChoiceChip(
                       label: const Text('Audius'),
                       selected: _src == 'aud',
                       onSelected: (_) => _pickSrc('aud')),
+                  ChoiceChip(
+                      label: const Text('Jamendo'),
+                      selected: _src == 'jam',
+                      onSelected: (_) => _pickSrc('jam')),
                   ChoiceChip(
                       avatar: const Icon(Icons.favorite_rounded, size: 16),
                       label: Text('${tx('Favoriler')} (${store.onFavs.length})'),
@@ -223,6 +254,23 @@ class _OnlineTabState extends State<OnlineTab>
                           hintText: tx('Şarkı, sanatçı veya tür ara'),
                           isDense: true,
                           prefixIcon: const Icon(Icons.search_rounded),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 64,
+                      child: TextField(
+                        controller: _lim,
+                        keyboardType: TextInputType.number,
+                        textInputAction: TextInputAction.done,
+                        textAlign: TextAlign.center,
+                        onSubmitted: _applyLimit,
+                        decoration: InputDecoration(
+                          labelText: tx('Adet'),
+                          isDense: true,
                           border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14)),
                         ),
@@ -315,8 +363,16 @@ class _OnlineTabState extends State<OnlineTab>
               Expanded(
                 child: ListView.builder(
                   padding: const EdgeInsets.only(bottom: 12),
-                  itemCount: list.length,
-                  itemBuilder: (_, i) => _row(context, list, i),
+                  itemCount: list.length + (_showMore(list) ? 1 : 0),
+                  itemBuilder: (_, i) => i >= list.length
+                      ? Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: OutlinedButton.icon(
+                              onPressed: _more,
+                              icon: const Icon(Icons.expand_more_rounded),
+                              label: Text(tx('Daha fazla'))),
+                        )
+                      : _row(context, list, i),
                 ),
               ),
           ],
@@ -324,6 +380,10 @@ class _OnlineTabState extends State<OnlineTab>
       },
     );
   }
+
+  /// Daha fazla sonuç olabilir mi: istenen kadar geldiyse ve üst sınıra varılmadıysa
+  bool _showMore(List<OnTrack> list) =>
+      _src != 'fav' && list.length >= _limit && _limit < 200;
 
   Widget _row(BuildContext context, List<OnTrack> list, int i) {
     final p = palOf(context);

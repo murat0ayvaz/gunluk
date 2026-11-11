@@ -1027,6 +1027,18 @@ class AppStore extends ChangeNotifier {
   }
 
   List<WxFav> wxFavs = [];
+  int wxSel = -1; // seçili yer: -1 = Konumum, 0.. = favori yer (ana ekran da bunu kullanır)
+  List<String> wxSecOrder = []; // hava durumu bölümlerinin sırası (boşsa hazır sıra)
+
+  void setWxSel(int i) {
+    wxSel = (i >= 0 && i < wxFavs.length) ? i : -1;
+    _commit();
+  }
+
+  void setWxSecOrder(List<String> ids) {
+    wxSecOrder = ids;
+    _commit();
+  }
 
   // Araçlar menüsü sırası (boşsa hazır sıra)
   List<String> toolOrder = [];
@@ -1051,6 +1063,11 @@ class AppStore extends ChangeNotifier {
   void removeWxFav(int i) {
     if (i < 0 || i >= wxFavs.length) return;
     wxFavs.removeAt(i);
+    if (wxSel == i) {
+      wxSel = -1;
+    } else if (wxSel > i) {
+      wxSel -= 1;
+    }
     _commit();
   }
 
@@ -1546,7 +1563,7 @@ class AppStore extends ChangeNotifier {
   bool shuffleOn = false; // karışık çalma
   double ttsRate = 0.5; // haber okuma hızı
   String ttsVoice = ''; // seçilen ses ("ad|dil"), boş = varsayılan
-  int newsN = 5; // "Oku": her kaynaktan okunacak haber sayısı
+  int newsN = 0; // "Oku": her kaynaktan okunacak haber sayısı (0 = hepsi)
 
   /// Radyo kategorileri hiç yoksa (ilk kurulum) hazır listeyi kurar
   void _mediaDefaults() {
@@ -2193,6 +2210,24 @@ class AppStore extends ChangeNotifier {
     wxFavs = ((j['wxfavs'] as List?) ?? [])
         .map((e) => WxFav.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
+    wxSecOrder = [for (final x in ((j['wxsec'] as List?) ?? [])) x.toString()];
+    if (j['wxsel'] is int) {
+      wxSel = j['wxsel'] as int;
+      if (wxSel >= wxFavs.length) wxSel = -1;
+    } else {
+      // eski sürüm: ana ekrandaki şehir favori yer olur; yoksa Konumum
+      wxSel = -1;
+      if (!wxGps && wxCity.isNotEmpty && wxLat != null && wxLon != null) {
+        var k = wxFavs.indexWhere((f) => f.name == wxCity);
+        if (k < 0) {
+          wxFavs.add(WxFav(wxCity, wxLat!, wxLon!));
+          k = wxFavs.length - 1;
+        }
+        wxSel = k;
+        wxLat = null;
+        wxLon = null;
+      }
+    }
     alarms = ((j['alarms'] as List?) ?? [])
         .map((e) => AlarmItem.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
@@ -2236,7 +2271,7 @@ class AppStore extends ChangeNotifier {
     }
     ttsRate = ((j['ttsr'] as num?) ?? 0.5).toDouble();
     ttsVoice = (j['ttsv'] as String?) ?? '';
-    newsN = (j['newsn'] as int?) ?? 5;
+    newsN = (j['newsn2'] as int?) ?? 0;
     if (j['rep'] is int) {
       repeatMode = ((j['rep'] as int).clamp(0, 2)).toInt();
       shuffleOn = (j['shuf'] as bool?) ?? false;
@@ -2440,6 +2475,8 @@ class AppStore extends ChangeNotifier {
         'tord': toolOrder,
         'tgord': toolGroupOrder,
         'wxfavs': wxFavs.map((f) => f.toJson()).toList(),
+        'wxsel': wxSel,
+        'wxsec': wxSecOrder,
         'alarms': alarms.map((a) => a.toJson()).toList(),
         'launch': launchers.map((a) => a.toJson()).toList(),
         'eppos': epPos,
@@ -2448,7 +2485,7 @@ class AppStore extends ChangeNotifier {
         'shuf': shuffleOn,
         'ttsr': ttsRate,
         'ttsv': ttsVoice,
-        'newsn': newsN,
+        'newsn2': newsN,
         'weather': {
           'on': wxOn,
           'city': wxCity,

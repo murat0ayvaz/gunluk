@@ -145,8 +145,8 @@ class _WxDetailPageState extends State<WxDetailPage> {
   WxDetail? _sel;
   bool _loading = false;
   String? _err;
-  late final int _tab = widget.daily ? 2 : 0; // 0 saatlik, 2 günlük (16 gün)
-  int _fav = -1; // -1: Konumum / ayarlı yer; 0..: favori yer
+  late int _tab = widget.daily ? 2 : 0; // 0 saatlik, 2 günlük (16 gün)
+  bool _sort = false; // bölüm sıralama kipi
 
   WxMarine? _marine;
   bool _marineAsked = false;
@@ -159,22 +159,25 @@ class _WxDetailPageState extends State<WxDetailPage> {
     _load();
   }
 
-  /// Şu an gösterilen yerin (konum, enlem, boylam, ad); favori seçiliyse o
+  /// Şu an gösterilen yerin (enlem, boylam, ad); seçili favori ya da Konumum
   (double?, double?, String) _pos() {
-    if (_fav >= 0 && _fav < store.wxFavs.length) {
-      final f = store.wxFavs[_fav];
+    final i = store.wxSel;
+    if (i >= 0 && i < store.wxFavs.length) {
+      final f = store.wxFavs[i];
       return (f.lat, f.lon, f.name);
     }
-    return (store.wxLat, store.wxLon, store.wxGps ? '' : store.wxCity);
+    return (store.wxLat, store.wxLon, '');
   }
 
   Future<void> _load() async {
-    if (_fav < 0 &&
-        (store.wxLat == null || store.wxLon == null) &&
-        store.wxGps) {
-      setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _err = null;
+    });
+    if (store.wxSel < 0) {
+      // Konumum: telefonun konumundan bul (olmazsa son bilinen konum)
       try {
-        await weather.ensure(force: true); // telefonun konumunu bulup kaydeder
+        await weather.locate();
       } catch (_) {}
       if (!mounted) return;
     }
@@ -182,14 +185,12 @@ class _WxDetailPageState extends State<WxDetailPage> {
     final lat = pos.$1;
     final lon = pos.$2;
     if (lat == null || lon == null) {
-      setState(() => _loading = false);
-      setState(() => _err = tx('Konum yok. Aşağıdaki Kaynaklar ve ayarlar bölümünden konum ya da şehir seç.'));
+      setState(() {
+        _loading = false;
+        _err = tx('Konum alınamadı. Konum iznini aç ya da yukarıdan "Yer ekle" ile bir yer seç.');
+      });
       return;
     }
-    setState(() {
-      _loading = true;
-      _err = null;
-    });
     try {
       final a = await fetchWxAll(lat, lon, place: pos.$3);
       if (!mounted) return;
@@ -715,18 +716,11 @@ class _WxDetailPageState extends State<WxDetailPage> {
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: Text(tx('Hava durumunu göster')),
-          subtitle: Text(store.wxGps
-              ? tx('Konumum')
-              : (store.wxCity.isEmpty ? tx('Önce bir şehir seç') : store.wxCity)),
+          subtitle: Text(tx('Ana ekranda seçili yerin havası gösterilir.')),
           value: store.wxOn,
-          onChanged: (v) async {
-            if (v && !store.wxGps && store.wxLat == null) {
-              await showCityDialog(context);
-              if (mounted) _load();
-            } else {
-              store.setWxOn(v);
-              if (v) weather.ensure();
-            }
+          onChanged: (v) {
+            store.setWxOn(v);
+            if (v) weather.ensure();
           },
         ),
         ListTile(
@@ -771,31 +765,6 @@ class _WxDetailPageState extends State<WxDetailPage> {
               }
             },
           ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.location_city_outlined),
-          title: Text(tx('Şehir adıyla seç')),
-          subtitle:
-              store.wxGps || store.wxCity.isEmpty ? null : Text(store.wxCity),
-          trailing:
-              store.wxGps ? null : const Icon(Icons.check_rounded, size: 20),
-          onTap: () async {
-            await showCityDialog(context);
-            if (mounted) _load();
-          },
-        ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.my_location_rounded),
-          title: Text(tx('Konumumu kullan')),
-          trailing:
-              store.wxGps ? const Icon(Icons.check_rounded, size: 20) : null,
-          onTap: () {
-            store.setWxGps(true);
-            weather.reset();
-            _load();
-          },
-        ),
         Text(
           store.wxProvider == 'mgm'
               ? tx('MGM verisi resmi olmayan yoldan alınır; çalışmazsa başka bir servis seç.')
@@ -806,8 +775,24 @@ class _WxDetailPageState extends State<WxDetailPage> {
     );
   }
 
-  /// Üstte favori yerler: Konumum + eklenen yerler + (+)
+  void _select(int i) {
+    if (store.wxSel == i) return;
+    store.setWxSel(i);
+    _marineAsked = false;
+    _marine = null;
+    weather.ensure(); // ana ekran da seçili yere uysun
+    _load();
+  }
+
+  /// Çipte yalnız ilk kelime: "Serdivan, Sakarya" -> Serdivan
+  String _first(String name) {
+    final t = name.trim().split(RegExp(r'[\s,]+'));
+    return t.isEmpty || t.first.isEmpty ? name : t.first;
+  }
+
+  /// Üstte yerler: Konumum + eklenen yerler + (+)
   Widget _favRow(Pal p) {
+    final sel = store.wxSel;
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -817,14 +802,8 @@ class _WxDetailPageState extends State<WxDetailPage> {
             child: ChoiceChip(
               avatar: const Icon(Icons.my_location_rounded, size: 16),
               label: Text(tx('Konumum')),
-              selected: _fav < 0,
-              onSelected: (_) {
-                if (_fav == -1) return;
-                setState(() => _fav = -1);
-                _marineAsked = false;
-                _marine = null;
-                _load();
-              },
+              selected: sel < 0,
+              onSelected: (_) => _select(-1),
             ),
           ),
           for (var i = 0; i < store.wxFavs.length; i++)
@@ -840,24 +819,15 @@ class _WxDetailPageState extends State<WxDetailPage> {
                       okLabel: tx('Çıkar'));
                   if (!ok) return;
                   store.removeWxFav(i);
-                  if (_fav >= store.wxFavs.length || _fav == i) {
-                    setState(() => _fav = -1);
-                  } else if (_fav > i) {
-                    setState(() => _fav -= 1);
-                  }
                   _marineAsked = false;
                   _marine = null;
+                  weather.ensure();
                   _load();
                 },
                 child: ChoiceChip(
-                  label: Text(store.wxFavs[i].name),
-                  selected: _fav == i,
-                  onSelected: (_) {
-                    setState(() => _fav = i);
-                    _marineAsked = false;
-                    _marine = null;
-                    _load();
-                  },
+                  label: Text(_first(store.wxFavs[i].name)),
+                  selected: sel == i,
+                  onSelected: (_) => _select(i),
                 ),
               ),
             ),
@@ -868,14 +838,119 @@ class _WxDetailPageState extends State<WxDetailPage> {
               final c = await pickGeoCity(context);
               if (c == null) return;
               store.addWxFav(c.label, c.lat, c.lon);
-              setState(() => _fav = store.wxFavs.length - 1);
+              final k = store.wxFavs.indexWhere((f) => f.name == c.label);
+              store.setWxSel(k);
               _marineAsked = false;
               _marine = null;
+              weather.ensure();
               _load();
             },
           ),
         ],
       ),
+    );
+  }
+
+  // ---------- Bölümler (sıralanabilir) ----------
+  static const _secIds = [
+    'temp', 'feels', 'hum', 'wind', 'press', 'rain', 'uv', 'vis', 'sea'
+  ];
+
+  List<String> _order() => [
+        ...store.wxSecOrder.where(_secIds.contains),
+        ..._secIds.where((x) => !store.wxSecOrder.contains(x)),
+      ];
+
+  (String, IconData) _secInfo(String id) {
+    switch (id) {
+      case 'temp':
+        return (tx('Sıcaklık'), Icons.thermostat_rounded);
+      case 'feels':
+        return (tx('Hissedilen'), Icons.device_thermostat_rounded);
+      case 'hum':
+        return (tx('Nem'), Icons.water_drop_outlined);
+      case 'wind':
+        return (tx('Rüzgar'), Icons.air_rounded);
+      case 'press':
+        return (tx('Basınç'), Icons.speed_rounded);
+      case 'rain':
+        return (tx('Yağış'), Icons.grain_rounded);
+      case 'uv':
+        return (tx('UV'), Icons.wb_sunny_outlined);
+      case 'vis':
+        return (tx('Görüş'), Icons.visibility_outlined);
+      default:
+        return (tx('Deniz durumu'), Icons.sailing_rounded);
+    }
+  }
+
+  Widget _secBody(Pal p, String id) {
+    switch (id) {
+      case 'temp':
+        return _tempSection(p);
+      case 'feels':
+        return _metricSection(p, _fFeels);
+      case 'hum':
+        return _metricSection(p, _fHum);
+      case 'wind':
+        return _metricSection(p, _fWind);
+      case 'press':
+        return _metricSection(p, _fPress);
+      case 'rain':
+        return _metricSection(p, _fRain);
+      case 'uv':
+        return _metricSection(p, _fUv);
+      case 'vis':
+        return _metricSection(p, _fVis);
+      default:
+        return _marineBody(p);
+    }
+  }
+
+  Widget _sec(Pal p, String id) {
+    final info = _secInfo(id);
+    return _Sec(
+        key: ValueKey('s_$id'),
+        title: info.$1,
+        icon: info.$2,
+        initOpen: id == 'temp',
+        onOpen: id == 'sea' ? _loadMarine : null,
+        child: _secBody(p, id));
+  }
+
+  /// Sıralama kipi: bölümleri sürükleyerek yeniden dizer
+  Widget _sortList(Pal p) {
+    final ids = _order();
+    return ReorderableListView(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      buildDefaultDragHandles: false,
+      onReorder: (o, n) {
+        if (n > o) n -= 1;
+        final l = [...ids];
+        final x = l.removeAt(o);
+        l.insert(n, x);
+        store.setWxSecOrder(l);
+      },
+      children: [
+        for (var i = 0; i < ids.length; i++)
+          Container(
+            key: ValueKey('o_${ids[i]}'),
+            margin: const EdgeInsets.only(top: 8),
+            decoration: BoxDecoration(
+              color: p.card,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: p.line),
+            ),
+            child: ListTile(
+              leading: Icon(_secInfo(ids[i]).$2, color: p.accent),
+              title: Text(_secInfo(ids[i]).$1,
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              trailing: ReorderableDragStartListener(
+                  index: i, child: Icon(Icons.drag_handle_rounded, color: p.soft)),
+            ),
+          ),
+      ],
     );
   }
 
@@ -890,11 +965,13 @@ class _WxDetailPageState extends State<WxDetailPage> {
           backgroundColor: p.bg,
           endDrawer: const ToolsDrawer(replace: true),
           appBar: AppBar(
-            title: Text(widget.daily
-                ? tx('Hava durumu: Günlük')
-                : tx('Hava durumu: Saatlik')),
+            title: Text(tx('Hava durumu')),
             actions: [
               const ToolsButton(),
+              IconButton(
+                  tooltip: _sort ? tx('Tamam') : tx('Sırala'),
+                  onPressed: () => setState(() => _sort = !_sort),
+                  icon: Icon(_sort ? Icons.check_rounded : Icons.swap_vert_rounded)),
               IconButton(
                   tooltip: tx('Yenile'),
                   onPressed: _loading
@@ -912,6 +989,16 @@ class _WxDetailPageState extends State<WxDetailPage> {
             children: [
               _favRow(p),
               const SizedBox(height: 10),
+              SegmentedButton<int>(
+                showSelectedIcon: false,
+                segments: [
+                  ButtonSegment(value: 0, label: Text(tx('Saatlik'))),
+                  ButtonSegment(value: 2, label: Text(tx('Günlük'))),
+                ],
+                selected: {_tab},
+                onSelectionChanged: (v) => setState(() => _tab = v.first),
+              ),
+              const SizedBox(height: 4),
               if (_loading)
                 const Padding(
                     padding: EdgeInsets.all(30),
@@ -924,54 +1011,11 @@ class _WxDetailPageState extends State<WxDetailPage> {
                           color: Theme.of(context).colorScheme.error)),
                 ),
               if (has) ...[
-                _nowCard(p),
-                _Sec(
-                    key: const ValueKey('s_temp'),
-                    title: tx('Sıcaklık'),
-                    icon: Icons.thermostat_rounded,
-                    initOpen: true,
-                    child: _tempSection(p)),
-                _Sec(
-                    key: const ValueKey('s_feels'),
-                    title: tx('Hissedilen'),
-                    icon: Icons.device_thermostat_rounded,
-                    child: _metricSection(p, _fFeels)),
-                _Sec(
-                    key: const ValueKey('s_hum'),
-                    title: tx('Nem'),
-                    icon: Icons.water_drop_outlined,
-                    child: _metricSection(p, _fHum)),
-                _Sec(
-                    key: const ValueKey('s_wind'),
-                    title: tx('Rüzgar'),
-                    icon: Icons.air_rounded,
-                    child: _metricSection(p, _fWind)),
-                _Sec(
-                    key: const ValueKey('s_press'),
-                    title: tx('Basınç'),
-                    icon: Icons.speed_rounded,
-                    child: _metricSection(p, _fPress)),
-                _Sec(
-                    key: const ValueKey('s_rain'),
-                    title: tx('Yağış'),
-                    icon: Icons.grain_rounded,
-                    child: _metricSection(p, _fRain)),
-                _Sec(
-                    key: const ValueKey('s_uv'),
-                    title: tx('UV'),
-                    icon: Icons.wb_sunny_outlined,
-                    child: _metricSection(p, _fUv)),
-                _Sec(
-                    key: const ValueKey('s_vis'),
-                    title: tx('Görüş'),
-                    icon: Icons.visibility_outlined,
-                    child: _metricSection(p, _fVis)),
-                _Sec(
-                    key: const ValueKey('s_sea'),
-                    title: tx('Deniz durumu'),
-                    icon: Icons.sailing_rounded,
-                    onOpen: _loadMarine,
-                    child: _marineBody(p)),
+                if (!_sort) _nowCard(p),
+                if (_sort)
+                  _sortList(p)
+                else
+                  for (final id in _order()) _sec(p, id),
               ],
               _Sec(
                   key: const ValueKey('s_set'),

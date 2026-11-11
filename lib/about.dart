@@ -10,11 +10,11 @@ import 'version.dart';
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
       tx('Verilerin korundu.'),
-      tx('Haber okuma: üstteki Oku düğmesi tüm kaynakları sırayla okur (her kaynaktan 3/5/10 haber); okuma hızı ve ses seçilebilir.'),
-      tx('Direksiyon / kulaklık ileri-geri tuşları müzik, radyo, podcast ve haber okumada çalışacak şekilde düzenlendi (araca göre değişebilir).'),
-      tx('Hava durumu: Saatlik ve Günlük ayrıldı; favori yerler üstte; günler siyah büyük başlık, çizgilerle ayrık.'),
-      tx('Araçlar gruplandı ve sıralanabilir; Uyku aracı menüden kalktı; Zamanlama tek kutuda.'),
-      tx('LGS: dersler ünite ünite düzenlendi; İngilizce için Gramer ve kalıplar, 24 seviyeli okuma parçası; Türkçe için paragraf soru kalıpları ve 15 okuma parçası; Söz sanatları, Noktalama, Anlatım biçimleri, Yazı türleri.'),
+      tx('Haber: okuma hızı − / + ile ayarlanır; sesler Erkek 1-2 ve Bayan 1-2; "Hepsi" seçeneği ve Hazır kaynaklar (çalışanları uygulama kendisi bulur).'),
+      tx('Hava durumu tek sayfada: Saatlik / Günlük sekmeleri, bölümler sıralanabilir, yerler ilk kelimeyle; konum ayarı buraya taşındı ve ana ekran seçili yeri gösterir.'),
+      tx('Araçlar: büyük, açılıp kapanan grup başlıkları.'),
+      tx('Online müzik: Audius önde ve seçili, çalan parça listenin başında, sonuç sayısı elle girilebilir ve Daha fazla düğmesi.'),
+      tx('Ders çalışma: haftalık programda gün başlıkları büyük ve siyah.'),
     ];
 
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {

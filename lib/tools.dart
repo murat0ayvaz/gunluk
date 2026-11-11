@@ -50,6 +50,9 @@ String _groupTitle(String g) {
 
 const _defaultGroupOrder = ['health', 'time', 'weather'];
 
+// Kapalı (daraltılmış) gruplar; çekmece kapanıp açılınca da hatırlanır
+final Set<String> _closedGroups = {};
+
 /// Hazır sıra (varsayılan); kullanıcının sıralaması bunun üstüne uygulanır
 List<_ToolInfo> _allTools() => [
       _ToolInfo('meditate', Icons.self_improvement_rounded, tx('Meditasyon'),
@@ -76,11 +79,8 @@ List<_ToolInfo> _allTools() => [
       _ToolInfo('zamanlama', Icons.alarm_rounded, tx('Zamanlama'),
           const Color(0xFF7E57C2), () => const ZamanlamaPage(),
           group: 'time'),
-      _ToolInfo('wxhourly', Icons.schedule_rounded, tx('Saatlik'),
+      _ToolInfo('wx', Icons.wb_sunny_outlined, tx('Hava durumu'),
           const Color(0xFF3E9FD6), () => const WxDetailPage(),
-          group: 'weather'),
-      _ToolInfo('wxdaily', Icons.calendar_view_week_rounded, tx('Günlük'),
-          const Color(0xFF3E9FD6), () => const WxDetailPage(daily: true),
           group: 'weather'),
     ];
 
@@ -206,18 +206,27 @@ class _ToolsDrawerState extends State<ToolsDrawer> {
   }
 
   Widget _groupHeader(Pal p, String g, int i, int n) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 8, 2),
+    final closed = _closedGroups.contains(g) && !_edit;
+    return InkWell(
+      onTap: _edit
+          ? null
+          : () => setState(() {
+                if (!_closedGroups.remove(g)) _closedGroups.add(g);
+              }),
+      child: Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 8, 6),
       child: Row(
         children: [
           Expanded(
             child: Text(_groupTitle(g),
                 style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.4,
-                    color: p.soft)),
+                    fontSize: 21,
+                    fontWeight: FontWeight.w800,
+                    color: p.ink)),
           ),
+          if (!_edit)
+            Icon(closed ? Icons.expand_more_rounded : Icons.expand_less_rounded,
+                color: p.soft),
           if (_edit) ...[
             IconButton(
               visualDensity: VisualDensity.compact,
@@ -233,6 +242,7 @@ class _ToolsDrawerState extends State<ToolsDrawer> {
             ),
           ],
         ],
+      ),
       ),
     );
   }
@@ -321,7 +331,7 @@ class _ToolsDrawerState extends State<ToolsDrawer> {
                                             color: groups[gi].$2[i].tone))),
                             ],
                           )
-                        else
+                        else if (!_closedGroups.contains(groups[gi].$1))
                           for (final t in groups[gi].$2) _tile(p, t),
                       ],
                       const SizedBox(height: 16),

@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'data.dart';
 import 'media.dart';
 import 'net.dart';
+import 'newspresets.dart';
 import 'strings.dart';
 import 'ui.dart';
 
@@ -315,7 +316,9 @@ class NewsTab extends StatelessWidget {
       try {
         final items = await _news(s.url);
         if (items.isEmpty) continue;
-        out.add(NewsBatch(s.name, [for (final it in items.take(n)) _speakText(it)]));
+        out.add(NewsBatch(s.name, [
+          for (final it in items.take(n <= 0 ? items.length : n)) _speakText(it)
+        ]));
       } catch (_) {}
     }
     if (out.isEmpty) {
@@ -503,11 +506,13 @@ class NewsTab extends StatelessWidget {
                     tooltip: tx('Her kaynaktan kaç haber'),
                     onSelected: (v) => store.setTts(n: v),
                     itemBuilder: (_) => [
-                      for (final v in [3, 5, 10])
+                      for (final v in [3, 5, 10, 0])
                         CheckedPopupMenuItem<int>(
                             value: v,
                             checked: store.newsN == v,
-                            child: Text(tx('{0} haber', ['$v']))),
+                            child: Text(v == 0
+                                ? tx('Hepsi')
+                                : tx('{0} haber', ['$v']))),
                     ],
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -515,9 +520,17 @@ class NewsTab extends StatelessWidget {
                       decoration: BoxDecoration(
                           border: Border.all(color: p.line),
                           borderRadius: BorderRadius.circular(20)),
-                      child: Text(tx('{0} haber', ['${store.newsN}']),
+                      child: Text(
+                          store.newsN == 0
+                              ? tx('Hepsi')
+                              : tx('{0} haber', ['${store.newsN}']),
                           style: const TextStyle(fontWeight: FontWeight.w600)),
                     ),
+                  ),
+                  IconButton(
+                    tooltip: tx('Hazır kaynaklar'),
+                    onPressed: () => showNewsPresets(context),
+                    icon: const Icon(Icons.playlist_add_check_rounded),
                   ),
                   IconButton(
                     tooltip: tx('Ses ve hız'),
@@ -863,14 +876,26 @@ class _VoiceDialogState extends State<_VoiceDialog> {
     });
   }
 
-  /// Android sesin cinsiyetini bildirmez; addan tahmin edilir
-  String _guess(String name) {
-    final n = name.toLowerCase();
-    if (n.contains('female') || n.contains('kadin') || n.contains('kadın')) {
-      return tx('kadın');
+  /// Listedeki sıra numarasına (1'den) göre seçilen sesler: Erkek 1-2, Bayan 1-2
+  static const _picks = <(int, String)>[
+    (2, 'Erkek 1'),
+    (10, 'Erkek 2'),
+    (4, 'Bayan 1'),
+    (6, 'Bayan 2'),
+  ];
+
+  /// (görünen ad, ses adı, dil) listesi; öneri sesleri yoksa tüm sesler "Ses N"
+  List<(String, String, String)> _shown(List<(String, String)> v) {
+    final out = <(String, String, String)>[];
+    for (final k in _picks) {
+      if (k.$1 <= v.length) out.add((k.$2, v[k.$1 - 1].$1, v[k.$1 - 1].$2));
     }
-    if (n.contains('male') || n.contains('erkek')) return tx('erkek');
-    return '';
+    if (out.isEmpty) {
+      for (var i = 0; i < v.length; i++) {
+        out.add((tx('Ses {0}', ['${i + 1}']), v[i].$1, v[i].$2));
+      }
+    }
+    return out;
   }
 
   @override
@@ -891,13 +916,29 @@ class _VoiceDialogState extends State<_VoiceDialog> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(tx('Okuma hızı: {0}x',
-                      [(store.ttsRate * 2).toStringAsFixed(1)])),
-                  Slider(
-                    value: store.ttsRate.clamp(0.2, 1.0).toDouble(),
-                    min: 0.2,
-                    max: 1.0,
-                    divisions: 16,
-                    onChanged: (x) => store.setTts(rate: x),
+                      [(store.ttsRate * 2).toStringAsFixed(2)])),
+                  Row(
+                    children: [
+                      IconButton(
+                        tooltip: tx('Yavaşlat'),
+                        icon: const Icon(Icons.remove_circle_outline_rounded),
+                        onPressed: () => store.setTts(rate: store.ttsRate - 0.05),
+                      ),
+                      Expanded(
+                        child: Slider(
+                          value: store.ttsRate.clamp(0.2, 1.0).toDouble(),
+                          min: 0.2,
+                          max: 1.0,
+                          divisions: 16,
+                          onChanged: (x) => store.setTts(rate: x),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: tx('Hızlandır'),
+                        icon: const Icon(Icons.add_circle_outline_rounded),
+                        onPressed: () => store.setTts(rate: store.ttsRate + 0.05),
+                      ),
+                    ],
                   ),
                   Text(tx('Ses'),
                       style: const TextStyle(fontWeight: FontWeight.w700)),
@@ -925,29 +966,21 @@ class _VoiceDialogState extends State<_VoiceDialog> {
                         tx('Telefonda ek Türkçe ses bulunamadı. Ayarlar > Metin okuma bölümünden yeni ses indirebilirsin.'),
                         style: TextStyle(color: p.soft, fontSize: 13))
                   else
-                    for (var i = 0; i < v.length; i++)
+                    for (final sv in _shown(v))
                       ListTile(
                         dense: true,
                         contentPadding: EdgeInsets.zero,
                         leading: Icon(
-                            cur == '${v[i].$1}|${v[i].$2}'
+                            cur == '${sv.$2}|${sv.$3}'
                                 ? Icons.radio_button_checked
                                 : Icons.radio_button_off,
                             color: p.accent),
-                        title: Text(_guess(v[i].$1).isEmpty
-                            ? tx('Ses {0}', ['${i + 1}'])
-                            : tx('Ses {0} ({1})', ['${i + 1}', _guess(v[i].$1)])),
-                        onTap: () =>
-                            store.setTts(voice: '${v[i].$1}|${v[i].$2}'),
+                        title: Text(sv.$1),
+                        onTap: () => store.setTts(voice: '${sv.$2}|${sv.$3}'),
                         trailing: IconButton(
                             icon: const Icon(Icons.volume_up_rounded),
-                            onPressed: () =>
-                                newsReader.testVoice(v[i].$1, v[i].$2)),
+                            onPressed: () => newsReader.testVoice(sv.$2, sv.$3)),
                       ),
-                  const SizedBox(height: 8),
-                  Text(
-                      tx('Android sesin kadın mı erkek mi olduğunu bildirmez; dinleyerek seç.'),
-                      style: TextStyle(color: p.soft, fontSize: 12.5)),
                 ],
               ),
             ),
