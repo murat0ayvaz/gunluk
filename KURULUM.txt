@@ -1,16 +1,19 @@
-DAILY ROUTINE v29.2 (1.25.2) - TAM PAKET
+DAILY ROUTINE v29.3 (1.25.3) - TAM PAKET
 
 Bu zipte projenin TAMAMI var: .github, assets, lib, debug.keystore, pubspec.yaml.
 1) Zipi çıkar. GitHub'da "gunluk" reposunun ANA sayfasında: Add file > Upload files.
 2) Çıkan klasörlerin ve dosyaların HEPSİNİ (.github, assets, lib, debug.keystore, pubspec.yaml) sürükle-bırak > Commit changes.
-   (Yeni dosya: lib/newspresets.dart.)
+   (Yeni dosya: lib/wallet.dart.)
 3) Actions > yeşil tik > Artifacts > gunluk-apk indir, telefona kur (veriler kalır).
 
-v29.2 yenilikleri:
-- Araçlar: büyük, açılıp kapanan grup başlıkları; Hava durumu tek araç.
-- Hava durumu: tek sayfada Saatlik / Günlük sekmeleri; bölümler "Sırala" ile sıralanır; yer çiplerinde ilk kelime (Serdivan, Karasu);
-  konum buradan seçilir (Konumum = telefonun konumu); ana ekran seçili yeri gösterir; ayarlardaki şehir/konum seçimi kalktı.
-- Haber: hız - / + ile; sesler Erkek 1-2, Bayan 1-2 (listedeki 2., 10., 4., 6. ses); "Hepsi" seçeneği (varsayılan);
-  "Hazır kaynaklar" (uygulama adayları dener, yalnız çalışanları listeler).
-- Online müzik: Audius önde ve seçili; çalan parça en üstte; Adet kutusu + Daha fazla.
-- Ders: haftalık programda gün başlıkları büyük ve siyah.
+v29.3 yenilikleri:
+- Cüzdan (Araçlar > Para): birden fazla cüzdan (Murat, Eymen...); Harcamalar | Borç | Alacak.
+  Harcama/gelir: kategori, ödeme şekli (peşin/kredi/banka), günlük-haftalık-aylık-yıllık özet ve dağılım.
+  Borç/alacak: kısmi ödeme, vade, vade günü bildirimi. Sağa kaydır = sil (Geri al), dokun = düzenle. Yedeğe dahildir.
+- Her sayfada en üstteyken aşağı çekip bırak = ana sayfa (kısa mesafe; pencere/yazı alanı/sıralamada kapalı).
+- Araçlar: Sağlık ve denge / Zaman ve sayaçlar / Para başlıkları beyaz şeritte siyah yazı; Hava durumu başlıksız tek araç.
+- Hava durumu: her başlığın sağında güncel değer (saatlikte bu saat, günlükte bugün); Deniz durumunda TAHMİNİ bayrak (resmi değildir).
+- Tekrar et: soru-cevap kartında soru görünür; diğer kartlarda içerik baştan görünür, Bilmiyorum kartı sona atar.
+- Online müzik: varsayılan 100 sonuç, Daha fazla +50 (Audius en çok 100, Jamendo 200).
+- Haber: Hazır kaynaklar artık "Kaynak ekle" penceresinde.
+- Ayarlar > Hakkında > Neler yapabilir? (simgeli açılır kartlar).

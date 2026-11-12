@@ -59,8 +59,10 @@ class _Sec extends StatefulWidget {
   final bool initOpen;
   final VoidCallback? onOpen;
   final Widget child;
+  final Widget? trailing; // başlığın en sağında anlık değer
   const _Sec(
       {super.key,
+      this.trailing,
       required this.title,
       required this.icon,
       required this.child,
@@ -112,6 +114,10 @@ class _SecState extends State<_Sec> {
                             fontSize: 16,
                             fontWeight: FontWeight.w600)),
                   ),
+                  if (widget.trailing != null) ...[
+                    widget.trailing!,
+                    const SizedBox(width: 6),
+                  ],
                   Icon(_open
                       ? Icons.expand_less_rounded
                       : Icons.expand_more_rounded),
@@ -199,6 +205,7 @@ class _WxDetailPageState extends State<WxDetailPage> {
         _loading = false;
         _pickSel();
       });
+      _loadMarine(); // başlıktaki bayrak için deniz verisi de arkadan alınır
     } catch (e) {
       if (!mounted) return;
       final t = e is WxError ? '${e.step}: ${e.detail}' : e.toString();
@@ -628,6 +635,7 @@ class _WxDetailPageState extends State<WxDetailPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _flagRow(p),
         if (n != null) ...[
           if (n.v['wave'] != null)
             line(tx('Dalga yüksekliği'),
@@ -884,6 +892,166 @@ class _WxDetailPageState extends State<WxDetailPage> {
     }
   }
 
+  // ---------- Başlık satırındaki anlık değer ----------
+  /// Şu anki saatin noktası (Saatlik); yoksa şimdiki durum
+  WxPt? _curPt() {
+    final d = _sel;
+    if (d == null) return null;
+    final now = DateTime.now();
+    for (final x in d.hourly) {
+      if (x.t.year == now.year &&
+          x.t.month == now.month &&
+          x.t.day == now.day &&
+          x.t.hour == now.hour) {
+        return x;
+      }
+    }
+    return d.now;
+  }
+
+  /// Bugünün günlük noktası (Günlük)
+  WxPt? _todayPt() {
+    final d = _sel;
+    if (d == null) return null;
+    final now = DateTime.now();
+    for (final x in d.daily) {
+      if (x.t.year == now.year && x.t.month == now.month && x.t.day == now.day) {
+        return x;
+      }
+    }
+    return null;
+  }
+
+  /// Saatlik sekmede şimdiki saatin, Günlük sekmede bugünün değeri
+  WxPt? _headPt() => _tab == 0 ? _curPt() : _todayPt();
+
+  Widget? _headVal(Pal p, String id) {
+    if (id == 'sea') return _flagChip(p);
+    final x = _headPt();
+    if (x == null) return null;
+    String t;
+    switch (id) {
+      case 'feels':
+        t = _fFeels(x);
+        break;
+      case 'hum':
+        t = _fHum(x);
+        break;
+      case 'wind':
+        final w = x.v['wind'];
+        final dir = x.v['dir'];
+        t = w == null
+            ? ''
+            : '${_n(w)} ${tx('km/sa')}${dir == null ? '' : ' ${_compass(dir)}'}';
+        break;
+      case 'press':
+        t = _fPress(x);
+        break;
+      case 'rain':
+        t = _fRain(x);
+        break;
+      case 'uv':
+        t = _fUv(x);
+        break;
+      case 'vis':
+        t = _fVis(x);
+        break;
+      default:
+        return null;
+    }
+    if (t.isEmpty) return null;
+    return Text(t,
+        style: TextStyle(color: p.ink, fontSize: 15, fontWeight: FontWeight.w700));
+  }
+
+  // ---------- Tahmini bayrak (dalga ve rüzgâra göre) ----------
+  /// -1: veri yok, 0: yeşil, 1: sarı, 2: kırmızı
+  int _flagLevel() {
+    final m = _marine;
+    if (m == null) return -1; // kıyıdan uzak: deniz verisi yok, bayrak da yok
+    double? wave;
+    double? wind;
+    if (_tab == 0) {
+      wave = m.now?.v['wave'];
+      wind = _curPt()?.v['wind'];
+    } else {
+      final now = DateTime.now();
+      for (final x in m.daily) {
+        if (x.t.year == now.year && x.t.month == now.month && x.t.day == now.day) {
+          wave = x.v['wave'];
+          break;
+        }
+      }
+      wind = _todayPt()?.v['wind'];
+    }
+    if (wave == null && wind == null) return -1;
+    var l = 0;
+    if (wave != null) {
+      if (wave >= 1.25) {
+        l = 2;
+      } else if (wave >= 0.5) {
+        l = 1;
+      }
+    }
+    if (wind != null) {
+      if (wind >= 35) {
+        l = 2;
+      } else if (wind >= 20 && l < 1) {
+        l = 1;
+      }
+    }
+    return l;
+  }
+
+  static const _flagColors = [Color(0xFF2E9E4F), Color(0xFFE0A100), Color(0xFFD33B3B)];
+
+  String _flagName(int l) =>
+      [tx('Yeşil'), tx('Sarı'), tx('Kırmızı')][l.clamp(0, 2).toInt()];
+
+  Widget? _flagChip(Pal p) {
+    final l = _flagLevel();
+    if (l < 0) return null;
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(Icons.flag_rounded, color: _flagColors[l], size: 22),
+      const SizedBox(width: 4),
+      Text(_flagName(l),
+          style: TextStyle(
+              color: _flagColors[l], fontSize: 15, fontWeight: FontWeight.w800)),
+    ]);
+  }
+
+  Widget _flagRow(Pal p) {
+    final l = _flagLevel();
+    if (l < 0) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: _flagColors[l].withOpacity(0.13),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(children: [
+          Icon(Icons.flag_rounded, color: _flagColors[l], size: 34),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(tx('Tahmini bayrak: {0}', [_flagName(l)]),
+                    style: TextStyle(
+                        color: p.ink, fontSize: 15, fontWeight: FontWeight.w800)),
+                Text(
+                    tx('Dalga ve rüzgâra göre tahmindir; resmi bayrak değildir. Yeşil: sakin, sarı: dikkat, kırmızı: yüzmek tehlikeli.'),
+                    style: TextStyle(color: p.soft, fontSize: 11.5, height: 1.3)),
+              ],
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
   Widget _secBody(Pal p, String id) {
     switch (id) {
       case 'temp':
@@ -915,6 +1083,7 @@ class _WxDetailPageState extends State<WxDetailPage> {
         icon: info.$2,
         initOpen: id == 'temp',
         onOpen: id == 'sea' ? _loadMarine : null,
+        trailing: _headVal(p, id),
         child: _secBody(p, id));
   }
 

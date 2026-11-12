@@ -96,8 +96,11 @@ class OnlineTab extends StatefulWidget {
 class _OnlineTabState extends State<OnlineTab>
     with AutomaticKeepAliveClientMixin {
   String _src = 'aud'; // aud | jam | fav (Audius önde ve seçili)
-  int _limit = 30; // en çok kaç sonuç istenecek
-  final _lim = TextEditingController(text: '30');
+  int _limit = 100; // en çok kaç sonuç istenecek
+  final _lim = TextEditingController(text: '100');
+
+  /// Kaynağın verebildiği en çok sonuç (Audius 100, Jamendo 200)
+  int get _cap => _src == 'aud' ? 100 : 200;
   final _q = TextEditingController();
   int _genre = -1;
   bool _loading = false;
@@ -161,13 +164,13 @@ class _OnlineTabState extends State<OnlineTab>
       _lim.text = '$_limit';
       return;
     }
-    _limit = n > 200 ? 200 : n;
+    _limit = n > _cap ? _cap : n;
     _lim.text = '$_limit';
     _search();
   }
 
   void _more() {
-    _limit = (_limit + 30) > 200 ? 200 : _limit + 30;
+    _limit = (_limit + 50) > _cap ? _cap : _limit + 50;
     _lim.text = '$_limit';
     _search();
   }
@@ -192,6 +195,8 @@ class _OnlineTabState extends State<OnlineTab>
     if (_src == s) return;
     setState(() {
       _src = s;
+      if (_limit > _cap) _limit = _cap;
+      _lim.text = '$_limit';
       _res = [];
       _err = null;
       _loaded = false;
@@ -383,7 +388,7 @@ class _OnlineTabState extends State<OnlineTab>
 
   /// Daha fazla sonuç olabilir mi: istenen kadar geldiyse ve üst sınıra varılmadıysa
   bool _showMore(List<OnTrack> list) =>
-      _src != 'fav' && list.length >= _limit && _limit < 200;
+      _src != 'fav' && list.length >= _limit && _limit < _cap;
 
   Widget _row(BuildContext context, List<OnTrack> list, int i) {
     final p = palOf(context);

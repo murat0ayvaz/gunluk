@@ -622,3 +622,129 @@ Color tagTone(String seed) {
   }
   return Color(_tagHues[h % _tagHues.length]);
 }
+
+// ---------------------------------------------------------------
+// Her sayfada: sayfanın en üstündeyken aşağı çekip bırakınca ana sayfaya dön
+// ---------------------------------------------------------------
+final ValueNotifier<int> homeReset = ValueNotifier<int>(0);
+
+class PullHome extends StatefulWidget {
+  final Widget child;
+  final GlobalKey<NavigatorState> navKey;
+  const PullHome({super.key, required this.child, required this.navKey});
+
+  @override
+  State<PullHome> createState() => _PullHomeState();
+}
+
+class _PullHomeState extends State<PullHome> {
+  static const double _need = 75; // yaklaşık 2 cm
+  double _pull = 0;
+  bool _active = false;
+  final ValueNotifier<double> _prog = ValueNotifier<double>(0);
+
+  bool _typing() {
+    final f = FocusManager.instance.primaryFocus;
+    return f?.context?.findAncestorWidgetOfExactType<EditableText>() != null;
+  }
+
+  bool _onScroll(ScrollNotification n) {
+    if (n.metrics.axis != Axis.vertical) return false;
+    if (n is ScrollStartNotification) {
+      _pull = 0;
+      _active = false;
+      _prog.value = 0;
+      final ctx = n.context;
+      final route = ctx == null ? null : ModalRoute.of(ctx);
+      // pencere / alt panel / yazı yazarken devre dışı
+      _active = route is PageRoute && !_typing() && !store.locked;
+    } else if (n is OverscrollNotification) {
+      if (_active &&
+          n.dragDetails != null &&
+          n.overscroll < 0 &&
+          n.metrics.pixels <= n.metrics.minScrollExtent + 0.5) {
+        _pull += -n.overscroll;
+        _prog.value = (_pull / _need).clamp(0.0, 1.0);
+      }
+    } else if (n is ScrollUpdateNotification) {
+      if (n.metrics.pixels > n.metrics.minScrollExtent + 1) {
+        _pull = 0;
+        _prog.value = 0;
+      }
+    } else if (n is ScrollEndNotification) {
+      final go = _active && _pull >= _need;
+      _pull = 0;
+      _active = false;
+      _prog.value = 0;
+      if (go) {
+        final nav = widget.navKey.currentState;
+        nav?.popUntil((r) => r.isFirst);
+        homeReset.value++;
+      }
+    }
+    return false;
+  }
+
+  @override
+  void dispose() {
+    _prog.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palOf(context);
+    return NotificationListener<ScrollNotification>(
+      onNotification: _onScroll,
+      child: Stack(
+        children: [
+          widget.child,
+          Positioned(
+            top: 56,
+            left: 0,
+            right: 0,
+            child: IgnorePointer(
+              child: ValueListenableBuilder<double>(
+                valueListenable: _prog,
+                builder: (context, v, _) => v <= 0.05
+                    ? const SizedBox.shrink()
+                    : Center(
+                        child: Opacity(
+                          opacity: v,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: p.dark,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.home_rounded,
+                                    size: 18,
+                                    color: v >= 1 ? p.accent : Colors.white),
+                                const SizedBox(width: 6),
+                                Text(
+                                  v >= 1
+                                      ? tx('Bırak: ana sayfa')
+                                      : tx('Ana sayfa için çek'),
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      decoration: TextDecoration.none),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

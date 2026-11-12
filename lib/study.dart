@@ -1436,9 +1436,16 @@ class _ReviewPageState extends State<_ReviewPage> {
     setState(() => _shown = false);
   }
 
+  /// Konu özeti parçası ve soru-cevap değil: içerik baştan görünür
+  bool _plain(_Item c) => _isSum(c.topic) && !c.exp.contains('||');
+
   void _dontKnow() {
     store.studyForget(_q.first.id);
-    setState(() => _shown = true);
+    if (_plain(_q.first)) {
+      _next(); // içerik zaten görünüyordu; kart sona gider
+    } else {
+      setState(() => _shown = true);
+    }
   }
 
   void _next() {
@@ -1510,10 +1517,36 @@ class _ReviewPageState extends State<_ReviewPage> {
                   Text(c.front,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                          fontSize: 26,
+                          fontSize: _isSum(c.topic) ? 21 : 26,
                           fontWeight: FontWeight.w700,
                           color: p.ink)),
-                  if (_shown) ...[
+                  if (_plain(c)) ...[
+                    const SizedBox(height: 18),
+                    Text(c.exp,
+                        style: TextStyle(fontSize: 17, color: p.ink, height: 1.5)),
+                  ] else if (_isSum(c.topic)) ...[
+                    const SizedBox(height: 18),
+                    Text(c.exp.split('||').first.trim(),
+                        style: TextStyle(fontSize: 18, color: p.ink, height: 1.5)),
+                    if (_shown) ...[
+                      const SizedBox(height: 18),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: p.accent.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                            c.exp.substring(c.exp.indexOf('||') + 2).trim(),
+                            style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w600,
+                                color: p.ink,
+                                height: 1.45)),
+                      ),
+                    ],
+                  ] else if (_shown) ...[
                     const SizedBox(height: 22),
                     if (c.exp.isNotEmpty)
                       Text(c.exp,

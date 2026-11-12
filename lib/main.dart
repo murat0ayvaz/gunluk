@@ -9,6 +9,7 @@ import 'notify.dart';
 import 'strings.dart';
 import 'theme.dart';
 import 'timing.dart';
+import 'ui.dart';
 
 // ---------------------------------------------------------------
 // DAILY ROUTINE - günlük rutin, hedef, yapılacaklar ve günlük (not) uygulaması
@@ -70,6 +71,8 @@ class GunlukApp extends StatelessWidget {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
+        builder: (context, child) =>
+            PullHome(navKey: navKey, child: child ?? const SizedBox.shrink()),
         home: const Gate(),
       ),
     );

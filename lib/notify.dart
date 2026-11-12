@@ -327,6 +327,32 @@ class Notifier {
       for (final a in store.launchers) {
         if (a.on) await syncLauncher(a);
       }
+      for (final d in store.wdebts) {
+        if (d.remind && !d.done) await syncDebt(d);
+      }
+    } catch (_) {}
+  }
+
+  /// Cüzdan: borç / alacak vade günü sabah 09:00 bildirimi
+  static Future<void> syncDebt(WalletDebt d) async {
+    try {
+      await init();
+      await cancelOnce(d.nid * 100);
+      if (!d.remind || d.nid == 0 || d.dueMs <= 0 || d.done) return;
+      final day = DateTime.fromMillisecondsSinceEpoch(d.dueMs);
+      final when = DateTime(day.year, day.month, day.day, 9);
+      if (when.isBefore(DateTime.now())) return;
+      final body = d.theirs
+          ? tx('{0}: alacak vadesi bugün', [d.person])
+          : tx('{0}: borç vadesi bugün', [d.person]);
+      await scheduleOnce(d.nid * 100, body, when);
+    } catch (_) {}
+  }
+
+  static Future<void> cancelDebt(WalletDebt d) async {
+    try {
+      await init();
+      await cancelOnce(d.nid * 100);
     } catch (_) {}
   }
 

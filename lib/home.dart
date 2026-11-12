@@ -76,6 +76,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     store.rollTodos(); // bitmeyen geçmiş maddeler bugüne taşınır
     _wasAll = store.todayGoals().all;
     store.addListener(_checkGoals);
+    homeReset.addListener(_onHomeReset);
     // Güncelleme sonrası ilk açılışta "Uygulama güncellendi" penceresi
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && store.takeUpdateNotice()) {
@@ -87,8 +88,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void dispose() {
     store.removeListener(_checkGoals);
+    homeReset.removeListener(_onHomeReset);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  /// Herhangi bir sayfada aşağı çekilince: ana ekran ilk haline döner
+  void _onHomeReset() {
+    if (!mounted) return;
+    setState(() {
+      day = dayOnly(DateTime.now());
+      _wxOpen = false;
+      _openSec.clear();
+      _catFilter = null;
+    });
   }
 
   bool _wasAll = false; // bugünün tüm hedefleri az önce tamam mıydı
@@ -584,17 +597,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
             ...[
               Expanded(
-                child: RefreshIndicator(
-                  // Yukarıdan aşağı çekince ana ekran ilk haline döner
-                  onRefresh: () async {
-                    setState(() {
-                      day = dayOnly(DateTime.now());
-                      _wxOpen = false;
-                      _openSec.clear();
-                      _catFilter = null;
-                    });
-                  },
-                  child: ListView(
+                child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
                   children: [
@@ -662,7 +665,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     ),
                   ],
                   ),
-                ),
               ),
             ],
           ],

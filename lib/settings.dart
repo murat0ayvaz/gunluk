@@ -342,6 +342,14 @@ class SettingsPage extends StatelessWidget {
               sec(tx('Hakkında'), [
               ListTile(
                 contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.auto_awesome_rounded),
+                title: Text(tx('Neler yapabilir?')),
+                onTap: () => Navigator.of(context)
+                    .push(MaterialPageRoute<void>(
+                        builder: (_) => const FeaturesPage())),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.new_releases_outlined),
                 title: Text(tx('Yenilikler')),
                 onTap: () => showWhatsNew(context),

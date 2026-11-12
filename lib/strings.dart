@@ -1365,4 +1365,222 @@ const _en = <String, String>{
   'Araçlar: büyük, açılıp kapanan grup başlıkları.': 'Tools: big collapsible group headings.',
   'Online müzik: Audius önde ve seçili, çalan parça listenin başında, sonuç sayısı elle girilebilir ve Daha fazla düğmesi.': 'Online music: Audius first and selected, the playing track at the top, result count can be typed and a More button.',
   'Ders çalışma: haftalık programda gün başlıkları büyük ve siyah.': 'Study: day headings in the weekly schedule are big and black.',
+  'Alacak':
+      'Receivable',
+  'Alacak kaydı yok. Sağ alttaki + ile ekleyebilirsin.':
+      'No receivables yet. Add one with the + button at the bottom right.',
+  'Alacağı düzenle':
+      'Edit receivable',
+  'Ana sayfa için çek':
+      'Pull for home',
+  'Ana sayfada sağa/sola kaydırarak günler arasında gez; aşağı çekince bugüne dön.':
+      'Swipe left/right on the home page to move between days; pull down to return to today.',
+  'Araçlar: beyaz şeritli grup başlıkları, Para grubu.':
+      'Tools: white strip group headers and a Money group.',
+  'Ayarlar > Hakkında > Neler yapabilir? bölümü eklendi.':
+      'Settings > About > What can it do? section added.',
+  'Açık kayıt':
+      'Open items',
+  'Bilmediklerin tekrar karşına çıkar.':
+      'Cards you did not know come back again.',
+  'Birden fazla cüzdan: Murat, Eymen gibi.':
+      'Several wallets, such as Murat, Eymen.',
+  'Borcu düzenle':
+      'Edit debt',
+  'Borç':
+      'Debt',
+  'Borç kaydı yok. Sağ alttaki + ile ekleyebilirsin.':
+      'No debts yet. Add one with the + button at the bottom right.',
+  'Borç ve alacakları kısmi ödemeler ve vade hatırlatmasıyla takip et.':
+      'Track debts and receivables with partial payments and due-date reminders.',
+  'Bu dönemde kayıt yok.':
+      'No records in this period.',
+  'Bırak: ana sayfa':
+      'Release: home',
+  'Cüzdan':
+      'Wallet',
+  'Cüzdan adı':
+      'Wallet name',
+  'Cüzdan ekle':
+      'Add wallet',
+  'Cüzdan silinsin mi?':
+      'Delete this wallet?',
+  'Dalga ve rüzgâra göre tahmindir; resmi bayrak değildir. Yeşil: sakin, sarı: dikkat, kırmızı: yüzmek tehlikeli.':
+      'This is an estimate from waves and wind, not an official flag. Green: calm, yellow: caution, red: swimming is dangerous.',
+  'Deniz durumunda dalga ve rüzgara göre tahmini bayrak rengi görürsün.':
+      'In sea conditions you see an estimated flag colour based on waves and wind.',
+  'Direksiyon / kulaklık tuşlarıyla sonraki - önceki parçaya geç.':
+      'Skip to the next or previous track with steering-wheel or headset buttons.',
+  'Gelir':
+      'Income',
+  'Geçerli bir tutar gir':
+      'Enter a valid amount',
+  'Geçmiş günlere bakıp istatistiklerini gör.':
+      'Look back at past days and see your statistics.',
+  'Gider':
+      'Expense',
+  'Grupları açıp kapatabilir, sıralayabilirsin.':
+      'Groups can be collapsed, expanded and reordered.',
+  'Günlük rutinlerini kategorilere ayırıp her gün işaretle.':
+      'Organise daily routines into categories and tick them off each day.',
+  'Günlük, haftalık, aylık, yıllık özet ve dağılım.':
+      'Daily, weekly, monthly and yearly summary and breakdown.',
+  'Günlüğüne not yaz; takvimden geçmiş notlara ulaş.':
+      'Write notes in your diary and reach past notes from the calendar.',
+  'Haber: Hazır kaynaklar artık Kaynak ekle penceresinde.':
+      'News: Ready sources are now inside the Add source window.',
+  'Haberler':
+      'News',
+  'Haberleri sesli oku: hızı ve sesi ayarla, kaç haber okunacağını seç.':
+      'Read news aloud: set speed and voice, choose how many items to read.',
+  'Haftalık ders programı ve çalışma planı.':
+      'Weekly lesson schedule and study plan.',
+  'Harcama ve gelirleri kategori ve ödeme şekliyle kaydet (peşin, kredi kartı, banka kartı).':
+      'Record expenses and income with category and payment method (cash, credit card, debit card).',
+  'Harcama, borç ve alacaklarını takip etmek için önce bir cüzdan ekle (ör. Murat, Eymen).':
+      'To track expenses, debts and receivables, first add a wallet (e.g. Murat, Eymen).',
+  'Harcamalar':
+      'Expenses',
+  'Hatırlatıcılar bildirimle gelir.':
+      'Reminders arrive as notifications.',
+  'Hava durumu: her başlığın sağında güncel değer; deniz durumunda tahmini bayrak.':
+      'Weather: the current value on the right of each heading; an estimated flag in sea conditions.',
+  'Hazır kaynaklardan ekle':
+      'Add from ready sources',
+  'Hedeflerini takip et; hepsi bitince küçük bir kutlama görürsün.':
+      'Track your goals; when all are done you get a small celebration.',
+  'Henüz kayıt yok.':
+      'No records yet.',
+  'Her sayfada en üstteyken aşağı çekip bırakınca ana sayfaya dönersin (çekme mesafesi kısaldı).':
+      'On any page, pull down at the top and release to return home (the pull distance is shorter).',
+  'Kalan':
+      'Remaining',
+  'Kategoriye göre':
+      'By category',
+  'Kimden alacaklısın':
+      'Owed to you by',
+  'Kime borçlusun':
+      'You owe',
+  'Kişi adı gir':
+      'Enter a name',
+  'Konu özetleri ve Tekrar et kartları: soruyu gör, cevabı aç.':
+      'Topic summaries and Review cards: see the question, reveal the answer.',
+  'Konumunu ve favori yerlerini seç; ana ekran seçili yeri gösterir.':
+      'Pick your location and favourite places; the home screen shows the selected one.',
+  'Kırmızı':
+      'Red',
+  'Müzik, radyo, podcast':
+      'Music, radio, podcasts',
+  'Neler yapabilir?':
+      'What can it do?',
+  'Net':
+      'Net',
+  'Online müzik: Audius ve Jamendo\'da ara, favorilere ekle.':
+      'Online music: search Audius and Jamendo and add favourites.',
+  'Online müzik: varsayılan 100 sonuç, Daha fazla +50.':
+      'Online music: 100 results by default, More adds 50.',
+  'Para':
+      'Money',
+  'RSS kaynaklarından haber oku; kendi kaynağını ekle veya Hazır kaynaklardan seç.':
+      'Read news from RSS sources; add your own or pick from ready sources.',
+  'Radyo ve podcast dinle.':
+      'Listen to radio and podcasts.',
+  'Rutin ve kayıtlar':
+      'Routines and records',
+  'Saatlik ve günlük tahmin tek sayfada; bölümleri sıralayabilirsin.':
+      'Hourly and daily forecast on one page; sections can be reordered.',
+  'Sarı':
+      'Yellow',
+  'Sağlık ve denge: meditasyon, nefes, su sayacı.':
+      'Health and balance: meditation, breathing, water counter.',
+  'Tahmini bayrak: {0}':
+      'Estimated flag: {0}',
+  'Tahsil edildi':
+      'Collected',
+  'Tahsilat ekle':
+      'Add collection',
+  'Tahsilat tutarı':
+      'Collected amount',
+  'Tahsilatlar':
+      'Collections',
+  'Tamamı tahsil edildi':
+      'Fully collected',
+  'Tamamı ödendi':
+      'Fully paid',
+  'Tarih':
+      'Date',
+  'Tekrar et: soru-cevap kartlarında soru görünür; diğerlerinde içerik baştan görünür.':
+      'Review: Q&A cards show the question; other cards show their content from the start.',
+  'Telefondaki müziği çal; arka planda ve kilit ekranından kontrol et.':
+      'Play music on your phone; control it in the background and from the lock screen.',
+  'Toplam alacak':
+      'Total receivable',
+  'Toplam borç':
+      'Total debt',
+  'Toplam {0}':
+      'Total {0}',
+  'Tutar':
+      'Amount',
+  'Tüm verilerini yedekleyip geri yükle.':
+      'Back up and restore all your data.',
+  'Uygulama kilidi, tema ve dil seçenekleri.':
+      'App lock, theme and language options.',
+  'Vade (isteğe bağlı)':
+      'Due date (optional)',
+  'Vade geçti: {0}':
+      'Overdue: {0}',
+  'Vade gününde hatırlat':
+      'Remind on the due date',
+  'Vade yok':
+      'No due date',
+  'Vade: {0}':
+      'Due: {0}',
+  'Vadesi geçen':
+      'Overdue',
+  'Verilerin telefonunda saklanır.':
+      'Your data is stored on your phone.',
+  'Yapılacaklar listesi: hatırlatıcı ekle, bitmeyenler bugüne taşınır.':
+      'To-do list: add reminders; unfinished items roll over to today.',
+  'Yapılacaklar ve Günlük':
+      'To-dos and Diary',
+  'Yedek ve veriler':
+      'Backup and data',
+  'Yeni alacak':
+      'New receivable',
+  'Yeni borç':
+      'New debt',
+  'Yeni cüzdan':
+      'New wallet',
+  'Yeni: Cüzdan (Araçlar > Para). Birden fazla cüzdan; harcama, gelir, borç ve alacak takibi; günlük / haftalık / aylık / yıllık özet.':
+      'New: Wallet (Tools > Money). Several wallets; track expenses, income, debts and receivables; daily / weekly / monthly / yearly summary.',
+  'Yeniden adlandır':
+      'Rename',
+  'Yıl':
+      'Year',
+  'Zaman ve sayaçlar: sayaç, pomodoro, kronometre, zikirmatik, zamanlama (alarm ve başlatıcı).':
+      'Time and timers: timer, pomodoro, stopwatch, dhikr counter, scheduling (alarm and launcher).',
+  'kalan':
+      'left',
+  '{0}: alacak vadesi bugün':
+      '{0}: receivable is due today',
+  '{0}: borç vadesi bugün':
+      '{0}: debt is due today',
+  'Ödeme ekle':
+      'Add payment',
+  'Ödeme tutarı':
+      'Payment amount',
+  'Ödeme şekli':
+      'Payment method',
+  'Ödeme şekline göre':
+      'By payment method',
+  'Ödemeler':
+      'Payments',
+  'Ödendi':
+      'Paid',
+  'Ödenen {0}':
+      'Paid {0}',
+  '“{0}” cüzdanı ve içindeki tüm kayıtlar silinecek.':
+      'The wallet “{0}” and all its records will be deleted.',
+  '“{0}” listeden kaldırılacak. Eski kayıtlar etkilenmez.':
+      '“{0}” will be removed from the list. Existing records are not affected.',
 };

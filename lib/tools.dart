@@ -15,6 +15,7 @@ import 'reminders.dart' show dtLabel;
 import 'theme.dart' show Pal;
 import 'strings.dart';
 import 'timing.dart';
+import 'wallet.dart';
 import 'ui.dart';
 import 'wxdetail.dart';
 
@@ -43,12 +44,27 @@ String _groupTitle(String g) {
       return tx('Sağlık ve denge');
     case 'time':
       return tx('Zaman ve sayaçlar');
+    case 'para':
+      return tx('Para');
     default:
       return tx('Hava durumu');
   }
 }
 
-const _defaultGroupOrder = ['health', 'time', 'weather'];
+const _defaultGroupOrder = ['health', 'time', 'weather', 'para'];
+
+IconData _groupIcon(String g) {
+  switch (g) {
+    case 'health':
+      return Icons.spa_rounded;
+    case 'time':
+      return Icons.timer_rounded;
+    case 'para':
+      return Icons.account_balance_wallet_rounded;
+    default:
+      return Icons.wb_sunny_outlined;
+  }
+}
 
 // Kapalı (daraltılmış) gruplar; çekmece kapanıp açılınca da hatırlanır
 final Set<String> _closedGroups = {};
@@ -82,6 +98,9 @@ List<_ToolInfo> _allTools() => [
       _ToolInfo('wx', Icons.wb_sunny_outlined, tx('Hava durumu'),
           const Color(0xFF3E9FD6), () => const WxDetailPage(),
           group: 'weather'),
+      _ToolInfo('wallet', Icons.account_balance_wallet_rounded, tx('Cüzdan'),
+          const Color(0xFF2E9E6B), () => const WalletPage(),
+          group: 'para'),
     ];
 
 /// Kullanıcının sıralamasına göre gruplar ve içindeki araçlar
@@ -206,43 +225,66 @@ class _ToolsDrawerState extends State<ToolsDrawer> {
   }
 
   Widget _groupHeader(Pal p, String g, int i, int n) {
+    // Hava durumu tek araç: başlıksız (yalnız sıralama kipinde görünür)
+    if (g == 'weather' && !_edit) return const SizedBox(height: 4);
     final closed = _closedGroups.contains(g) && !_edit;
-    return InkWell(
-      onTap: _edit
-          ? null
-          : () => setState(() {
-                if (!_closedGroups.remove(g)) _closedGroups.add(g);
-              }),
-      child: Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 8, 6),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(_groupTitle(g),
-                style: TextStyle(
-                    fontSize: 21,
-                    fontWeight: FontWeight.w800,
-                    color: p.ink)),
+    const black = Color(0xFF111111);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: _edit
+              ? null
+              : () => setState(() {
+                    if (!_closedGroups.remove(g)) _closedGroups.add(g);
+                  }),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(14, 8, 6, 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: p.line),
+            ),
+            child: Row(
+              children: [
+                Icon(_groupIcon(g), color: black, size: 26),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(_groupTitle(g),
+                      style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: black)),
+                ),
+                if (!_edit)
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Icon(
+                        closed
+                            ? Icons.expand_more_rounded
+                            : Icons.expand_less_rounded,
+                        color: black),
+                  ),
+                if (_edit) ...[
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    tooltip: tx('Yukarı'),
+                    onPressed: i == 0 ? null : () => _moveGroup(i, i - 1),
+                    icon: const Icon(Icons.keyboard_arrow_up_rounded, color: black),
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    tooltip: tx('Aşağı'),
+                    onPressed: i >= n - 1 ? null : () => _moveGroup(i, i + 1),
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded, color: black),
+                  ),
+                ],
+              ],
+            ),
           ),
-          if (!_edit)
-            Icon(closed ? Icons.expand_more_rounded : Icons.expand_less_rounded,
-                color: p.soft),
-          if (_edit) ...[
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              tooltip: tx('Yukarı'),
-              onPressed: i == 0 ? null : () => _moveGroup(i, i - 1),
-              icon: const Icon(Icons.keyboard_arrow_up_rounded),
-            ),
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              tooltip: tx('Aşağı'),
-              onPressed: i >= n - 1 ? null : () => _moveGroup(i, i + 1),
-              icon: const Icon(Icons.keyboard_arrow_down_rounded),
-            ),
-          ],
-        ],
-      ),
+        ),
       ),
     );
   }
@@ -331,7 +373,8 @@ class _ToolsDrawerState extends State<ToolsDrawer> {
                                             color: groups[gi].$2[i].tone))),
                             ],
                           )
-                        else if (!_closedGroups.contains(groups[gi].$1))
+                        else if (groups[gi].$1 == 'weather' ||
+                            !_closedGroups.contains(groups[gi].$1))
                           for (final t in groups[gi].$2) _tile(p, t),
                       ],
                       const SizedBox(height: 16),

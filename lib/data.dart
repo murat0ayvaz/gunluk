@@ -2272,6 +2272,23 @@ class AppStore extends ChangeNotifier {
     ttsRate = ((j['ttsr'] as num?) ?? 0.5).toDouble();
     ttsVoice = (j['ttsv'] as String?) ?? '';
     newsN = (j['newsn2'] as int?) ?? 0;
+    wallets = [
+      for (final e in ((j['wal'] as List?) ?? []))
+        Wallet.fromJson(Map<String, dynamic>.from(e as Map))
+    ];
+    wtx = [
+      for (final e in ((j['wtx'] as List?) ?? []))
+        WalletTx.fromJson(Map<String, dynamic>.from(e as Map))
+    ];
+    wdebts = [
+      for (final e in ((j['wdebt'] as List?) ?? []))
+        WalletDebt.fromJson(Map<String, dynamic>.from(e as Map))
+    ];
+    final ec = [for (final x in ((j['wecat'] as List?) ?? [])) x.toString()];
+    walletExpCats = ec.isEmpty ? List.of(defaultExpCats) : ec;
+    final ic = [for (final x in ((j['wicat'] as List?) ?? [])) x.toString()];
+    walletIncCats = ic.isEmpty ? List.of(defaultIncCats) : ic;
+    walletSel = (j['wsel'] ?? '').toString();
     if (j['rep'] is int) {
       repeatMode = ((j['rep'] as int).clamp(0, 2)).toInt();
       shuffleOn = (j['shuf'] as bool?) ?? false;
@@ -2486,6 +2503,12 @@ class AppStore extends ChangeNotifier {
         'ttsr': ttsRate,
         'ttsv': ttsVoice,
         'newsn2': newsN,
+        'wal': wallets.map((w) => w.toJson()).toList(),
+        'wtx': wtx.map((t) => t.toJson()).toList(),
+        'wdebt': wdebts.map((d) => d.toJson()).toList(),
+        'wecat': walletExpCats,
+        'wicat': walletIncCats,
+        'wsel': walletSel,
         'weather': {
           'on': wxOn,
           'city': wxCity,
@@ -2882,6 +2905,71 @@ class AppStore extends ChangeNotifier {
     _commit();
   }
 
+  // ----- Cüzdan -----
+  List<Wallet> wallets = [];
+  List<WalletTx> wtx = [];
+  List<WalletDebt> wdebts = [];
+  List<String> walletExpCats = List.of(defaultExpCats);
+  List<String> walletIncCats = List.of(defaultIncCats);
+  String walletSel = ''; // seçili cüzdan ('' = ilk, '*' = hepsi)
+
+  Wallet addWallet(String name) {
+    final w = Wallet(newId(), name.trim());
+    wallets.add(w);
+    walletSel = w.id;
+    _commit();
+    return w;
+  }
+
+  void renameWallet(Wallet w, String name) {
+    w.name = name.trim();
+    _commit();
+  }
+
+  void deleteWallet(Wallet w) {
+    wallets.remove(w);
+    wtx.removeWhere((t) => t.wid == w.id);
+    wdebts.removeWhere((d) => d.wid == w.id);
+    if (walletSel == w.id) walletSel = '';
+    _commit();
+  }
+
+  void selectWallet(String id) {
+    walletSel = id;
+    _commit();
+  }
+
+  void walletAddTx(WalletTx t) {
+    wtx.add(t);
+    _commit();
+  }
+
+  void walletRemoveTx(WalletTx t) {
+    wtx.remove(t);
+    _commit();
+  }
+
+  void walletSave() => _commit();
+
+  void walletAddDebt(WalletDebt d) {
+    wdebts.add(d);
+    _commit();
+  }
+
+  void walletRemoveDebt(WalletDebt d) {
+    wdebts.remove(d);
+    _commit();
+  }
+
+  void walletSetCats(bool income, List<String> l) {
+    if (income) {
+      walletIncCats = l;
+    } else {
+      walletExpCats = l;
+    }
+    _commit();
+  }
+
   int newNid() => nextNid++;
 
   /// Maddeye hatırlatma koy (ms=0 → kaldır)
@@ -3267,3 +3355,104 @@ class AppStore extends ChangeNotifier {
     _commit();
   }
 }
+
+// ---------------------------------------------------------------
+// CÜZDAN modelleri (tutarlar kuruş cinsinden tam sayı tutulur)
+// ---------------------------------------------------------------
+class Wallet {
+  final String id;
+  String name;
+  Wallet(this.id, this.name);
+  Map<String, dynamic> toJson() => {'id': id, 'n': name};
+  factory Wallet.fromJson(Map<String, dynamic> j) =>
+      Wallet(j['id'].toString(), (j['n'] ?? '').toString());
+}
+
+/// Harcama / gelir kaydı. pay: 0 peşin, 1 kredi kartı, 2 banka kartı
+class WalletTx {
+  final String id;
+  String wid;
+  int ms; // gün (yalnızca tarih)
+  int amount; // kuruş
+  bool income;
+  String cat;
+  int pay;
+  String note;
+  WalletTx(this.id, this.wid, this.ms, this.amount, this.income, this.cat,
+      this.pay, this.note);
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'w': wid,
+        'ms': ms,
+        'a': amount,
+        'in': income,
+        'c': cat,
+        'p': pay,
+        'n': note,
+      };
+  factory WalletTx.fromJson(Map<String, dynamic> j) => WalletTx(
+        j['id'].toString(),
+        (j['w'] ?? '').toString(),
+        (j['ms'] as num?)?.toInt() ?? 0,
+        (j['a'] as num?)?.toInt() ?? 0,
+        (j['in'] as bool?) ?? false,
+        (j['c'] ?? '').toString(),
+        (j['p'] as num?)?.toInt() ?? 0,
+        (j['n'] ?? '').toString(),
+      );
+}
+
+/// Borç (theirs=false: ben borçluyum) veya alacak (theirs=true: bana borçlu)
+class WalletDebt {
+  final String id;
+  String wid;
+  bool theirs;
+  String person;
+  int total; // kuruş
+  int ms; // tarih
+  int dueMs; // vade (0 = yok)
+  String note;
+  bool remind;
+  int nid;
+  List<List<int>> pays; // [ms, kuruş]
+  WalletDebt(this.id, this.wid, this.theirs, this.person, this.total, this.ms,
+      this.dueMs, this.note, this.remind, this.nid, this.pays);
+  int get paid => pays.fold<int>(0, (a, b) => a + b[1]);
+  int get left => total - paid < 0 ? 0 : total - paid;
+  bool get done => left <= 0;
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'w': wid,
+        't': theirs,
+        'who': person,
+        'a': total,
+        'ms': ms,
+        'due': dueMs,
+        'n': note,
+        'rem': remind,
+        'nid': nid,
+        'pays': pays,
+      };
+  factory WalletDebt.fromJson(Map<String, dynamic> j) => WalletDebt(
+        j['id'].toString(),
+        (j['w'] ?? '').toString(),
+        (j['t'] as bool?) ?? false,
+        (j['who'] ?? '').toString(),
+        (j['a'] as num?)?.toInt() ?? 0,
+        (j['ms'] as num?)?.toInt() ?? 0,
+        (j['due'] as num?)?.toInt() ?? 0,
+        (j['n'] ?? '').toString(),
+        (j['rem'] as bool?) ?? false,
+        (j['nid'] as num?)?.toInt() ?? 0,
+        [
+          for (final x in ((j['pays'] as List?) ?? []))
+            [(x as List)[0] as int, x[1] as int]
+        ],
+      );
+}
+
+const defaultExpCats = [
+  'Market', 'Yemek-kafe', 'Ulaşım', 'Akaryakıt', 'Fatura', 'Kira', 'Sağlık',
+  'Giyim', 'Eğlence', 'Eğitim', 'Diğer'
+];
+const defaultIncCats = ['Maaş', 'Ek gelir', 'Diğer'];

@@ -292,6 +292,10 @@ class NewsTab extends StatelessWidget {
         context: context,
         builder: (_) => _SrcDialog(src: s, catId: catId));
     if (r == null) return;
+    if (r.presets) {
+      if (context.mounted) await showNewsPresets(context);
+      return;
+    }
     store.saveNewsSrc(r.catId, s?.id, r.name, r.url);
   }
 
@@ -528,11 +532,6 @@ class NewsTab extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    tooltip: tx('Hazır kaynaklar'),
-                    onPressed: () => showNewsPresets(context),
-                    icon: const Icon(Icons.playlist_add_check_rounded),
-                  ),
-                  IconButton(
                     tooltip: tx('Ses ve hız'),
                     onPressed: () => showDialog<void>(
                         context: context,
@@ -758,7 +757,8 @@ class _SrcInput {
   final String catId;
   final String name;
   final String url;
-  _SrcInput(this.catId, this.name, this.url);
+  final bool presets; // "Hazır kaynaklardan ekle" seçildi
+  _SrcInput(this.catId, this.name, this.url, {this.presets = false});
 }
 
 class _SrcDialog extends StatefulWidget {
@@ -811,6 +811,18 @@ class _SrcDialogState extends State<_SrcDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (widget.src == null) ...[
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.tonalIcon(
+                  onPressed: () =>
+                      Navigator.pop(context, _SrcInput(_cat, '', '', presets: true)),
+                  icon: const Icon(Icons.playlist_add_check_rounded),
+                  label: Text(tx('Hazır kaynaklardan ekle')),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             TextField(
               controller: _name,
               decoration: InputDecoration(labelText: tx('Kaynak adı')),
