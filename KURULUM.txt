@@ -1,19 +1,16 @@
-DAILY ROUTINE v29.3 (1.25.3) - TAM PAKET
+DAILY ROUTINE v29.4 (1.25.4) - TAM PAKET
 
 Bu zipte projenin TAMAMI var: .github, assets, lib, debug.keystore, pubspec.yaml.
 1) Zipi çıkar. GitHub'da "gunluk" reposunun ANA sayfasında: Add file > Upload files.
 2) Çıkan klasörlerin ve dosyaların HEPSİNİ (.github, assets, lib, debug.keystore, pubspec.yaml) sürükle-bırak > Commit changes.
-   (Yeni dosya: lib/wallet.dart.)
+   (Yeni dosyalar: lib/wallet.dart, lib/prayer.dart.)
 3) Actions > yeşil tik > Artifacts > gunluk-apk indir, telefona kur (veriler kalır).
+Derleme hatası olursa Actions'taki kırmızı satırları gönder.
 
-v29.3 yenilikleri:
-- Cüzdan (Araçlar > Para): birden fazla cüzdan (Murat, Eymen...); Harcamalar | Borç | Alacak.
-  Harcama/gelir: kategori, ödeme şekli (peşin/kredi/banka), günlük-haftalık-aylık-yıllık özet ve dağılım.
-  Borç/alacak: kısmi ödeme, vade, vade günü bildirimi. Sağa kaydır = sil (Geri al), dokun = düzenle. Yedeğe dahildir.
-- Her sayfada en üstteyken aşağı çekip bırak = ana sayfa (kısa mesafe; pencere/yazı alanı/sıralamada kapalı).
-- Araçlar: Sağlık ve denge / Zaman ve sayaçlar / Para başlıkları beyaz şeritte siyah yazı; Hava durumu başlıksız tek araç.
-- Hava durumu: her başlığın sağında güncel değer (saatlikte bu saat, günlükte bugün); Deniz durumunda TAHMİNİ bayrak (resmi değildir).
-- Tekrar et: soru-cevap kartında soru görünür; diğer kartlarda içerik baştan görünür, Bilmiyorum kartı sona atar.
-- Online müzik: varsayılan 100 sonuç, Daha fazla +50 (Audius en çok 100, Jamendo 200).
-- Haber: Hazır kaynaklar artık "Kaynak ekle" penceresinde.
-- Ayarlar > Hakkında > Neler yapabilir? (simgeli açılır kartlar).
+v29.4 yenilikleri (v29.3 dahil):
+- Araçlar > Dini grubu: Zikirmatik + Kaza namazı (5 vakit, - / + ve elle giriş, negatif olabilir, toplam kalan).
+- Ayarlar > Araçlar: her araç için aç/kapa; kapalılar Araçlar menüsünde görünmez.
+- Ayarlar > Ana ekran: Hava durumunu göster / Namaz vakitlerini göster.
+- Ana ekran: hava durumunun altında namaz vakitleri (Aladhan, Diyanet yöntemi; konum = hava durumunda seçili yer; günlük saklanır).
+- Haber okuma çubuğunda önceki/sonraki haber ve kaynak düğmeleri (zaten vardı; Haberler sekmesinde okurken görünür).
+- v29.3: Cüzdan, her sayfada aşağı çek = ana sayfa, hava başlık değerleri + tahmini bayrak, Tekrar et düzeltmesi, online müzik 100/+50, Hazır kaynaklar Kaynak ekle'de, Hakkında > Neler yapabilir?

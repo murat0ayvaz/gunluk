@@ -7,6 +7,8 @@ import 'net.dart';
 import 'lock.dart';
 import 'notify.dart';
 import 'reminders.dart';
+import 'prayer.dart';
+import 'tools.dart' show toolList;
 import 'strings.dart';
 import 'theme.dart';
 import 'ui.dart';
@@ -128,6 +130,46 @@ class SettingsPage extends StatelessWidget {
           body: ListView(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
             children: [
+              sec(tx('Ana ekran'), [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: const Icon(Icons.wb_sunny_outlined),
+                  title: Text(tx('Hava durumunu göster')),
+                  subtitle:
+                      Text(tx('Ana ekranda seçili yerin havası gösterilir.')),
+                  value: store.wxOn,
+                  onChanged: (v) {
+                    store.setWxOn(v);
+                    if (v) weather.ensure();
+                  },
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: const Icon(Icons.mosque_rounded),
+                  title: Text(tx('Namaz vakitlerini göster')),
+                  subtitle: Text(tx('Hava durumunun altında; seçili yere göre (Diyanet yöntemi).')),
+                  value: store.prayOn,
+                  onChanged: (v) {
+                    store.setPrayOn(v);
+                    if (v) prayer.ensure();
+                  },
+                ),
+              ]),
+              sec(tx('Araçlar'), [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(tx('Seçtiklerin Araçlar menüsünde görünür.'),
+                      style: TextStyle(color: p.soft, fontSize: 13)),
+                ),
+                for (final t in toolList())
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    secondary: Icon(t.$3, color: t.$4),
+                    title: Text(t.$2),
+                    value: !store.hiddenTools.contains(t.$1),
+                    onChanged: (v) => store.setToolHidden(t.$1, !v),
+                  ),
+              ]),
               sec(tx('Dil'), [
               Wrap(spacing: 8, children: [
                 ChoiceChip(

@@ -1583,4 +1583,82 @@ const _en = <String, String>{
       'The wallet “{0}” and all its records will be deleted.',
   '“{0}” listeden kaldırılacak. Eski kayıtlar etkilenmez.':
       '“{0}” will be removed from the list. Existing records are not affected.',
+  'Sabah':
+      'Fajr',
+  'Öğle':
+      'Dhuhr',
+  'İkindi':
+      'Asr',
+  'Akşam':
+      'Maghrib',
+  'Yatsı':
+      'Isha',
+  'İmsak':
+      'Imsak',
+  'Güneş':
+      'Sunrise',
+  'Peşin':
+      'Cash',
+  'Kredi kartı':
+      'Credit card',
+  'Banka kartı':
+      'Debit card',
+  'Market':
+      'Groceries',
+  'Yemek-kafe':
+      'Food and cafe',
+  'Ulaşım':
+      'Transport',
+  'Akaryakıt':
+      'Fuel',
+  'Fatura':
+      'Bills',
+  'Kira':
+      'Rent',
+  'Sağlık':
+      'Health',
+  'Giyim':
+      'Clothing',
+  'Eğlence':
+      'Entertainment',
+  'Eğitim':
+      'Education',
+  'Maaş':
+      'Salary',
+  'Ek gelir':
+      'Extra income',
+  'Ana ekran':
+      'Home screen',
+  'Ana ekranda hava durumunun altında namaz vakitleri (Diyanet yöntemi, seçili yere göre). Ayarlar > Ana ekran bölümünden açılıp kapanır.':
+      'Prayer times under the weather on the home screen (Diyanet method, for the selected place). Switch them on or off in Settings > Home screen.',
+  'Ana ekranda hava durumunun altında namaz vakitleri gösterilebilir.':
+      'Prayer times can be shown under the weather on the home screen.',
+  'Ayarlar > Araçlar: hangi araçların Araçlar menüsünde görüneceğini seçebilirsin.':
+      'Settings > Tools: choose which tools appear in the Tools menu.',
+  'Ayarlar\'dan hangi araçların görüneceğini seçebilirsin.':
+      'You can choose in Settings which tools are shown.',
+  'Derleme hatalarına karşı kod taraması yapıldı.':
+      'The code was reviewed for build errors.',
+  'Dini: zikirmatik ve kaza namazı sayaçları.':
+      'Religious: dhikr counter and missed-prayer (qada) counters.',
+  'Haber okuma çubuğunda önceki / sonraki haber ve kaynak düğmeleri.':
+      'Previous / next item and source buttons in the news reading bar.',
+  'Hava durumunun altında; seçili yere göre (Diyanet yöntemi).':
+      'Under the weather; for the selected place (Diyanet method).',
+  'Kaza namazı':
+      'Missed prayers (Qada)',
+  'Kılmadığın namaz sayısını gir; kıldıkça − ile düş. Eksi sayı da girilebilir.':
+      'Enter the number of prayers you have not performed; subtract with − as you pray. Negative numbers are allowed.',
+  'Namaz vakitleri alınamadı. Dokun, yeniden dene.':
+      'Prayer times could not be loaded. Tap to retry.',
+  'Namaz vakitlerini göster':
+      'Show prayer times',
+  'Seçtiklerin Araçlar menüsünde görünür.':
+      'The ones you pick appear in the Tools menu.',
+  'Toplam kalan':
+      'Total remaining',
+  'Yeni: Dini grubu (Araçlar): Zikirmatik ve Kaza namazı. Kaza namazında her vakit için − / + ve elle sayı girişi; negatif değer de girilebilir.':
+      'New: Religious group (Tools): Dhikr counter and Missed prayers. Each prayer has − / + and manual entry; negative values are allowed.',
+  'Zaman ve sayaçlar: sayaç, pomodoro, kronometre, zamanlama (alarm ve başlatıcı).':
+      'Time and timers: timer, pomodoro, stopwatch, scheduling (alarm and launcher).',
 };

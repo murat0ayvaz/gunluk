@@ -46,12 +46,14 @@ String _groupTitle(String g) {
       return tx('Zaman ve sayaçlar');
     case 'para':
       return tx('Para');
+    case 'din':
+      return tx('Dini');
     default:
       return tx('Hava durumu');
   }
 }
 
-const _defaultGroupOrder = ['health', 'time', 'weather', 'para'];
+const _defaultGroupOrder = ['health', 'time', 'weather', 'para', 'din'];
 
 IconData _groupIcon(String g) {
   switch (g) {
@@ -61,6 +63,8 @@ IconData _groupIcon(String g) {
       return Icons.timer_rounded;
     case 'para':
       return Icons.account_balance_wallet_rounded;
+    case 'din':
+      return Icons.mosque_rounded;
     default:
       return Icons.wb_sunny_outlined;
   }
@@ -91,7 +95,10 @@ List<_ToolInfo> _allTools() => [
           group: 'time'),
       _ToolInfo('zikir', Icons.touch_app_outlined, tx('Zikirmatik'),
           const Color(0xFF2FB38A), () => const ZikirPage(),
-          group: 'time'),
+          group: 'din'),
+      _ToolInfo('kaza', Icons.event_repeat_rounded, tx('Kaza namazı'),
+          const Color(0xFF5C7CFA), () => const KazaPage(),
+          group: 'din'),
       _ToolInfo('zamanlama', Icons.alarm_rounded, tx('Zamanlama'),
           const Color(0xFF7E57C2), () => const ZamanlamaPage(),
           group: 'time'),
@@ -103,9 +110,15 @@ List<_ToolInfo> _allTools() => [
           group: 'para'),
     ];
 
+/// Ayarlar'daki araç seçimi için: (kimlik, ad, simge, renk)
+List<(String, String, IconData, Color)> toolList() =>
+    [for (final t in _allTools()) (t.id, t.name, t.icon, t.tone)];
+
 /// Kullanıcının sıralamasına göre gruplar ve içindeki araçlar
+/// (Ayarlar'da kapatılan araçlar ve boş kalan gruplar gizlenir)
 List<(String, List<_ToolInfo>)> _grouped() {
-  final all = _allTools();
+  final all =
+      _allTools().where((t) => !store.hiddenTools.contains(t.id)).toList();
   final gOrder = [
     ...store.toolGroupOrder.where(_defaultGroupOrder.contains),
     ..._defaultGroupOrder.where((g) => !store.toolGroupOrder.contains(g)),
@@ -117,11 +130,12 @@ List<(String, List<_ToolInfo>)> _grouped() {
 
   return [
     for (final g in gOrder)
-      (
-        g,
-        (all.where((t) => t.group == g).toList()
-          ..sort((a, b) => rank(a).compareTo(rank(b))))
-      ),
+      if (all.any((t) => t.group == g))
+        (
+          g,
+          (all.where((t) => t.group == g).toList()
+            ..sort((a, b) => rank(a).compareTo(rank(b))))
+        ),
   ];
 }
 
@@ -2836,6 +2850,143 @@ class _MeditatePageState extends State<MeditatePage>
               ),
             ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------
+// KAZA NAMAZI: her vakit için kalan sayı; − ile düşer, + ile artar.
+// Sayı elle de girilebilir; negatif değerler de kabul edilir.
+// ---------------------------------------------------------------
+class KazaPage extends StatefulWidget {
+  const KazaPage({super.key});
+
+  @override
+  State<KazaPage> createState() => _KazaPageState();
+}
+
+class _KazaPageState extends State<KazaPage> {
+  static const _names = ['Sabah', 'Öğle', 'İkindi', 'Akşam', 'Yatsı'];
+  late final List<TextEditingController> _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = [for (final v in store.kaza) TextEditingController(text: '$v')];
+  }
+
+  @override
+  void dispose() {
+    for (final c in _c) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _set(int i, int v) {
+    final x = v.clamp(-999999, 999999).toInt();
+    store.setKaza(i, x);
+    _c[i].text = '$x';
+    _c[i].selection = TextSelection.collapsed(offset: _c[i].text.length);
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palOf(context);
+    final total = store.kaza.fold<int>(0, (a, b) => a + b);
+    return _page(
+      context,
+      tx('Kaza namazı'),
+      ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        children: [
+          Text(
+              tx('Kılmadığın namaz sayısını gir; kıldıkça − ile düş. Eksi sayı da girilebilir.'),
+              style: TextStyle(color: p.soft, height: 1.4)),
+          const SizedBox(height: 14),
+          for (var i = 0; i < 5; i++)
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+              decoration: BoxDecoration(
+                color: p.card,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: p.line),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(tx(_names[i]),
+                        style: TextStyle(
+                            color: p.ink,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 17)),
+                  ),
+                  IconButton.filledTonal(
+                    onPressed: () => _set(i, store.kaza[i] - 1),
+                    icon: const Icon(Icons.remove_rounded),
+                  ),
+                  SizedBox(
+                    width: 84,
+                    child: TextField(
+                      controller: _c[i],
+                      textAlign: TextAlign.center,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          signed: true, decimal: false),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[-0-9]')),
+                        LengthLimitingTextInputFormatter(7),
+                      ],
+                      style: const TextStyle(
+                          fontSize: 20, fontWeight: FontWeight.w800),
+                      decoration: const InputDecoration(
+                          border: InputBorder.none, isDense: true),
+                      onChanged: (s) {
+                        final v = int.tryParse(s);
+                        if (v == null) return; // boş veya yalnız "-": yazılmaya devam
+                        store.setKaza(i, v);
+                        setState(() {});
+                      },
+                      onEditingComplete: () {
+                        _set(i, int.tryParse(_c[i].text) ?? 0);
+                        FocusScope.of(context).unfocus();
+                      },
+                    ),
+                  ),
+                  IconButton.filledTonal(
+                    onPressed: () => _set(i, store.kaza[i] + 1),
+                    icon: const Icon(Icons.add_rounded),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: p.accent.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(tx('Toplam kalan'),
+                      style: TextStyle(
+                          color: p.ink,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 17)),
+                ),
+                Text('$total',
+                    style: TextStyle(
+                        color: p.ink,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 24)),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

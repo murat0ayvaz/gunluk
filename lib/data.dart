@@ -2272,6 +2272,13 @@ class AppStore extends ChangeNotifier {
     ttsRate = ((j['ttsr'] as num?) ?? 0.5).toDouble();
     ttsVoice = (j['ttsv'] as String?) ?? '';
     newsN = (j['newsn2'] as int?) ?? 0;
+    hiddenTools = {for (final x in ((j['thid'] as List?) ?? [])) x.toString()};
+    final kz = [for (final x in ((j['kaza'] as List?) ?? [])) (x as num).toInt()];
+    kaza = [for (var i = 0; i < 5; i++) i < kz.length ? kz[i] : 0];
+    prayOn = (j['prayon'] as bool?) ?? true;
+    prayCache = j['praycache'] is Map
+        ? Map<String, dynamic>.from(j['praycache'] as Map)
+        : {};
     wallets = [
       for (final e in ((j['wal'] as List?) ?? []))
         Wallet.fromJson(Map<String, dynamic>.from(e as Map))
@@ -2503,6 +2510,10 @@ class AppStore extends ChangeNotifier {
         'ttsr': ttsRate,
         'ttsv': ttsVoice,
         'newsn2': newsN,
+        'thid': hiddenTools.toList(),
+        'kaza': kaza,
+        'prayon': prayOn,
+        'praycache': prayCache,
         'wal': wallets.map((w) => w.toJson()).toList(),
         'wtx': wtx.map((t) => t.toJson()).toList(),
         'wdebt': wdebts.map((d) => d.toJson()).toList(),
@@ -2903,6 +2914,37 @@ class AppStore extends ChangeNotifier {
     }
     todos = out;
     _commit();
+  }
+
+  // ----- Araç seçimi, kaza namazı, namaz vakitleri -----
+  Set<String> hiddenTools = {}; // Araçlar menüsünde gizlenen araçlar
+  List<int> kaza = [0, 0, 0, 0, 0]; // sabah, öğle, ikindi, akşam, yatsı (negatif olabilir)
+  bool prayOn = true; // ana ekranda namaz vakitleri
+  Map<String, dynamic> prayCache = {}; // {'d': gün, 'k': konum, 't': [6 saat]}
+
+  void setToolHidden(String id, bool hidden) {
+    if (hidden) {
+      hiddenTools.add(id);
+    } else {
+      hiddenTools.remove(id);
+    }
+    _commit();
+  }
+
+  void setKaza(int i, int v) {
+    if (i < 0 || i >= kaza.length) return;
+    kaza[i] = v;
+    _commit();
+  }
+
+  void setPrayOn(bool v) {
+    prayOn = v;
+    _commit();
+  }
+
+  void setPrayCache(Map<String, dynamic> c) {
+    prayCache = c;
+    _persist();
   }
 
   // ----- Cüzdan -----

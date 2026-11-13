@@ -697,6 +697,7 @@ class _PullHomeState extends State<PullHome> {
     return NotificationListener<ScrollNotification>(
       onNotification: _onScroll,
       child: Stack(
+        fit: StackFit.expand,
         children: [
           widget.child,
           Positioned(
@@ -715,7 +716,7 @@ class _PullHomeState extends State<PullHome> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 14, vertical: 8),
                             decoration: BoxDecoration(
-                              color: p.dark,
+                              color: const Color(0xFF2E3238),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Row(

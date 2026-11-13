@@ -17,6 +17,7 @@ import 'strings.dart';
 import 'theme.dart';
 import 'todos.dart';
 import 'ui.dart';
+import 'prayer.dart';
 import 'weather.dart';
 
 // ---------------------------------------------------------------
@@ -126,6 +127,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && mounted) {
       weather.ensure(); // 30 dakikadan eskiyse yeniler
+      prayer.ensure(); // gün değiştiyse namaz vakitleri
       store.rollTodos(); // gün değişmiş olabilir
       setState(() {});
     }
@@ -784,6 +786,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               // Saatlik hava: simgeye basınca aşağı doğru açılır
               if (_wxOpen && store.wxOn)
                 WxPanel(key: ValueKey('wx_$date'), date: date),
+              // Namaz vakitleri (Ayarlar > Ana ekran'dan açılıp kapanır)
+              if (store.prayOn) const PrayerBar(),
               Expanded(child: body),
             ],
           ),

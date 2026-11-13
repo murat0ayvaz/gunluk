@@ -10,14 +10,11 @@ import 'version.dart';
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
       tx('Verilerin korundu.'),
-      tx('Yeni: Cüzdan (Araçlar > Para). Birden fazla cüzdan; harcama, gelir, borç ve alacak takibi; günlük / haftalık / aylık / yıllık özet.'),
-      tx('Her sayfada en üstteyken aşağı çekip bırakınca ana sayfaya dönersin (çekme mesafesi kısaldı).'),
-      tx('Hava durumu: her başlığın sağında güncel değer; deniz durumunda tahmini bayrak.'),
-      tx('Tekrar et: soru-cevap kartlarında soru görünür; diğerlerinde içerik baştan görünür.'),
-      tx('Online müzik: varsayılan 100 sonuç, Daha fazla +50.'),
-      tx('Haber: Hazır kaynaklar artık Kaynak ekle penceresinde.'),
-      tx('Araçlar: beyaz şeritli grup başlıkları, Para grubu.'),
-      tx('Ayarlar > Hakkında > Neler yapabilir? bölümü eklendi.'),
+      tx('Yeni: Dini grubu (Araçlar): Zikirmatik ve Kaza namazı. Kaza namazında her vakit için − / + ve elle sayı girişi; negatif değer de girilebilir.'),
+      tx('Ana ekranda hava durumunun altında namaz vakitleri (Diyanet yöntemi, seçili yere göre). Ayarlar > Ana ekran bölümünden açılıp kapanır.'),
+      tx('Ayarlar > Araçlar: hangi araçların Araçlar menüsünde görüneceğini seçebilirsin.'),
+      tx('Haber okuma çubuğunda önceki / sonraki haber ve kaynak düğmeleri.'),
+      tx('Derleme hatalarına karşı kod taraması yapıldı.'),
     ];
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {
   return showDialog<void>(
@@ -115,6 +112,7 @@ class FeaturesPage extends StatelessWidget {
             tx('Saatlik ve günlük tahmin tek sayfada; bölümleri sıralayabilirsin.'),
             tx('Konumunu ve favori yerlerini seç; ana ekran seçili yeri gösterir.'),
             tx('Deniz durumunda dalga ve rüzgara göre tahmini bayrak rengi görürsün.'),
+            tx('Ana ekranda hava durumunun altında namaz vakitleri gösterilebilir.'),
           ]
         ),
         (
@@ -123,7 +121,9 @@ class FeaturesPage extends StatelessWidget {
           tx('Araçlar'),
           [
             tx('Sağlık ve denge: meditasyon, nefes, su sayacı.'),
-            tx('Zaman ve sayaçlar: sayaç, pomodoro, kronometre, zikirmatik, zamanlama (alarm ve başlatıcı).'),
+            tx('Zaman ve sayaçlar: sayaç, pomodoro, kronometre, zamanlama (alarm ve başlatıcı).'),
+            tx('Dini: zikirmatik ve kaza namazı sayaçları.'),
+            tx('Ayarlar\'dan hangi araçların görüneceğini seçebilirsin.'),
             tx('Grupları açıp kapatabilir, sıralayabilirsin.'),
           ]
         ),
