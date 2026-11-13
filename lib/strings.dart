@@ -1661,4 +1661,72 @@ const _en = <String, String>{
       'New: Religious group (Tools): Dhikr counter and Missed prayers. Each prayer has − / + and manual entry; negative values are allowed.',
   'Zaman ve sayaçlar: sayaç, pomodoro, kronometre, zamanlama (alarm ve başlatıcı).':
       'Time and timers: timer, pomodoro, stopwatch, scheduling (alarm and launcher).',
+  'Araçlar: Para başlığı kalktı, Cüzdan tek araç. Ayarlar > Hakkında altında Kullanım şartları; Ayarlar\'daki Tanıtım bölümü kaldırıldı.':
+      'Tools: the Money heading is gone and Wallet is a single tool. Terms of use added under Settings > About; the Intro section in Settings was removed.',
+  'Ayarlar > Ana ekran: hava ve namaz vakitleri için ayrı ayrı Üst bar veya Sol sütun seçimi; kartlar yuvarlak ve aralıklar eşit.':
+      'Settings > Home screen: choose Top bar or Left column separately for weather and prayer times; cards are rounded and spacing is even.',
+  'Aşağı çekince ana sayfaya dönüşte yazı yerine dönen yuvarlak gösterge.':
+      'Pulling down to go home now shows a spinning circle instead of text.',
+  'Bu soru ne ölçüyor?':
+      'What does this question measure?',
+  'Bugün / yarın için yoğun yağış, fırtına, aşırı sıcak-soğuk gibi uyarılar.':
+      'Warnings for today / tomorrow such as heavy rain, storms, extreme heat or cold.',
+  'Bunlar tahmin verisinden çıkarılan işaretlerdir, resmî uyarı değildir.':
+      'These are signs derived from forecast data, not official warnings.',
+  'Cüzdan özeti':
+      'Wallet summary',
+  'Ders çalışma: her LGS dersinde Soru kalıpları (soru tipi, ne ölçtüğü, nelere bakılacağı, tuzaklar, çözüm adımları).':
+      'Study: Question patterns in every LGS subject (question type, what it measures, what to look for, traps, solution steps).',
+  'Dondurucu soğuk (en düşük {0})':
+      'Freezing cold (low {0})',
+  'Gök gürültülü fırtına bekleniyor':
+      'Thunderstorm expected',
+  'Hava durumu: hava simgesine dokununca bar açılır ve sabit kalır; ok kalktı. Bugün / yarın için sert hava uyarıları (tahmin verisinden).':
+      'Weather: tapping the weather icon opens the bar and keeps it; the arrow is gone. Severe weather warnings for today / tomorrow (from forecast data).',
+  'Hava uyarıları':
+      'Weather warnings',
+  'Kar yağışı bekleniyor':
+      'Snowfall expected',
+  'Kullanım şartları':
+      'Terms of use',
+  'LGS’de sık çıkan soru tipleri. Her kalıbın sorusunu, ne ölçtüğünü, nelere bakman gerektiğini, tuzaklarını ve çözüm adımlarını oku. Bu notlar genel bilgidir; resmî kaynaklarla tek tek doğrulanmamıştır.':
+      'Question types that often appear in the LGS. Read each pattern: the question, what it measures, what to look for, its traps and solution steps. These notes are general information and have not been verified one by one against official sources.',
+  'Maddi gelir sağlanmamaktadır.':
+      'No financial income is made.',
+  'Resmî uyarılar (MGM)':
+      'Official warnings (MGM)',
+  'Seçili yere göre (Diyanet yöntemi). Hava simgesine dokununca açılır.':
+      'For the selected place (Diyanet method). Opens when you tap the weather icon.',
+  'Sol sütun':
+      'Left column',
+  'Soldaki menüde Cüzdan (tüm harcamaların özeti) ve açılır Kategoriler.':
+      'In the left menu: Wallet (summary of all expenses) and collapsible Categories.',
+  'Soru kalıpları':
+      'Question patterns',
+  'Soru kalıpları: LGS derslerinde sık çıkan soru tipleri ve çözüm yolları.':
+      'Question patterns: common question types in LGS subjects and how to solve them.',
+  'Soru kökü':
+      'Question stem',
+  'Soruda ne aramalıyız?':
+      'What should we look for in the question?',
+  'Ticari amacı yoktur.':
+      'It has no commercial purpose.',
+  'Tuzaklar / olmaması gerekenler':
+      'Traps / what should not be there',
+  'Yoğun yağış bekleniyor':
+      'Heavy rain expected',
+  '{0} soru tipi ve nasıl çözülür':
+      '{0} question types and how to solve them',
+  'Çok sıcak (en yüksek {0})':
+      'Very hot (high {0})',
+  'Çözüm adımları':
+      'Solution steps',
+  'Örnek':
+      'Example',
+  'Üst bar':
+      'Top bar',
+  'İnsana fayda amaçlanmıştır.':
+      'It is intended to benefit people.',
+  '“Hayır duası” ya da “kamuya hayrı olan bir kuruma bağış” karşılığında helaldir.':
+      'It is halal in return for a “prayer of goodwill” or a “donation to an institution that benefits the public”.',
 };

@@ -143,17 +143,49 @@ class SettingsPage extends StatelessWidget {
                     if (v) weather.ensure();
                   },
                 ),
+                if (store.wxOn)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 8),
+                    child: Wrap(spacing: 8, children: [
+                      ChoiceChip(
+                        label: Text(tx('Üst bar')),
+                        selected: store.wxPlace == 0,
+                        onSelected: (_) => store.setWxPlace(0),
+                      ),
+                      ChoiceChip(
+                        label: Text(tx('Sol sütun')),
+                        selected: store.wxPlace == 1,
+                        onSelected: (_) => store.setWxPlace(1),
+                      ),
+                    ]),
+                  ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   secondary: const Icon(Icons.mosque_rounded),
                   title: Text(tx('Namaz vakitlerini göster')),
-                  subtitle: Text(tx('Hava durumunun altında; seçili yere göre (Diyanet yöntemi).')),
+                  subtitle: Text(tx('Seçili yere göre (Diyanet yöntemi). Hava simgesine dokununca açılır.')),
                   value: store.prayOn,
                   onChanged: (v) {
                     store.setPrayOn(v);
                     if (v) prayer.ensure();
                   },
                 ),
+                if (store.prayOn)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 8),
+                    child: Wrap(spacing: 8, children: [
+                      ChoiceChip(
+                        label: Text(tx('Üst bar')),
+                        selected: store.prayPlace == 0,
+                        onSelected: (_) => store.setPrayPlace(0),
+                      ),
+                      ChoiceChip(
+                        label: Text(tx('Sol sütun')),
+                        selected: store.prayPlace == 1,
+                        onSelected: (_) => store.setPrayPlace(1),
+                      ),
+                    ]),
+                  ),
               ]),
               sec(tx('Araçlar'), [
                 Padding(
@@ -368,19 +400,6 @@ class SettingsPage extends StatelessWidget {
                 ),
               ]),
               ]),
-              sec(tx('Tanıtım'), [
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.help_outline_rounded),
-                title: Text(tx('Tanıtımı göster')),
-                onTap: () {
-                  Navigator.of(context).push(MaterialPageRoute<void>(
-                    builder: (ctx) =>
-                        IntroPage(onDone: () => Navigator.pop(ctx)),
-                  ));
-                },
-              ),
-              ]),
               sec(tx('Hakkında'), [
               ListTile(
                 contentPadding: EdgeInsets.zero,
@@ -403,6 +422,36 @@ class SettingsPage extends StatelessWidget {
                 trailing: Text('$appVersion ($appBuild)',
                     style: TextStyle(color: p.soft)),
               ),
+              ]),
+              sec(tx('Kullanım şartları'), [
+                for (final line in [
+                  tx('Ticari amacı yoktur.'),
+                  tx('Maddi gelir sağlanmamaktadır.'),
+                  tx('İnsana fayda amaçlanmıştır.'),
+                  tx('“Hayır duası” ya da “kamuya hayrı olan bir kuruma bağış” karşılığında helaldir.'),
+                ])
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 7, right: 10),
+                          child: Container(
+                            width: 7,
+                            height: 7,
+                            decoration: BoxDecoration(
+                                color: p.accent, shape: BoxShape.circle),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(line,
+                              style: TextStyle(
+                                  color: p.ink, fontSize: 14.5, height: 1.4)),
+                        ),
+                      ],
+                    ),
+                  ),
               ]),
             ],
           ),

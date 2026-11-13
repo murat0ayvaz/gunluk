@@ -2276,6 +2276,8 @@ class AppStore extends ChangeNotifier {
     final kz = [for (final x in ((j['kaza'] as List?) ?? [])) (x as num).toInt()];
     kaza = [for (var i = 0; i < 5; i++) i < kz.length ? kz[i] : 0];
     prayOn = (j['prayon'] as bool?) ?? true;
+    wxPlace = (j['wxpl'] as int?) == 1 ? 1 : 0;
+    prayPlace = (j['prpl'] as int?) == 1 ? 1 : 0;
     prayCache = j['praycache'] is Map
         ? Map<String, dynamic>.from(j['praycache'] as Map)
         : {};
@@ -2513,6 +2515,8 @@ class AppStore extends ChangeNotifier {
         'thid': hiddenTools.toList(),
         'kaza': kaza,
         'prayon': prayOn,
+        'wxpl': wxPlace,
+        'prpl': prayPlace,
         'praycache': prayCache,
         'wal': wallets.map((w) => w.toJson()).toList(),
         'wtx': wtx.map((t) => t.toJson()).toList(),
@@ -2920,6 +2924,8 @@ class AppStore extends ChangeNotifier {
   Set<String> hiddenTools = {}; // Araçlar menüsünde gizlenen araçlar
   List<int> kaza = [0, 0, 0, 0, 0]; // sabah, öğle, ikindi, akşam, yatsı (negatif olabilir)
   bool prayOn = true; // ana ekranda namaz vakitleri
+  int wxPlace = 0; // hava: 0 üst bar, 1 sol sütun
+  int prayPlace = 0; // namaz vakitleri: 0 üst bar, 1 sol sütun
   Map<String, dynamic> prayCache = {}; // {'d': gün, 'k': konum, 't': [6 saat]}
 
   void setToolHidden(String id, bool hidden) {
@@ -2934,6 +2940,16 @@ class AppStore extends ChangeNotifier {
   void setKaza(int i, int v) {
     if (i < 0 || i >= kaza.length) return;
     kaza[i] = v;
+    _commit();
+  }
+
+  void setWxPlace(int v) {
+    wxPlace = v == 1 ? 1 : 0;
+    _commit();
+  }
+
+  void setPrayPlace(int v) {
+    prayPlace = v == 1 ? 1 : 0;
     _commit();
   }
 

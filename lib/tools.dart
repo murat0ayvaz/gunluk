@@ -240,7 +240,7 @@ class _ToolsDrawerState extends State<ToolsDrawer> {
 
   Widget _groupHeader(Pal p, String g, int i, int n) {
     // Hava durumu tek araç: başlıksız (yalnız sıralama kipinde görünür)
-    if (g == 'weather' && !_edit) return const SizedBox(height: 4);
+    if ((g == 'weather' || g == 'para') && !_edit) return const SizedBox(height: 4);
     final closed = _closedGroups.contains(g) && !_edit;
     const black = Color(0xFF111111);
     return Padding(
@@ -388,6 +388,7 @@ class _ToolsDrawerState extends State<ToolsDrawer> {
                             ],
                           )
                         else if (groups[gi].$1 == 'weather' ||
+                            groups[gi].$1 == 'para' ||
                             !_closedGroups.contains(groups[gi].$1))
                           for (final t in groups[gi].$2) _tile(p, t),
                       ],

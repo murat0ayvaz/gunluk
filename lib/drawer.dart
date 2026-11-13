@@ -7,6 +7,7 @@ import 'stats.dart';
 import 'strings.dart';
 import 'ui.dart';
 import 'version.dart';
+import 'wallet.dart';
 
 // ---------------------------------------------------------------
 // SOLDAKİ MENÜ (Your Book): verileri topluca görmek için
@@ -65,12 +66,24 @@ class AppDrawer extends StatelessWidget {
                               builder: (_) => const DiaryCalendarPage()));
                         },
                       ),
-                      Divider(color: p.line),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
-                        child: Text(tx('Kategoriler'),
-                            style: TextStyle(color: p.soft, fontSize: 13)),
+                      ListTile(
+                        leading: const Icon(Icons.account_balance_wallet_rounded),
+                        title: Text(tx('Cüzdan')),
+                        onTap: () {
+                          nav.pop();
+                          nav.push(MaterialPageRoute<void>(
+                              builder: (_) => const WalletPage(stats: true)));
+                        },
                       ),
+                      Divider(color: p.line),
+                      ExpansionTile(
+                        shape: const Border(),
+                        collapsedShape: const Border(),
+                        initiallyExpanded: false,
+                        leading: const Icon(Icons.category_outlined),
+                        title: Text(tx('Kategoriler'),
+                            style: const TextStyle(fontWeight: FontWeight.w700)),
+                        children: [
                       for (final c in store.cats)
                         ExpansionTile(
                           shape: const Border(),
@@ -107,6 +120,8 @@ class AppDrawer extends StatelessWidget {
                               tx('Henüz kategori yok. “Kategorileri düzenle” veya Ekle ile oluşturabilirsin.'),
                               style: TextStyle(color: p.soft)),
                         ),
+                        ],
+                      ),
                     ],
                   ),
                 ),

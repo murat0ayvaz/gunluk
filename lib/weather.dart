@@ -3,6 +3,8 @@ import 'package:geolocator/geolocator.dart';
 import 'data.dart';
 import 'net.dart';
 import 'strings.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'theme.dart' show Pal;
 import 'ui.dart';
 
 // ---------------------------------------------------------------
@@ -243,12 +245,15 @@ class WxChip extends StatelessWidget {
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600,
                         color: p.ink)),
-                Icon(
-                    open
-                        ? Icons.expand_less_rounded
-                        : Icons.expand_more_rounded,
-                    size: 16,
-                    color: p.soft),
+                if (wxAlerts(d).isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 3),
+                    child: Icon(Icons.warning_amber_rounded,
+                        size: 17,
+                        color: wxAlerts(d).any((a) => a.level >= 2)
+                            ? const Color(0xFFD1495B)
+                            : const Color(0xFFE8883A)),
+                  ),
               ],
             ),
           ),
@@ -302,16 +307,20 @@ class _WxPanelState extends State<WxPanel> {
         final day = d.days[widget.date];
         final nowHr = DateTime.now().hour;
         final today = _isToday(widget.date);
+        final alerts = wxAlerts(d);
         return Container(
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
           decoration: BoxDecoration(
             color: p.card,
-            border: Border(bottom: BorderSide(color: p.line)),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: p.line),
           ),
-          padding: const EdgeInsets.only(top: 8, bottom: 8),
+          padding: const EdgeInsets.only(top: 10, bottom: 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (alerts.isNotEmpty) wxAlertRows(context, p, alerts),
               if (day != null)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
@@ -515,6 +524,261 @@ class _CityDialogState extends State<_CityDialog> {
         TextButton(
             onPressed: () => Navigator.pop(context), child: Text(tx('Kapat'))),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------
+// HAVA UYARILARI: tahmin verisinden bugün / yarın için sert hava işaretleri.
+// Resmî uyarı DEĞİLDİR (resmî uyarılar için Meteoroloji bağlantısı verilir).
+// ---------------------------------------------------------------
+class WxAlert {
+  final int level; // 1 dikkat, 2 uyarı
+  final String text;
+  final String when;
+  const WxAlert(this.level, this.text, this.when);
+}
+
+String _hh(int h) => '${h.toString().padLeft(2, '0')}:00';
+
+List<WxAlert> wxAlerts(WeatherData d) {
+  final out = <WxAlert>[];
+  final now = DateTime.now();
+  for (var k = 0; k < 2; k++) {
+    final day = DateTime(now.year, now.month, now.day + k);
+    final key = dKey(day);
+    final label = k == 0 ? tx('Bugün') : tx('Yarın');
+    final hours = d.hours[key] ?? const <HourW>[];
+    final from = k == 0 ? now.hour : 0;
+
+    String span(List<int> hs) =>
+        hs.length == 1 ? _hh(hs.first) : '${_hh(hs.first)}-${_hh(hs.last + 1 > 23 ? 23 : hs.last + 1)}';
+
+    final heavy = <int>[];
+    var maxMm = 0.0;
+    final storm = <int>[];
+    final snow = <int>[];
+    for (final h in hours) {
+      if (h.hour < from) continue;
+      if (h.mm >= 4 || (h.rain >= 70 && h.mm >= 2)) {
+        heavy.add(h.hour);
+        if (h.mm > maxMm) maxMm = h.mm;
+      }
+      if (h.code == 95 || h.code == 96 || h.code == 99) storm.add(h.hour);
+      if ((h.code >= 71 && h.code <= 77) || h.code == 85 || h.code == 86) {
+        snow.add(h.hour);
+      }
+    }
+    if (heavy.isNotEmpty) {
+      out.add(WxAlert(maxMm >= 10 ? 2 : 1, tx('Yoğun yağış bekleniyor'),
+          '$label ${span(heavy)}'));
+    }
+    if (storm.isNotEmpty) {
+      out.add(WxAlert(2, tx('Gök gürültülü fırtına bekleniyor'),
+          '$label ${span(storm)}'));
+    }
+    if (snow.isNotEmpty) {
+      out.add(WxAlert(1, tx('Kar yağışı bekleniyor'), '$label ${span(snow)}'));
+    }
+    final dd = d.days[key];
+    if (dd != null) {
+      if (dd.tmax >= 35) {
+        out.add(WxAlert(dd.tmax >= 40 ? 2 : 1,
+            tx('Çok sıcak (en yüksek {0})', [_deg(dd.tmax)]), label));
+      }
+      if (dd.tmin <= 0) {
+        out.add(WxAlert(dd.tmin <= -5 ? 2 : 1,
+            tx('Dondurucu soğuk (en düşük {0})', [_deg(dd.tmin)]), label));
+      }
+    }
+  }
+  return out;
+}
+
+Future<void> _openMgm() async {
+  try {
+    await launchUrl(Uri.parse('https://www.mgm.gov.tr/meteouyari/turkiye.aspx'),
+        mode: LaunchMode.externalApplication);
+  } catch (_) {}
+}
+
+void showWxAlerts(BuildContext context, List<WxAlert> al) {
+  showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(tx('Hava uyarıları')),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final a in al)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.warning_amber_rounded,
+                      size: 20,
+                      color: a.level >= 2
+                          ? const Color(0xFFD1495B)
+                          : const Color(0xFFE8883A)),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text('${a.when}: ${a.text}')),
+                ],
+              ),
+            ),
+          const SizedBox(height: 4),
+          Text(
+              tx('Bunlar tahmin verisinden çıkarılan işaretlerdir, resmî uyarı değildir.'),
+              style: const TextStyle(fontSize: 12.5)),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: _openMgm, child: Text(tx('Resmî uyarılar (MGM)'))),
+        TextButton(
+            onPressed: () => Navigator.pop(ctx), child: Text(tx('Tamam'))),
+      ],
+    ),
+  );
+}
+
+Widget wxAlertRows(BuildContext context, Pal p, List<WxAlert> al) {
+  return InkWell(
+    onTap: () => showWxAlerts(context, al),
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final a in al)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 3),
+              child: Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded,
+                      size: 18,
+                      color: a.level >= 2
+                          ? const Color(0xFFD1495B)
+                          : const Color(0xFFE8883A)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text('${a.when}: ${a.text}',
+                        style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: p.ink)),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
+}
+
+// ---------------------------------------------------------------
+// Sol sütun: saatlik hava dikey (ana ekranın solunda dar sütun)
+// ---------------------------------------------------------------
+class WxSide extends StatefulWidget {
+  final String date;
+  const WxSide({super.key, required this.date});
+
+  @override
+  State<WxSide> createState() => _WxSideState();
+}
+
+class _WxSideState extends State<WxSide> {
+  static const double _cell = 66;
+  late final ScrollController _sc;
+
+  @override
+  void initState() {
+    super.initState();
+    final hr = _isToday(widget.date) ? DateTime.now().hour - 1 : 6;
+    _sc = ScrollController(initialScrollOffset: (hr < 0 ? 0 : hr) * _cell);
+  }
+
+  @override
+  void dispose() {
+    _sc.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palOf(context);
+    return ListenableBuilder(
+      listenable: weather,
+      builder: (context, _) {
+        final d = weather.data;
+        final hours = d?.hours[widget.date];
+        if (d == null || hours == null || hours.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        final alerts = wxAlerts(d);
+        final nowHr = DateTime.now().hour;
+        final today = _isToday(widget.date);
+        return Container(
+          width: 68,
+          margin: const EdgeInsets.fromLTRB(8, 0, 0, 10),
+          decoration: BoxDecoration(
+            color: p.card,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: p.line),
+          ),
+          child: Column(
+            children: [
+              if (alerts.isNotEmpty)
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => showWxAlerts(context, alerts),
+                  icon: Icon(Icons.warning_amber_rounded,
+                      color: alerts.any((a) => a.level >= 2)
+                          ? const Color(0xFFD1495B)
+                          : const Color(0xFFE8883A)),
+                ),
+              Expanded(
+                child: ListView.builder(
+                  controller: _sc,
+                  itemExtent: _cell,
+                  itemCount: hours.length,
+                  itemBuilder: (context, i) {
+                    final h = hours[i];
+                    final isNow = today && h.hour == nowHr;
+                    return Container(
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isNow ? p.bg : null,
+                        borderRadius: BorderRadius.circular(10),
+                        border: isNow ? Border.all(color: p.line) : null,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(_hh(h.hour),
+                              style: TextStyle(fontSize: 11, color: p.soft)),
+                          Icon(
+                              wxIcon(h.code,
+                                  night: h.hour < 6 || h.hour >= 20),
+                              size: 20,
+                              color: wxColor(h.code)),
+                          Text(_deg(h.temp),
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: p.ink)),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

@@ -10,11 +10,12 @@ import 'version.dart';
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
       tx('Verilerin korundu.'),
-      tx('Yeni: Dini grubu (Araçlar): Zikirmatik ve Kaza namazı. Kaza namazında her vakit için − / + ve elle sayı girişi; negatif değer de girilebilir.'),
-      tx('Ana ekranda hava durumunun altında namaz vakitleri (Diyanet yöntemi, seçili yere göre). Ayarlar > Ana ekran bölümünden açılıp kapanır.'),
-      tx('Ayarlar > Araçlar: hangi araçların Araçlar menüsünde görüneceğini seçebilirsin.'),
-      tx('Haber okuma çubuğunda önceki / sonraki haber ve kaynak düğmeleri.'),
-      tx('Derleme hatalarına karşı kod taraması yapıldı.'),
+      tx('Ders çalışma: her LGS dersinde Soru kalıpları (soru tipi, ne ölçtüğü, nelere bakılacağı, tuzaklar, çözüm adımları).'),
+      tx('Hava durumu: hava simgesine dokununca bar açılır ve sabit kalır; ok kalktı. Bugün / yarın için sert hava uyarıları (tahmin verisinden).'),
+      tx('Ayarlar > Ana ekran: hava ve namaz vakitleri için ayrı ayrı Üst bar veya Sol sütun seçimi; kartlar yuvarlak ve aralıklar eşit.'),
+      tx('Aşağı çekince ana sayfaya dönüşte yazı yerine dönen yuvarlak gösterge.'),
+      tx('Soldaki menüde Cüzdan (tüm harcamaların özeti) ve açılır Kategoriler.'),
+      tx('Araçlar: Para başlığı kalktı, Cüzdan tek araç. Ayarlar > Hakkında altında Kullanım şartları; Ayarlar\'daki Tanıtım bölümü kaldırıldı.'),
     ];
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {
   return showDialog<void>(
@@ -113,6 +114,7 @@ class FeaturesPage extends StatelessWidget {
             tx('Konumunu ve favori yerlerini seç; ana ekran seçili yeri gösterir.'),
             tx('Deniz durumunda dalga ve rüzgara göre tahmini bayrak rengi görürsün.'),
             tx('Ana ekranda hava durumunun altında namaz vakitleri gösterilebilir.'),
+            tx('Bugün / yarın için yoğun yağış, fırtına, aşırı sıcak-soğuk gibi uyarılar.'),
           ]
         ),
         (
@@ -134,6 +136,7 @@ class FeaturesPage extends StatelessWidget {
           [
             tx('Haftalık ders programı ve çalışma planı.'),
             tx('Konu özetleri ve Tekrar et kartları: soruyu gör, cevabı aç.'),
+            tx('Soru kalıpları: LGS derslerinde sık çıkan soru tipleri ve çözüm yolları.'),
             tx('Bilmediklerin tekrar karşına çıkar.'),
           ]
         ),

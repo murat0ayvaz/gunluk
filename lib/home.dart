@@ -613,7 +613,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           style: TextStyle(color: p.soft, height: 1.4),
                         ),
                       ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 10),
                     // ----- Açılır başlıklar: Yapılacaklar / Günlük / Hatırlatıcı -----
                     _HomeSection(
                       icon: Icons.task_alt_rounded,
@@ -781,16 +781,44 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
             ],
           ),
-          body: Column(
-            children: [
-              // Saatlik hava: simgeye basınca aşağı doğru açılır
-              if (_wxOpen && store.wxOn)
-                WxPanel(key: ValueKey('wx_$date'), date: date),
-              // Namaz vakitleri (Ayarlar > Ana ekran'dan açılıp kapanır)
-              if (store.prayOn) const PrayerBar(),
-              Expanded(child: body),
-            ],
-          ),
+          body: Builder(builder: (context) {
+            // Hava simgesi hava + namaz vakitleri çubuğunu açar/kapatır (sabit kalır).
+            // Hava kapalıysa namaz vakitleri her zaman görünür.
+            final open = _wxOpen || !store.wxOn;
+            final topWx = _wxOpen && store.wxOn && store.wxPlace == 0;
+            final sideWx = _wxOpen && store.wxOn && store.wxPlace == 1;
+            final topPr = store.prayOn && store.prayPlace == 0 && open;
+            final sidePr = store.prayOn && store.prayPlace == 1 && open;
+            return Column(
+              children: [
+                if (topWx) WxPanel(key: ValueKey('wx_$date'), date: date),
+                if (topPr) const PrayerBar(),
+                Expanded(
+                  child: (sideWx || sidePr)
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            SizedBox(
+                              width: 76,
+                              child: Column(
+                                children: [
+                                  if (sideWx)
+                                    Expanded(
+                                        child: WxSide(
+                                            key: ValueKey('wxs_$date'),
+                                            date: date)),
+                                  if (sidePr) const PrayerBar(vertical: true),
+                                ],
+                              ),
+                            ),
+                            Expanded(child: body),
+                          ],
+                        )
+                      : body,
+                ),
+              ],
+            );
+          }),
         );
 
         // Geri tuşu: önce menü, sonra çıkış onayı

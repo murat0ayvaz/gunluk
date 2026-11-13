@@ -701,7 +701,7 @@ class _PullHomeState extends State<PullHome> {
         children: [
           widget.child,
           Positioned(
-            top: 56,
+            top: 60,
             left: 0,
             right: 0,
             child: IgnorePointer(
@@ -711,32 +711,27 @@ class _PullHomeState extends State<PullHome> {
                     ? const SizedBox.shrink()
                     : Center(
                         child: Opacity(
-                          opacity: v,
+                          opacity: v.clamp(0.0, 1.0).toDouble(),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 8),
+                            width: 42,
+                            height: 42,
+                            padding: const EdgeInsets.all(9),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF2E3238),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.home_rounded,
-                                    size: 18,
-                                    color: v >= 1 ? p.accent : Colors.white),
-                                const SizedBox(width: 6),
-                                Text(
-                                  v >= 1
-                                      ? tx('Bırak: ana sayfa')
-                                      : tx('Ana sayfa için çek'),
-                                  style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      decoration: TextDecoration.none),
-                                ),
+                              color: p.card,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: p.line),
+                              boxShadow: const [
+                                BoxShadow(
+                                    color: Color(0x33000000),
+                                    blurRadius: 6,
+                                    offset: Offset(0, 2)),
                               ],
+                            ),
+                            // çekildikçe dolar; eşikte (bırakılabilir) dönmeye başlar
+                            child: CircularProgressIndicator(
+                              value: v >= 1 ? null : v,
+                              strokeWidth: 3,
+                              color: p.accent,
                             ),
                           ),
                         ),

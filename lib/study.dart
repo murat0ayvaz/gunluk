@@ -7,6 +7,7 @@ import 'reminders.dart' show dtLabel, permissionMessage;
 import 'strings.dart';
 import 'theme.dart' show Pal;
 import 'studydata.dart';
+import 'studypatterns.dart';
 import 'studysum.dart';
 import 'ui.dart';
 import 'voice.dart';
@@ -485,6 +486,19 @@ class _SubjectPage extends StatelessWidget {
                   tx('{0} kart • {1} tekrar bekliyor', ['${rev.length}', '$due']),
                   () => Navigator.of(context)
                       .push(slideFromRight(_RevPage(sid)))),
+              if (studyPatterns.containsKey(sid)) ...[
+                const SizedBox(height: 12),
+                _big(
+                    context,
+                    p,
+                    Icons.psychology_alt_rounded,
+                    tx('Soru kalıpları'),
+                    tx('{0} soru tipi ve nasıl çözülür', [
+                      '${studyPatterns[sid]!.length}'
+                    ]),
+                    () => Navigator.of(context)
+                        .push(slideFromRight(_PatternPage(sid)))),
+              ],
             ],
           ),
         );
@@ -1653,6 +1667,120 @@ class _RevealState extends State<_Reveal> {
             child: Text(tx('Cevabı göster')),
           ),
       ],
+    );
+  }
+}
+
+
+// ---------------------------------------------------------------
+// Soru kalıpları: LGS'de sık çıkan soru tipleri ve çözüm yolları
+// ---------------------------------------------------------------
+class _PatternPage extends StatelessWidget {
+  final String sid;
+  const _PatternPage(this.sid);
+
+  Widget _sec(Pal p, IconData icon, Color c, String title, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 20, color: c),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(title,
+                    style: TextStyle(
+                        fontSize: 15.5, fontWeight: FontWeight.w800, color: c)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Text(text,
+              style: TextStyle(fontSize: 14.5, height: 1.45, color: p.ink)),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palOf(context);
+    final s = _subj(sid);
+    final list = studyPatterns[sid] ?? const <List<String>>[];
+    return Scaffold(
+      backgroundColor: p.bg,
+      appBar: AppBar(
+          title: Text('${s?.name ?? ''} • ${tx('Soru kalıpları')}', maxLines: 1)),
+      body: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        children: [
+          Text(
+              tx('LGS’de sık çıkan soru tipleri. Her kalıbın sorusunu, ne ölçtüğünü, nelere bakman gerektiğini, tuzaklarını ve çözüm adımlarını oku. Bu notlar genel bilgidir; resmî kaynaklarla tek tek doğrulanmamıştır.'),
+              style: TextStyle(color: p.soft, fontSize: 12.5, height: 1.4)),
+          const SizedBox(height: 12),
+          for (var i = 0; i < list.length; i++)
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              decoration: BoxDecoration(
+                color: p.card,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: p.line),
+              ),
+              child: Theme(
+                data: Theme.of(context)
+                    .copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  key: PageStorageKey('pat_${sid}_$i'),
+                  tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+                  childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  expandedCrossAxisAlignment: CrossAxisAlignment.start,
+                  leading: CircleAvatar(
+                    radius: 16,
+                    backgroundColor: p.accent.withOpacity(0.18),
+                    child: Text('${i + 1}',
+                        style: TextStyle(
+                            color: p.ink, fontWeight: FontWeight.w800)),
+                  ),
+                  title: Text(list[i][0],
+                      style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: p.ink)),
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 3),
+                    child: Text(list[i][1],
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 12.5,
+                            fontStyle: FontStyle.italic,
+                            color: p.soft)),
+                  ),
+                  children: [
+                    _sec(p, Icons.help_outline_rounded, const Color(0xFF3E9FD6),
+                        tx('Soru kökü'), list[i][1]),
+                    _sec(p, Icons.lightbulb_outline_rounded,
+                        const Color(0xFFC9A227), tx('Bu soru ne ölçüyor?'),
+                        list[i][2]),
+                    _sec(p, Icons.search_rounded, const Color(0xFF2E9E6B),
+                        tx('Soruda ne aramalıyız?'), list[i][3]),
+                    _sec(p, Icons.warning_amber_rounded,
+                        const Color(0xFFD1495B),
+                        tx('Tuzaklar / olmaması gerekenler'), list[i][4]),
+                    _sec(p, Icons.format_list_numbered_rounded,
+                        const Color(0xFF8A6FD1), tx('Çözüm adımları'),
+                        list[i][5]),
+                    _sec(p, Icons.edit_note_rounded, const Color(0xFFE8883A),
+                        tx('Örnek'), list[i][6]),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

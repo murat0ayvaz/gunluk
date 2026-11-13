@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'data.dart';
 import 'net.dart';
 import 'strings.dart';
+import 'theme.dart' show Pal;
 import 'ui.dart';
 import 'weather.dart';
 
@@ -93,7 +94,9 @@ int _mins(String hm) {
 }
 
 class PrayerBar extends StatefulWidget {
-  const PrayerBar({super.key});
+  /// vertical: sol sütunda alt alta
+  final bool vertical;
+  const PrayerBar({super.key, this.vertical = false});
 
   @override
   State<PrayerBar> createState() => _PrayerBarState();
@@ -119,6 +122,31 @@ class _PrayerBarState extends State<PrayerBar> {
     super.dispose();
   }
 
+  Widget _cellW(Pal p, List<String> t, int i, int next) => Container(
+        margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        decoration: BoxDecoration(
+          color: i == next ? p.accent.withOpacity(0.25) : null,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          children: [
+            Text(tx(prayerNames[i]),
+                maxLines: 1,
+                style: TextStyle(
+                    fontSize: 11.5,
+                    color: p.soft,
+                    fontWeight: i == next ? FontWeight.w800 : FontWeight.w500)),
+            const SizedBox(height: 2),
+            Text(t[i],
+                style: TextStyle(
+                    fontSize: 14,
+                    color: p.ink,
+                    fontWeight: i == next ? FontWeight.w800 : FontWeight.w600)),
+          ],
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final p = palOf(context);
@@ -137,7 +165,12 @@ class _PrayerBarState extends State<PrayerBar> {
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2))
-                  : TextButton.icon(
+                  : widget.vertical
+                      ? IconButton(
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => prayer.ensure(force: true),
+                          icon: const Icon(Icons.refresh_rounded))
+                      : TextButton.icon(
                       onPressed: () => prayer.ensure(force: true),
                       icon: const Icon(Icons.refresh_rounded, size: 18),
                       label: Text(tx('Namaz vakitleri alınamadı. Dokun, yeniden dene.')),
@@ -154,48 +187,23 @@ class _PrayerBarState extends State<PrayerBar> {
               break;
             }
           }
-          inner = Row(
-            children: [
+          final cells = [
               for (var i = 0; i < 6; i++)
-                Expanded(
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 2),
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    decoration: BoxDecoration(
-                      color: i == next ? p.accent.withOpacity(0.25) : null,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(tx(prayerNames[i]),
-                            maxLines: 1,
-                            style: TextStyle(
-                                fontSize: 11.5,
-                                color: p.soft,
-                                fontWeight: i == next
-                                    ? FontWeight.w800
-                                    : FontWeight.w500)),
-                        const SizedBox(height: 2),
-                        Text(t[i],
-                            style: TextStyle(
-                                fontSize: 14,
-                                color: p.ink,
-                                fontWeight: i == next
-                                    ? FontWeight.w800
-                                    : FontWeight.w600)),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          );
+                _cellW(p, t, i, next),
+          ];
+          inner = widget.vertical
+              ? Column(children: cells)
+              : Row(children: [for (final c in cells) Expanded(child: c)]);
         }
         return Container(
-          margin: const EdgeInsets.fromLTRB(12, 0, 12, 4),
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          width: widget.vertical ? 68 : null,
+          margin: widget.vertical
+              ? const EdgeInsets.fromLTRB(8, 0, 0, 10)
+              : const EdgeInsets.fromLTRB(16, 0, 16, 10),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
           decoration: BoxDecoration(
             color: p.card,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(color: p.line),
           ),
           child: inner,

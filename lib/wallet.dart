@@ -78,7 +78,9 @@ DateTime _dt(int ms) => DateTime.fromMillisecondsSinceEpoch(ms);
 String _dLabel(DateTime d) => '${d.day} ${monName(d.month)} ${d.year}';
 
 class WalletPage extends StatefulWidget {
-  const WalletPage({super.key});
+  /// stats: soldaki menüden açılan genel bakış (yalnız harcamalar, tüm cüzdanlar)
+  final bool stats;
+  const WalletPage({super.key, this.stats = false});
 
   @override
   State<WalletPage> createState() => _WalletPageState();
@@ -89,7 +91,16 @@ class _WalletPageState extends State<WalletPage> {
   int _per = 2; // 0 gün, 1 hafta, 2 ay, 3 yıl
   DateTime _anchor = dayOnly(DateTime.now());
 
+  String _fsel = '*'; // genel bakışta yerel cüzdan süzgeci
+
   String get _sel {
+    if (widget.stats) {
+      if (store.wallets.length <= 1) {
+        return store.wallets.isEmpty ? '' : store.wallets.first.id;
+      }
+      if (_fsel == '*' || store.wallets.any((w) => w.id == _fsel)) return _fsel;
+      return '*';
+    }
     final s = store.walletSel;
     if (s == '*' && store.wallets.length > 1) return '*';
     if (store.wallets.any((w) => w.id == s)) return s;
@@ -205,6 +216,33 @@ class _WalletPageState extends State<WalletPage> {
 
   Widget _walletChips(Pal p) {
     final ws = store.wallets;
+    if (widget.stats) {
+      if (ws.length <= 1) return const SizedBox.shrink();
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Text(tx('Hepsi')),
+                selected: _sel == '*',
+                onSelected: (_) => setState(() => _fsel = '*'),
+              ),
+            ),
+            for (final w in ws)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  label: Text(w.name),
+                  selected: _sel == w.id,
+                  onSelected: (_) => setState(() => _fsel = w.id),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -802,11 +840,11 @@ class _WalletPageState extends State<WalletPage> {
             backgroundColor: p.bg,
             elevation: 0,
             scrolledUnderElevation: 0,
-            title: Text(tx('Cüzdan')),
-            actions: const [ToolsButton()],
+            title: Text(widget.stats ? tx('Cüzdan özeti') : tx('Cüzdan')),
+            actions: widget.stats ? null : const [ToolsButton()],
           ),
-          endDrawer: const ToolsDrawer(replace: true),
-          floatingActionButton: empty
+          endDrawer: widget.stats ? null : const ToolsDrawer(replace: true),
+          floatingActionButton: (empty || widget.stats)
               ? null
               : FloatingActionButton(
                   onPressed: _add,
@@ -838,11 +876,11 @@ class _WalletPageState extends State<WalletPage> {
                   : [
                       _walletChips(p),
                       const SizedBox(height: 12),
-                      _tabs(p),
+                      if (!widget.stats) _tabs(p),
                       const SizedBox(height: 10),
-                      if (_tab == 0) ..._spendBody(p),
-                      if (_tab == 1) ..._debtBody(p, false),
-                      if (_tab == 2) ..._debtBody(p, true),
+                      if (_tab == 0 || widget.stats) ..._spendBody(p),
+                      if (_tab == 1 && !widget.stats) ..._debtBody(p, false),
+                      if (_tab == 2 && !widget.stats) ..._debtBody(p, true),
                     ],
             ),
           ),
