@@ -164,6 +164,55 @@ String _deg(double t) => '${t.round()}°';
 
 bool _isToday(String date) => date == dKey(DateTime.now());
 
+/// Saatlik listedeki bir hücre: saat verisi + hangi güne ait olduğu
+class WxCell {
+  final HourW h;
+  final String key;
+  WxCell(this.h, this.key);
+}
+
+/// Saatlik liste gece yarısında kesilmez: seçili günün saatlerinin ardından
+/// ertesi günün saatleri de gelir. Bugünde liste şimdiki saatin 3 saat
+/// gerisinden başlar (gerisi gösterilmez).
+List<WxCell> wxCells(WeatherData d, String date) {
+  final base = parseKey(date);
+  final prev = dKey(DateTime(base.year, base.month, base.day - 1));
+  final next = dKey(DateTime(base.year, base.month, base.day + 1));
+  final all = <WxCell>[];
+  for (final k in [prev, date, next]) {
+    for (final h in d.hours[k] ?? const <HourW>[]) {
+      all.add(WxCell(h, k));
+    }
+  }
+  final now = DateTime.now();
+  var start = 0;
+  if (_isToday(date)) {
+    final from = DateTime(now.year, now.month, now.day, now.hour)
+        .subtract(const Duration(hours: 3));
+    start = all.indexWhere((c) {
+      final t = parseKey(c.key);
+      return !DateTime(t.year, t.month, t.day, c.h.hour).isBefore(from);
+    });
+  } else {
+    start = all.indexWhere((c) => c.key == date);
+  }
+  if (start < 0) start = 0;
+  return all.sublist(start);
+}
+
+/// Saat etiketi; gün başında (00:00) günün adı da yazılır
+String wxCellLabel(WxCell c) {
+  if (c.h.hour != 0) return _hh(c.h.hour);
+  final t = parseKey(c.key);
+  final tom = DateTime.now().add(const Duration(days: 1));
+  final tag = dKey(tom) == c.key
+      ? tx('Yarın')
+      : '${t.day.toString().padLeft(2, '0')}.${t.month.toString().padLeft(2, '0')}';
+  return '$tag 00';
+}
+
+
+
 // ---------------------------------------------------------------
 // Tarih yanındaki küçük simge
 // ---------------------------------------------------------------
@@ -281,10 +330,9 @@ class _WxPanelState extends State<WxPanel> {
   @override
   void initState() {
     super.initState();
-    // Bugünde şimdiki saate, diğer günlerde sabah 6'ya yakın başla
-    final hr = _isToday(widget.date) ? DateTime.now().hour - 1 : 6;
+    // Bugünde liste şimdiki saatin 3 saat gerisinden başlar; diğer günlerde sabah 6'ya yakın
     _sc = ScrollController(
-        initialScrollOffset: (hr < 0 ? 0 : hr) * _cell);
+        initialScrollOffset: _isToday(widget.date) ? 0 : 6 * _cell);
   }
 
   @override
@@ -300,8 +348,8 @@ class _WxPanelState extends State<WxPanel> {
       listenable: weather,
       builder: (context, _) {
         final d = weather.data;
-        final hours = d?.hours[widget.date];
-        if (d == null || hours == null || hours.isEmpty) {
+        final cells = d == null ? <WxCell>[] : wxCells(d, widget.date);
+        if (d == null || cells.isEmpty) {
           return const SizedBox.shrink();
         }
         final day = d.days[widget.date];
@@ -339,10 +387,11 @@ class _WxPanelState extends State<WxPanel> {
                   controller: _sc,
                   scrollDirection: Axis.horizontal,
                   itemExtent: _cell,
-                  itemCount: hours.length,
+                  itemCount: cells.length,
                   itemBuilder: (context, i) {
-                    final h = hours[i];
-                    final isNow = today && h.hour == nowHr;
+                    final c = cells[i];
+                    final h = c.h;
+                    final isNow = today && c.key == widget.date && h.hour == nowHr;
                     return Container(
                       margin: const EdgeInsets.symmetric(horizontal: 2),
                       decoration: BoxDecoration(
@@ -353,7 +402,7 @@ class _WxPanelState extends State<WxPanel> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text('${h.hour.toString().padLeft(2, '0')}:00',
+                          Text(wxCellLabel(c),
                               style: TextStyle(fontSize: 11, color: p.soft)),
                           const SizedBox(height: 2),
                           Icon(
@@ -695,8 +744,8 @@ class _WxSideState extends State<WxSide> {
   @override
   void initState() {
     super.initState();
-    final hr = _isToday(widget.date) ? DateTime.now().hour - 1 : 6;
-    _sc = ScrollController(initialScrollOffset: (hr < 0 ? 0 : hr) * _cell);
+    _sc = ScrollController(
+        initialScrollOffset: _isToday(widget.date) ? 0 : 6 * _cell);
   }
 
   @override
@@ -712,8 +761,8 @@ class _WxSideState extends State<WxSide> {
       listenable: weather,
       builder: (context, _) {
         final d = weather.data;
-        final hours = d?.hours[widget.date];
-        if (d == null || hours == null || hours.isEmpty) {
+        final cells = d == null ? <WxCell>[] : wxCells(d, widget.date);
+        if (d == null || cells.isEmpty) {
           return const SizedBox.shrink();
         }
         final alerts = wxAlerts(d);
@@ -742,10 +791,11 @@ class _WxSideState extends State<WxSide> {
                 child: ListView.builder(
                   controller: _sc,
                   itemExtent: _cell,
-                  itemCount: hours.length,
+                  itemCount: cells.length,
                   itemBuilder: (context, i) {
-                    final h = hours[i];
-                    final isNow = today && h.hour == nowHr;
+                    final c = cells[i];
+                    final h = c.h;
+                    final isNow = today && c.key == widget.date && h.hour == nowHr;
                     return Container(
                       margin: const EdgeInsets.symmetric(
                           horizontal: 4, vertical: 2),
@@ -757,7 +807,7 @@ class _WxSideState extends State<WxSide> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(_hh(h.hour),
+                          Text(wxCellLabel(c),
                               style: TextStyle(fontSize: 11, color: p.soft)),
                           Icon(
                               wxIcon(h.code,

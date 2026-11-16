@@ -187,6 +187,35 @@ class SettingsPage extends StatelessWidget {
                     ]),
                   ),
               ]),
+              sec(tx('Uygulamalar'), [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                      tx('Kapattığın bölüm ekrandan kalkar; verilerin silinmez, tekrar açınca geri gelir.'),
+                      style: TextStyle(color: p.soft, fontSize: 13)),
+                ),
+                for (final a in const [
+                  ('todo', 'Yapılacaklar', Icons.task_alt_rounded),
+                  ('diary', 'Günlük', Icons.menu_book_rounded),
+                  ('rem', 'Hatırlatıcı', Icons.notifications_active_outlined),
+                  ('wallet', 'Cüzdan', Icons.account_balance_wallet_rounded),
+                  ('study', 'Ders çalışma', Icons.school_rounded),
+                  ('tools', 'Araçlar', Icons.handyman_outlined),
+                  ('media', 'Müzik ve Radyo', Icons.headphones_rounded),
+                  ('music', 'Müzik', Icons.music_note_rounded),
+                  ('radio', 'Radyo', Icons.radio_rounded),
+                  ('podcast', 'Podcast', Icons.podcasts_rounded),
+                  ('news', 'Haber', Icons.newspaper_rounded),
+                  ('online', 'Online', Icons.cloud_queue_rounded),
+                ])
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    secondary: Icon(a.$3),
+                    title: Text(tx(a.$2)),
+                    value: !store.appHidden(a.$1),
+                    onChanged: (v) => store.setAppHidden(a.$1, !v),
+                  ),
+              ]),
               sec(tx('Araçlar'), [
                 Padding(
                   padding: const EdgeInsets.only(bottom: 4),

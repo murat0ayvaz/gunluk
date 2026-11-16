@@ -1,18 +1,17 @@
-DAILY ROUTINE v29.5 (1.25.5) - TAM PAKET
+DAILY ROUTINE v29.6 (1.25.6) - TAM PAKET
 
 Bu zipte projenin TAMAMI var: .github, assets, lib, debug.keystore, pubspec.yaml.
 1) Zipi çıkar. GitHub'da "gunluk" reposunun ANA sayfasında: Add file > Upload files.
 2) Çıkan klasörlerin ve dosyaların HEPSİNİ (.github, assets, lib, debug.keystore, pubspec.yaml) sürükle-bırak > Commit changes.
-   (Yeni dosyalar: lib/wallet.dart, lib/prayer.dart, lib/studypatterns.dart. .github/workflows/build.yml de güncel: lint kapatma adımı var.)
 3) Actions > yeşil tik > Artifacts > gunluk-apk indir, telefona kur (veriler kalır).
 Derleme hatası olursa Actions'taki kırmızı satırları gönder.
 
-v29.5 yenilikleri:
-- Ders > her LGS dersi > Soru kalıpları (Türkçe 12, Matematik 7, Fen 6, İnkılap 5, Din 5, İngilizce 5 kalıp):
-  soru kökü, ne ölçüyor, ne aramalı, tuzaklar, çözüm adımları, örnek.
-- Hava durumu: simgeye dokununca bar açılır ve sabit kalır (ok kalktı), bugün/yarın uyarıları (tahmin verisinden; resmî değil, MGM bağlantısı var).
-- Ayarlar > Ana ekran: hava ve namaz vakitleri için ayrı ayrı Üst bar / Sol sütun; varsayılan ikisi üstte. Namaz vakitleri hava simgesiyle birlikte açılır.
-- Ana ekran kartları yuvarlak, aralıklar eşit. Aşağı çekince dönen yuvarlak gösterge.
-- Sol menü: Cüzdan (tüm harcamaların özeti), Kategoriler açılır (kapalı başlar).
-- Araçlar: Para başlığı yok, Cüzdan tek araç; Dini grubu (Zikirmatik + Kaza namazı); Ayarlar > Araçlar ile araç seçimi.
-- Ayarlar: Tanıtım bölümü kaldırıldı (ilk kurulum tanıtımı duruyor); Hakkında altında Kullanım şartları.
+v29.6 yenilikleri:
+- Namaz: ana ekrandaki vakit çubuğuna dokununca Namaz sayfası açılır. Araçlar > Namaz: "Vakitler ve uyarılar" + "Kaza namazı" (Zikirmatik Dini'de kaldı).
+  Her vakit (İmsak, Güneş, Öğle, İkindi, Akşam, Yatsı) için uyarı aç/kapa ve vaktinde / 5 / 10 / 15 / 30 dk önce seçimi (varsayılan 5 dk, kapalı başlar).
+  Uyarılar bugün + 2 gün için kurulur, uygulama açıldıkça yenilenir.
+- Haber: yeni "Etkinlikler" başlığı. Kaynak eklerken Hazır kaynaklar > Etkinlikler: belediye/valilik/kültür adresleri denenir, çalışanlar listelenir. Elle adres de eklenebilir.
+- Hava durumu barı yalnız simgeyle açılıp kapanır; yenileyince/gün değişince kapanmaz, uygulama yeniden açılınca da korunur.
+- Saatlik hava gece yarısından sonra yarının saatleriyle devam eder (00 işaretinde "Yarın"); bugün şimdiki saatin 3 saat gerisinden başlar.
+- Ayarlar > Uygulamalar: Yapılacaklar, Günlük, Hatırlatıcı, Cüzdan, Ders çalışma, Araçlar, Müzik ve Radyo ile Müzik/Radyo/Podcast/Haber/Online sekmeleri tek tek açılıp kapanır (veriler silinmez).
+- Ana ekranda Rutinler ile Yapılacaklar arasındaki fazla boşluk giderildi.

@@ -2,6 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'data.dart';
 import 'net.dart';
+import 'notify.dart';
+import 'media.dart' show slideFromRight;
+import 'tools.dart' show NamazPage;
 import 'strings.dart';
 import 'theme.dart' show Pal;
 import 'ui.dart';
@@ -38,9 +41,11 @@ class PrayerCtl extends ChangeNotifier {
         c['d'] == today &&
         c['k'] == locKey;
     if (okCache && !force) {
+      final fresh = times == null;
       times = cached;
       failed = false;
       notifyListeners();
+      if (fresh) Notifier.syncPrayer(cached);
       return;
     }
     if (loading) return;
@@ -72,6 +77,7 @@ class PrayerCtl extends ChangeNotifier {
       }
       times = out;
       store.setPrayCache({'d': today, 'k': locKey, 't': out});
+      Notifier.syncPrayer(out);
     } catch (_) {
       failed = true;
       // bugünün saklı verisi (konum farklı olsa da) yoksa boş kalır
@@ -86,6 +92,9 @@ class PrayerCtl extends ChangeNotifier {
 }
 
 final prayer = PrayerCtl();
+
+/// Bildirim kurulumu için bugünün vakitleri (yoksa null)
+List<String>? prayerTimesNow() => prayer.times;
 
 int _mins(String hm) {
   final p = hm.split(':');
@@ -195,7 +204,10 @@ class _PrayerBarState extends State<PrayerBar> {
               ? Column(children: cells)
               : Row(children: [for (final c in cells) Expanded(child: c)]);
         }
-        return Container(
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => Navigator.of(context).push(slideFromRight(const NamazPage())),
+          child: Container(
           width: widget.vertical ? 68 : null,
           margin: widget.vertical
               ? const EdgeInsets.fromLTRB(8, 0, 0, 10)
@@ -207,7 +219,7 @@ class _PrayerBarState extends State<PrayerBar> {
             border: Border.all(color: p.line),
           ),
           child: inner,
-        );
+        ));
       },
     );
   }

@@ -5,6 +5,7 @@ import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 import 'data.dart';
 import 'strings.dart';
+import 'prayer.dart' show prayerTimesNow;
 
 // ---------------------------------------------------------------
 // BİLDİRİMLER: hatırlatıcılar ve yapılacak maddesi hatırlatmaları.
@@ -330,6 +331,7 @@ class Notifier {
       for (final d in store.wdebts) {
         if (d.remind && !d.done) await syncDebt(d);
       }
+      await syncPrayer(prayerTimesNow());
     } catch (_) {}
   }
 
@@ -353,6 +355,40 @@ class Notifier {
     try {
       await init();
       await cancelOnce(d.nid * 100);
+    } catch (_) {}
+  }
+
+  /// Namaz vakti uyarıları: bugün ve sonraki 2 gün için kurulur (vakitler bugünün
+  /// saatlerine göre; günlük birkaç dakikalık kayma olabilir, uygulama açıldıkça yenilenir)
+  static const _prayBase = 770000;
+  static const _prayNames = ['İmsak', 'Güneş', 'Öğle', 'İkindi', 'Akşam', 'Yatsı'];
+
+  static Future<void> syncPrayer(List<String>? times) async {
+    try {
+      await init();
+      for (var k = 0; k < 18; k++) {
+        await _p.cancel(_prayBase + k);
+      }
+      if (times == null || times.length != 6 || !store.prayOn) return;
+      final now = DateTime.now();
+      for (var d = 0; d < 3; d++) {
+        for (var i = 0; i < 6; i++) {
+          final early = store.prayAlert[i];
+          if (early < 0) continue;
+          final hm = times[i].split(':');
+          if (hm.length < 2) continue;
+          final h = int.tryParse(hm[0]);
+          final m = int.tryParse(hm[1]);
+          if (h == null || m == null) continue;
+          final when = DateTime(now.year, now.month, now.day + d, h, m)
+              .subtract(Duration(minutes: early));
+          if (!when.isAfter(now)) continue;
+          final body = early == 0
+              ? tx('{0} vakti girdi', [tx(_prayNames[i])])
+              : tx('{0} vaktine {1} dk kaldı', [tx(_prayNames[i]), early]);
+          await scheduleOnce(_prayBase + d * 6 + i, body, when);
+        }
+      }
     } catch (_) {}
   }
 

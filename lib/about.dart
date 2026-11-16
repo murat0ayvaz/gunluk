@@ -10,12 +10,12 @@ import 'version.dart';
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
       tx('Verilerin korundu.'),
-      tx('Ders çalışma: her LGS dersinde Soru kalıpları (soru tipi, ne ölçtüğü, nelere bakılacağı, tuzaklar, çözüm adımları).'),
-      tx('Hava durumu: hava simgesine dokununca bar açılır ve sabit kalır; ok kalktı. Bugün / yarın için sert hava uyarıları (tahmin verisinden).'),
-      tx('Ayarlar > Ana ekran: hava ve namaz vakitleri için ayrı ayrı Üst bar veya Sol sütun seçimi; kartlar yuvarlak ve aralıklar eşit.'),
-      tx('Aşağı çekince ana sayfaya dönüşte yazı yerine dönen yuvarlak gösterge.'),
-      tx('Soldaki menüde Cüzdan (tüm harcamaların özeti) ve açılır Kategoriler.'),
-      tx('Araçlar: Para başlığı kalktı, Cüzdan tek araç. Ayarlar > Hakkında altında Kullanım şartları; Ayarlar\'daki Tanıtım bölümü kaldırıldı.'),
+      tx('Namaz: ana ekrandaki vakit çubuğuna dokununca Namaz sayfası açılır. Araçlar > Namaz altında Vakitler ve uyarılar ile Kaza namazı. Her vakit için uyarı aç/kapa ve kaç dakika önce (vaktinde, 5, 10, 15, 30).'),
+      tx('Haber: yeni Etkinlikler başlığı; Hazır kaynaklardan belediye, valilik ve kültür kaynakları eklenir (çalışanlar listelenir).'),
+      tx('Hava durumu barı yalnız simgeyle açılıp kapanır; yenileyince veya gün değişince kapanmaz, uygulama kapanıp açılınca da kalır.'),
+      tx('Saatlik hava gece yarısından sonra da yarının saatleriyle devam eder; bugün şimdiki saatin 3 saat gerisinden başlar.'),
+      tx('Ayarlar > Uygulamalar: Yapılacaklar, Günlük, Hatırlatıcı, Cüzdan, Ders, Araçlar, Müzik/Radyo/Podcast/Haber/Online tek tek açılıp kapanır (veriler silinmez).'),
+      tx('Ana ekranda Rutinler ile Yapılacaklar arasındaki fazla boşluk giderildi.'),
     ];
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {
   return showDialog<void>(

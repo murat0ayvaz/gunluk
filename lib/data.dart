@@ -1589,6 +1589,12 @@ class AppStore extends ChangeNotifier {
         ]),
       ];
     }
+    if (!evtCat) {
+      evtCat = true;
+      if (!newsCats.any((c) => c.name == 'Etkinlikler' || c.name == tx('Etkinlikler'))) {
+        newsCats.add(NewsCat(id: newId(), name: tx('Etkinlikler')));
+      }
+    }
     if (podCats.isEmpty) {
       podCats = [
         PodCat(id: newId(), name: tx('Genel')),
@@ -2276,6 +2282,11 @@ class AppStore extends ChangeNotifier {
     final kz = [for (final x in ((j['kaza'] as List?) ?? [])) (x as num).toInt()];
     kaza = [for (var i = 0; i < 5; i++) i < kz.length ? kz[i] : 0];
     prayOn = (j['prayon'] as bool?) ?? true;
+    wxBarOpen = (j['wxbar'] as bool?) ?? false;
+    hiddenApps = {for (final x in ((j['apphid'] as List?) ?? [])) x.toString()};
+    evtCat = (j['evtcat'] as bool?) ?? false;
+    final pa = [for (final x in ((j['pralert'] as List?) ?? [])) (x as num).toInt()];
+    prayAlert = [for (var i = 0; i < 6; i++) i < pa.length ? pa[i] : -1];
     wxPlace = (j['wxpl'] as int?) == 1 ? 1 : 0;
     prayPlace = (j['prpl'] as int?) == 1 ? 1 : 0;
     prayCache = j['praycache'] is Map
@@ -2515,6 +2526,10 @@ class AppStore extends ChangeNotifier {
         'thid': hiddenTools.toList(),
         'kaza': kaza,
         'prayon': prayOn,
+        'wxbar': wxBarOpen,
+        'apphid': hiddenApps.toList(),
+        'evtcat': evtCat,
+        'pralert': prayAlert,
         'wxpl': wxPlace,
         'prpl': prayPlace,
         'praycache': prayCache,
@@ -2924,6 +2939,32 @@ class AppStore extends ChangeNotifier {
   Set<String> hiddenTools = {}; // Araçlar menüsünde gizlenen araçlar
   List<int> kaza = [0, 0, 0, 0, 0]; // sabah, öğle, ikindi, akşam, yatsı (negatif olabilir)
   bool prayOn = true; // ana ekranda namaz vakitleri
+  // Namaz vakti uyarıları: vakit başına -1 = kapalı, aksi halde kaç dk önce (0 = vaktinde)
+  List<int> prayAlert = [-1, -1, -1, -1, -1, -1];
+  void setPrayAlert(int i, int v) {
+    if (i < 0 || i >= prayAlert.length) return;
+    prayAlert[i] = v;
+    _commit();
+  }
+
+  bool evtCat = false; // 'Etkinlikler' haber kategorisi bir kez kuruldu mu
+  // Ayarlar > Uygulamalar: kapatılan bölümler (veriler silinmez)
+  Set<String> hiddenApps = {};
+  bool appHidden(String id) => hiddenApps.contains(id);
+  void setAppHidden(String id, bool hidden) {
+    if (hidden) {
+      hiddenApps.add(id);
+    } else {
+      hiddenApps.remove(id);
+    }
+    _commit();
+  }
+
+  bool wxBarOpen = false; // hava durumu barı açık mı (sembolle açılır/kapanır, kalıcı)
+  void setWxBarOpen(bool v) {
+    wxBarOpen = v;
+    _commit();
+  }
   int wxPlace = 0; // hava: 0 üst bar, 1 sol sütun
   int prayPlace = 0; // namaz vakitleri: 0 üst bar, 1 sol sütun
   Map<String, dynamic> prayCache = {}; // {'d': gün, 'k': konum, 't': [6 saat]}

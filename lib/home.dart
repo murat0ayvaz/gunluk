@@ -64,7 +64,7 @@ Widget _swipeBg(Color color, IconData icon, Alignment align) => Container(
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   DateTime day = dayOnly(DateTime.now());
-  bool _wxOpen = false; // saatlik hava paneli açık mı
+  bool get _wxOpen => store.wxBarOpen; // saatlik hava paneli açık mı (kalıcı)
   // Rutinlerin altındaki açılır başlıklar ('todo', 'note', 'rem')
   final Set<String> _openSec = {};
   String? _catFilter; // null: tüm kategoriler, aksi halde seçili kategori kimliği
@@ -99,7 +99,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (!mounted) return;
     setState(() {
       day = dayOnly(DateTime.now());
-      _wxOpen = false;
       _openSec.clear();
       _catFilter = null;
     });
@@ -606,16 +605,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     ...children,
                     if (children.isEmpty)
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
                         child: Text(
                           tx('Bu gün için kayıt yok.\nSağ alttaki DR düğmesine dokunarak rutin veya kayıt ekleyebilirsin.'),
                           textAlign: TextAlign.center,
                           style: TextStyle(color: p.soft, height: 1.4),
                         ),
                       ),
-                    const SizedBox(height: 10),
                     // ----- Açılır başlıklar: Yapılacaklar / Günlük / Hatırlatıcı -----
-                    _HomeSection(
+                    if (!store.appHidden('todo')) _HomeSection(
                       icon: Icons.task_alt_rounded,
                       title: tx('Yapılacaklar'),
                       tone: const Color(0xFF2FB38A),
@@ -632,7 +630,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           : _openSec.add('todo')),
                       child: TodosBody(date: date),
                     ),
-                    _HomeSection(
+                    if (!store.appHidden('diary')) _HomeSection(
                       icon: Icons.menu_book_rounded,
                       title: tx('Günlük'),
                       tone: const Color(0xFF9A6BF0),
@@ -649,7 +647,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             title: _label()),
                       ),
                     ),
-                    _HomeSection(
+                    if (!store.appHidden('rem')) _HomeSection(
                       icon: Icons.notifications_active_outlined,
                       title: tx('Hatırlatıcı'),
                       tone: const Color(0xFFF08A3C),
@@ -708,6 +706,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   icon: const Icon(Icons.menu_rounded),
                   onPressed: () => _scaffoldKey.currentState?.openDrawer(),
                 ),
+                if (!store.appHidden('study'))
                 IconButton(
                   visualDensity: VisualDensity.compact,
                   padding: EdgeInsets.zero,
@@ -749,7 +748,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 WxChip(
                   date: date,
                   open: _wxOpen,
-                  onTap: () => setState(() => _wxOpen = !_wxOpen),
+                  onTap: () => store.setWxBarOpen(!store.wxBarOpen),
                 ),
                 IconButton(
                     visualDensity: VisualDensity.compact,
@@ -762,12 +761,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ),
             actions: [
               // Sağdan açılan Araçlar menüsü
+              if (!store.appHidden('tools'))
               IconButton(
                 tooltip: tx('Araçlar'),
                 onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
                 icon: const Icon(Icons.handyman_outlined),
               ),
               // Sağdan açılan Müzik ve Radyo sayfası
+              if (!store.appHidden('media') && mediaTabIds().isNotEmpty)
               ListenableBuilder(
                 listenable: media,
                 builder: (context, _) => IconButton(

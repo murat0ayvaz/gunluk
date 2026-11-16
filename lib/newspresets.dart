@@ -91,6 +91,23 @@ const newsPresets = <List<String>>[
   ['Resmi duyurular', 'Sakarya Büyükşehir Belediyesi', 'https://www.sakarya.bel.tr/rss'],
   ['Resmi duyurular', 'Sakarya Valiliği', 'https://www.sakarya.gov.tr/rss'],
   ['Resmi duyurular', 'Karasu Belediyesi', 'https://www.karasu.bel.tr/rss'],
+  // Etkinlikler (belediye, valilik, kültür müdürlükleri) - aday adresler
+  ['Etkinlikler', 'Sakarya Büyükşehir - Etkinlikler', 'https://www.sakarya.bel.tr/rss/etkinlikler'],
+  ['Etkinlikler', 'Sakarya Büyükşehir - Haberler', 'https://www.sakarya.bel.tr/rss/haberler'],
+  ['Etkinlikler', 'Sakarya Valiliği - Duyurular', 'https://www.sakarya.gov.tr/rss/duyurular'],
+  ['Etkinlikler', 'Sakarya Kültür ve Turizm', 'https://sakarya.ktb.gov.tr/rss'],
+  ['Etkinlikler', 'Adapazarı Belediyesi - Etkinlikler', 'https://www.adapazari.bel.tr/rss/etkinlikler'],
+  ['Etkinlikler', 'Serdivan Belediyesi', 'https://www.serdivan.bel.tr/rss'],
+  ['Etkinlikler', 'Sapanca Belediyesi', 'https://www.sapanca.bel.tr/rss'],
+  ['Etkinlikler', 'Kültür ve Turizm Bakanlığı', 'https://www.ktb.gov.tr/rss'],
+  ['Etkinlikler', 'Devlet Tiyatroları', 'https://www.devtiyatro.gov.tr/rss'],
+  ['Etkinlikler', 'İstanbul Büyükşehir Belediyesi', 'https://www.ibb.istanbul/rss'],
+  ['Etkinlikler', 'İstanbul Valiliği', 'https://istanbul.gov.tr/rss'],
+  ['Etkinlikler', 'Ankara Büyükşehir Belediyesi', 'https://www.ankara.bel.tr/rss'],
+  ['Etkinlikler', 'İzmir Büyükşehir Belediyesi', 'https://www.izmir.bel.tr/rss'],
+  ['Etkinlikler', 'Bursa Büyükşehir Belediyesi', 'https://www.bursa.bel.tr/rss'],
+  ['Etkinlikler', 'Kocaeli Büyükşehir Belediyesi', 'https://www.kocaeli.bel.tr/rss'],
+  ['Etkinlikler', 'Antalya Büyükşehir Belediyesi', 'https://www.antalya.bel.tr/rss'],
 ];
 
 /// Hazır kaynak penceresi: adayları dener, çalışanları işaretlenebilir listeler
@@ -162,10 +179,10 @@ class _PresetDialogState extends State<_PresetDialog> {
   void _add() {
     for (final p in _ok) {
       if (!_pick.contains(p[2])) continue;
-      var cat = store.newsCats.where((c) => c.name == p[0]).toList();
+      var cat = store.newsCats.where((c) => c.name == p[0] || c.name == tx(p[0])).toList();
       if (cat.isEmpty) {
         store.addNewsCat(p[0]);
-        cat = store.newsCats.where((c) => c.name == p[0]).toList();
+        cat = store.newsCats.where((c) => c.name == p[0] || c.name == tx(p[0])).toList();
       }
       store.saveNewsSrc(cat.first.id, null, p[1], p[2]);
     }

@@ -611,44 +611,79 @@ class MediaGroup extends StatelessWidget {
 // ---------------------------------------------------------------
 // Sayfa
 // ---------------------------------------------------------------
+/// Açık olan sekmeler (Ayarlar > Uygulamalar'dan kapatılanlar çıkar)
+List<String> mediaTabIds() => [
+      for (final id in const ['music', 'radio', 'podcast', 'news', 'online'])
+        if (!store.appHidden(id)) id
+    ];
+
 class MediaPage extends StatelessWidget {
   const MediaPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     final p = palOf(context);
-    return DefaultTabController(
-      length: 5,
-      child: Scaffold(
-        backgroundColor: p.bg,
-        appBar: AppBar(
-          title: Text(tx('Müzik ve Radyo')),
-          bottom: TabBar(
-            tabs: [
-              Tab(icon: const Icon(Icons.music_note_rounded), text: tx('Müzik')),
-              Tab(icon: const Icon(Icons.radio_rounded), text: tx('Radyo')),
-              Tab(icon: const Icon(Icons.podcasts_rounded), text: tx('Podcast')),
-              Tab(icon: const Icon(Icons.newspaper_rounded), text: tx('Haber')),
-              Tab(icon: const Icon(Icons.cloud_queue_rounded), text: tx('Online')),
-            ],
-          ),
-        ),
-        body: const Column(
-          children: [
-            Expanded(
-              child: TabBarView(
-                  children: [
-                    MusicTab(),
-                    RadioTab(),
-                    PodcastTab(),
-                    NewsTab(),
-                    OnlineTab()
-                  ]),
+    return ListenableBuilder(
+      listenable: store,
+      builder: (context, _) {
+        final ids = mediaTabIds();
+        if (ids.isEmpty) {
+          return Scaffold(
+            backgroundColor: p.bg,
+            appBar: AppBar(title: Text(tx('Müzik ve Radyo'))),
+            body: Center(child: Text(tx('Tüm sekmeler Ayarlar > Uygulamalar bölümünden kapatılmış.'))),
+          );
+        }
+        Tab tab(String id) {
+          switch (id) {
+            case 'music':
+              return Tab(icon: const Icon(Icons.music_note_rounded), text: tx('Müzik'));
+            case 'radio':
+              return Tab(icon: const Icon(Icons.radio_rounded), text: tx('Radyo'));
+            case 'podcast':
+              return Tab(icon: const Icon(Icons.podcasts_rounded), text: tx('Podcast'));
+            case 'news':
+              return Tab(icon: const Icon(Icons.newspaper_rounded), text: tx('Haber'));
+            default:
+              return Tab(icon: const Icon(Icons.cloud_queue_rounded), text: tx('Online'));
+          }
+        }
+
+        Widget view(String id) {
+          switch (id) {
+            case 'music':
+              return const MusicTab();
+            case 'radio':
+              return const RadioTab();
+            case 'podcast':
+              return const PodcastTab();
+            case 'news':
+              return const NewsTab();
+            default:
+              return const OnlineTab();
+          }
+        }
+
+        return DefaultTabController(
+          key: ValueKey(ids.join(',')),
+          length: ids.length,
+          child: Scaffold(
+            backgroundColor: p.bg,
+            appBar: AppBar(
+              title: Text(tx('Müzik ve Radyo')),
+              bottom: TabBar(tabs: [for (final id in ids) tab(id)]),
             ),
-            NowBar(),
-          ],
-        ),
-      ),
+            body: Column(
+              children: [
+                Expanded(
+                  child: TabBarView(children: [for (final id in ids) view(id)]),
+                ),
+                const NowBar(),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

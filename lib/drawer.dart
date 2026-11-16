@@ -57,7 +57,7 @@ class AppDrawer extends StatelessWidget {
                   child: ListView(
                     padding: EdgeInsets.zero,
                     children: [
-                      ListTile(
+                      if (!store.appHidden('diary')) ListTile(
                         leading: const Icon(Icons.menu_book_rounded),
                         title: Text(tx('Günlük')),
                         onTap: () {
@@ -66,7 +66,7 @@ class AppDrawer extends StatelessWidget {
                               builder: (_) => const DiaryCalendarPage()));
                         },
                       ),
-                      ListTile(
+                      if (!store.appHidden('wallet')) ListTile(
                         leading: const Icon(Icons.account_balance_wallet_rounded),
                         title: Text(tx('Cüzdan')),
                         onTap: () {
