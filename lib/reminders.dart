@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'data.dart';
 import 'notify.dart';
 import 'strings.dart';
@@ -23,18 +24,33 @@ String dtLabel(int ms) {
 }
 
 String everyLabel(int min) {
+  if (min >= 1440 && min % 1440 == 0) return tx('{0} gün', [min ~/ 1440]);
   if (min >= 60 && min % 60 == 0) return tx('{0} saat', [min ~/ 60]);
   return tx('{0} dk', [min]);
 }
 
-Future<int?> pickDateTime(BuildContext context, {int? initialMs}) async {
+String repLabel(int n, String unit) {
+  switch (unit) {
+    case 'd':
+      return tx('{0} gün', [n]);
+    case 'w':
+      return tx('{0} hafta', [n]);
+    case 'm':
+      return tx('{0} ay', [n]);
+    default:
+      return tx('{0} yıl', [n]);
+  }
+}
+
+Future<int?> pickDateTime(BuildContext context,
+    {int? initialMs, bool allowPast = false}) async {
   final init = initialMs != null && initialMs > 0
       ? DateTime.fromMillisecondsSinceEpoch(initialMs)
       : DateTime.now().add(const Duration(minutes: 5));
   final d = await showDatePicker(
     context: context,
     initialDate: init,
-    firstDate: DateTime.now().subtract(const Duration(days: 1)),
+    firstDate: DateTime.now().subtract(Duration(days: allowPast ? 365 * 10 : 1)),
     lastDate: DateTime.now().add(const Duration(days: 365 * 3)),
   );
   if (d == null || !context.mounted) return null;
@@ -76,8 +92,26 @@ String _summary(Reminder r) {
     return tx('Her gün {0}', [hm(r.hour, r.minute)]);
   }
   if (r.kind == 'interval') {
+    if (r.count <= 0) {
+      return tx('{0} • her {1} • sınırsız', [dtLabel(r.startMs), everyLabel(r.every)]);
+    }
     return tx('{0} • her {1} • {2} kez',
         [dtLabel(r.startMs), everyLabel(r.every), r.count]);
+  }
+  if (r.kind == 'repeat') {
+    // sonraki asıl tarih (uyarı değil, olay günü)
+    DateTime? ev;
+    for (var k = 0; k < 400; k++) {
+      final o = repeatOccurrence(r, k);
+      if (o.isAfter(DateTime.now())) {
+        ev = o;
+        break;
+      }
+    }
+    return tx('Sonraki {0} • her {1}', [
+      ev == null ? '-' : dtLabel(ev.millisecondsSinceEpoch),
+      repLabel(r.rep, r.unit)
+    ]);
   }
   return dtLabel(r.startMs);
 }
@@ -113,30 +147,19 @@ class _RemindersBodyState extends State<RemindersBody> {
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () => showReminderSheet(context),
-                      icon: const Icon(Icons.add_alert_rounded),
-                      label: Text(tx('Yeni hatırlatıcı')),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: tx('Çalışmıyorsa ne yapmalı?'),
-                    onPressed: () => showReminderHelp(context),
-                    icon: const Icon(Icons.help_outline_rounded),
-                  ),
-                ],
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                tooltip: tx('Çalışmıyorsa ne yapmalı?'),
+                onPressed: () => showReminderHelp(context),
+                icon: const Icon(Icons.help_outline_rounded),
               ),
-            ),
+            ),,
             if (list.isEmpty)
               Padding(
                 padding: const EdgeInsets.all(20),
                 child: Text(
-                  tx('Henüz hatırlatıcı yok. Yukarıdan ekleyebilirsin.'),
+                  tx('Henüz hatırlatıcı yok. Başlıktaki + ile ekleyebilirsin.'),
                   textAlign: TextAlign.center,
                   style: TextStyle(color: p.soft),
                 ),
@@ -252,8 +275,22 @@ class _ReminderFormState extends State<_ReminderForm> {
   late int _start = (widget.edit != null && widget.edit!.startMs > 0)
       ? widget.edit!.startMs
       : DateTime.now().add(const Duration(minutes: 5)).millisecondsSinceEpoch;
-  late int _every = widget.edit?.every ?? 15;
-  late int _count = widget.edit?.count ?? 3;
+  late final int _e0 = widget.edit?.every ?? 15;
+  // Aralıklı: süre elle yazılır (dakika / saat / gün)
+  late String _eUnit = _e0 % 1440 == 0 ? 'd' : (_e0 % 60 == 0 ? 'h' : 'm');
+  late final TextEditingController _eC = TextEditingController(
+      text: '${_e0 % 1440 == 0 ? _e0 ~/ 1440 : (_e0 % 60 == 0 ? _e0 ~/ 60 : _e0)}');
+  late bool _unlimited = widget.edit != null &&
+      widget.edit!.kind == 'interval' &&
+      widget.edit!.count <= 0;
+  late final TextEditingController _cC = TextEditingController(
+      text: '${(widget.edit != null && widget.edit!.count > 0) ? widget.edit!.count : 3}');
+  // Tarihli tekrar
+  late String _rUnit = widget.edit?.unit ?? 'y';
+  late final TextEditingController _rC =
+      TextEditingController(text: '${widget.edit?.rep ?? 1}');
+  late final TextEditingController _earlyC =
+      TextEditingController(text: '${widget.edit?.early ?? 0}');
   late int _hour = widget.edit?.hour ?? 9;
   late int _minute = widget.edit?.minute ?? 0;
   String? _warn;
@@ -261,6 +298,10 @@ class _ReminderFormState extends State<_ReminderForm> {
   @override
   void dispose() {
     _c.dispose();
+    _eC.dispose();
+    _cC.dispose();
+    _rC.dispose();
+    _earlyC.dispose();
     super.dispose();
   }
 
@@ -269,6 +310,43 @@ class _ReminderFormState extends State<_ReminderForm> {
     if (text.isEmpty) {
       setState(() => _warn = tx('Önce hatırlatıcı metnini yaz.'));
       return;
+    }
+    // aralıklı: süre (dakikaya çevrilir) ve kaç kez
+    var every = 15;
+    var count = 1;
+    if (_kind == 'interval') {
+      final n = int.tryParse(_eC.text.trim()) ?? 0;
+      if (n < 1) {
+        setState(() => _warn = tx('Süreyi yaz (en az 1).'));
+        return;
+      }
+      every = n * (_eUnit == 'd' ? 1440 : (_eUnit == 'h' ? 60 : 1));
+      if (_unlimited) {
+        count = 0;
+      } else {
+        count = int.tryParse(_cC.text.trim()) ?? 0;
+        if (count < 1) {
+          setState(() => _warn = tx('Kaç kez olacağını yaz (en az 1) ya da Sınırsız seç.'));
+          return;
+        }
+        if (count > 99) count = 99;
+      }
+    }
+    var rep = 1;
+    var early = 0;
+    if (_kind == 'repeat') {
+      final sd = DateTime.fromMillisecondsSinceEpoch(_start);
+      _hour = sd.hour;
+      _minute = sd.minute;
+      rep = int.tryParse(_rC.text.trim()) ?? 0;
+      if (rep < 1) {
+        setState(() => _warn = tx('Kaç birimde bir olacağını yaz (en az 1).'));
+        return;
+      }
+      if (rep > 999) rep = 999;
+      early = int.tryParse(_earlyC.text.trim()) ?? 0;
+      if (early < 0) early = 0;
+      if (early > 365) early = 365;
     }
     final nav = Navigator.of(context);
     final msg = await permissionMessage();
@@ -279,10 +357,13 @@ class _ReminderFormState extends State<_ReminderForm> {
       r.text = text;
       r.kind = _kind;
       r.startMs = _start;
-      r.every = _every;
-      r.count = _kind == 'interval' ? _count : 1;
+      r.every = every;
+      r.count = _kind == 'interval' ? count : 1;
       r.hour = _hour;
       r.minute = _minute;
+      r.rep = rep;
+      r.unit = _rUnit;
+      r.early = early;
       r.enabled = true;
       store.updateReminder(r);
     } else {
@@ -292,10 +373,13 @@ class _ReminderFormState extends State<_ReminderForm> {
         text: text,
         kind: _kind,
         startMs: _start,
-        every: _every,
-        count: _kind == 'interval' ? _count : 1,
+        every: every,
+        count: _kind == 'interval' ? count : 1,
         hour: _hour,
         minute: _minute,
+        rep: rep,
+        unit: _rUnit,
+        early: early,
       ));
     }
     await Notifier.syncReminder(r);
@@ -310,6 +394,7 @@ class _ReminderFormState extends State<_ReminderForm> {
       'once': tx('Tek seferlik'),
       'interval': tx('Aralıklı'),
       'daily': tx('Her gün'),
+      'repeat': tx('Tarihli tekrar'),
     };
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -354,7 +439,8 @@ class _ReminderFormState extends State<_ReminderForm> {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () async {
-                        final v = await pickDateTime(context, initialMs: _start);
+                        final v = await pickDateTime(context,
+                            initialMs: _start, allowPast: _kind == 'repeat');
                         if (v != null) setState(() => _start = v);
                       },
                       icon: const Icon(Icons.event_rounded),
@@ -373,36 +459,120 @@ class _ReminderFormState extends State<_ReminderForm> {
             ],
             if (_kind == 'interval') ...[
               const SizedBox(height: 12),
-              Text(tx('Tekrar aralığı'), style: TextStyle(color: p.soft)),
-              Wrap(
-                spacing: 8,
+              Text(tx('Tekrar süresi (kendin yaz)'), style: TextStyle(color: p.soft)),
+              Row(
                 children: [
-                  for (final m in const [5, 10, 15, 30, 60])
-                    ChoiceChip(
-                      label: Text(everyLabel(m)),
-                      selected: _every == m,
-                      onSelected: (_) => setState(() => _every = m),
+                  SizedBox(
+                    width: 90,
+                    child: TextField(
+                      controller: _eC,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: const InputDecoration(
+                          border: OutlineInputBorder(), isDense: true),
                     ),
+                  ),
+                  const SizedBox(width: 10),
+                  Wrap(
+                    spacing: 6,
+                    children: [
+                      for (final u in const [('m', 'dk'), ('h', 'saat'), ('d', 'gün')])
+                        ChoiceChip(
+                          label: Text(tx(u.$2)),
+                          selected: _eUnit == u.$1,
+                          onSelected: (_) => setState(() => _eUnit = u.$1),
+                        ),
+                    ],
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
               Text(tx('Toplam kaç kez'), style: TextStyle(color: p.soft)),
               Row(
                 children: [
-                  IconButton(
-                    onPressed:
-                        _count > 1 ? () => setState(() => _count--) : null,
-                    icon: const Icon(Icons.remove_circle_outline_rounded),
+                  SizedBox(
+                    width: 90,
+                    child: TextField(
+                      controller: _cC,
+                      enabled: !_unlimited,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(2),
+                      ],
+                      decoration: const InputDecoration(
+                          border: OutlineInputBorder(), isDense: true),
+                    ),
                   ),
-                  Text('$_count',
-                      style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.w700)),
-                  IconButton(
-                    onPressed:
-                        _count < 12 ? () => setState(() => _count++) : null,
-                    icon: const Icon(Icons.add_circle_outline_rounded),
+                  const SizedBox(width: 10),
+                  FilterChip(
+                    label: Text(tx('Sınırsız')),
+                    selected: _unlimited,
+                    onSelected: (v) => setState(() => _unlimited = v),
                   ),
                 ],
+              ),
+              if (_unlimited)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                      tx('Sınırsızda önümüzdeki 24 tekrar kurulur; uygulama açıldıkça yenilenir.'),
+                      style: TextStyle(color: p.soft, fontSize: 12.5)),
+                ),
+            ],
+            if (_kind == 'repeat') ...[
+              const SizedBox(height: 12),
+              Text(tx('Her kaç sürede bir?'), style: TextStyle(color: p.soft)),
+              Row(
+                children: [
+                  SizedBox(
+                    width: 90,
+                    child: TextField(
+                      controller: _rC,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(3),
+                      ],
+                      decoration: const InputDecoration(
+                          border: OutlineInputBorder(), isDense: true),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Wrap(
+                    spacing: 6,
+                    children: [
+                      for (final u in const [('d', 'gün'), ('w', 'hafta'), ('m', 'ay'), ('y', 'yıl')])
+                        ChoiceChip(
+                          label: Text(tx(u.$2)),
+                          selected: _rUnit == u.$1,
+                          onSelected: (_) => setState(() => _rUnit = u.$1),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(tx('Kaç gün önce de haber verilsin? (0 = yalnız o gün)'),
+                  style: TextStyle(color: p.soft)),
+              SizedBox(
+                width: 90,
+                child: TextField(
+                  controller: _earlyC,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(3),
+                  ],
+                  decoration: const InputDecoration(
+                      border: OutlineInputBorder(), isDense: true),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                    tx('Yukarıdaki başlangıç, ilk tarihtir (örneğin muayene tarihi). Sonraki tarihler kendiliğinden hesaplanır.'),
+                    style: TextStyle(color: p.soft, fontSize: 12.5)),
               ),
             ],
             if (_kind == 'daily') ...[

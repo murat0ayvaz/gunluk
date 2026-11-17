@@ -7,6 +7,7 @@ import 'media.dart';
 import 'net.dart' show fetchEpisodes;
 import 'notify.dart';
 import 'reminders.dart' show permissionMessage;
+import 'shortcuts.dart' show AppsChannel;
 import 'strings.dart';
 import 'theme.dart' show Pal;
 import 'tools.dart';
@@ -374,8 +375,10 @@ class _SchedDialog extends StatefulWidget {
   final int h, m;
   final Set<int> days;
   final String label, kind, ref;
+  final bool app; // uygulama kısayolu: yalnız saat ve gün
   const _SchedDialog(
-      {required this.title,
+      {this.app = false,
+      required this.title,
       required this.launch,
       required this.h,
       required this.m,
@@ -467,7 +470,7 @@ class _SchedDialogState extends State<_SchedDialog> {
                         ],
                         onChanged: (v) => setState(() => _ref = v ?? _ref),
                       ),
-            ] else ...[
+            ] else if (!widget.app) ...[
               const SizedBox(height: 8),
               TextField(
                 controller: _l,
@@ -498,7 +501,7 @@ class _SchedDialogState extends State<_SchedDialog> {
                     _h,
                     _m,
                     _days.length == 7 ? <int>{} : _days,
-                    widget.launch ? _launchLabel() : _l.text.trim(),
+                    widget.app ? widget.label : (widget.launch ? _launchLabel() : _l.text.trim()),
                     _kind,
                     _ref));
           },
@@ -652,6 +655,11 @@ class LauncherPage extends StatelessWidget {
   const LauncherPage({super.key});
 
   Future<void> _edit(BuildContext context, LaunchItem? a) async {
+    if (a != null && a.kind == 'app') {
+      final sc = store.shortcuts.where((x) => x.pkg == a.ref).toList();
+      if (sc.isNotEmpty) await showAppSchedule(context, sc.first);
+      return;
+    }
     final r = await showDialog<_Sched>(
         context: context,
         builder: (_) => _SchedDialog(
@@ -762,6 +770,48 @@ class LauncherPage extends StatelessWidget {
   }
 }
 
+/// Kısayol uygulaması için otomatik başlatma saati (bildirim; dokununca uygulama açılır)
+LaunchItem? appLaunchOf(String pkg) {
+  for (final l in store.launchers) {
+    if (l.kind == 'app' && l.ref == pkg) return l;
+  }
+  return null;
+}
+
+Future<void> showAppSchedule(BuildContext context, AppShortcut sc) async {
+  final a = appLaunchOf(sc.pkg);
+  final r = await showDialog<_Sched>(
+      context: context,
+      builder: (_) => _SchedDialog(
+          app: true,
+          title: tx('{0}: otomatik başlat', [sc.name]),
+          launch: false,
+          h: a?.h ?? 8,
+          m: a?.m ?? 0,
+          days: a?.days ?? <int>{},
+          label: '${tx('Uygulama')}: ${sc.name}',
+          kind: 'app',
+          ref: sc.pkg));
+  if (r == null) return;
+  LaunchItem item;
+  if (a == null) {
+    item = store.addLauncher(r.h, r.m, r.days, 'app', sc.pkg, r.label);
+  } else {
+    a.h = r.h;
+    a.m = r.m;
+    a.days = r.days;
+    a.label = r.label;
+    a.on = true;
+    store.touchLauncher();
+    item = a;
+  }
+  await Notifier.syncLauncher(item);
+  final msg = await permissionMessage();
+  if (msg != null && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+}
+
 // ---------------------------------------------------------------
 // Bildirime dokunulunca
 // ---------------------------------------------------------------
@@ -774,6 +824,9 @@ Future<void> handleNotifPayload(NavigatorState nav, String payload) async {
   }
   if (a == null) return;
   switch (a.kind) {
+    case 'app':
+      await AppsChannel.launch(a.ref);
+      break;
     case 'meditate':
       nav.push(MaterialPageRoute<void>(
           builder: (_) => const MeditatePage(autoStart: true)));

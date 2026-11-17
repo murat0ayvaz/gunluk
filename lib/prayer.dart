@@ -224,3 +224,121 @@ class _PrayerBarState extends State<PrayerBar> {
     );
   }
 }
+
+
+// ---------------------------------------------------------------
+// Ana ekran: tek satır namaz yazısı ("Öğleye 20 dk kaldı.")
+// Dokununca bugünün tüm vakitleri açılır.
+// ---------------------------------------------------------------
+const _dative = ['İmsaka', 'Güneşe', 'Öğleye', 'İkindiye', 'Akşama', 'Yatsıya'];
+
+class PrayerLine extends StatefulWidget {
+  final bool open;
+  final VoidCallback onTap;
+  const PrayerLine({super.key, required this.open, required this.onTap});
+
+  @override
+  State<PrayerLine> createState() => _PrayerLineState();
+}
+
+class _PrayerLineState extends State<PrayerLine> {
+  Timer? _t;
+
+  @override
+  void initState() {
+    super.initState();
+    prayer.ensure();
+    _t = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (!mounted) return;
+      prayer.ensure();
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  String _left(int diff) {
+    if (diff >= 60) {
+      final h = diff ~/ 60;
+      final m = diff % 60;
+      return m == 0 ? tx('{0} sa', [h]) : tx('{0} sa {1} dk', [h, m]);
+    }
+    return tx('{0} dk', [diff < 1 ? 1 : diff]);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palOf(context);
+    return ListenableBuilder(
+      listenable: Listenable.merge([prayer, store]),
+      builder: (context, _) {
+        if (!store.prayOn) return const SizedBox.shrink();
+        final t = prayer.times;
+        String text;
+        if (t == null) {
+          text = prayer.loading
+              ? tx('Namaz vakitleri alınıyor…')
+              : tx('Namaz vakitleri alınamadı. Dokun, yeniden dene.');
+        } else {
+          final now = DateTime.now();
+          final nm = now.hour * 60 + now.minute;
+          var next = -1;
+          for (var i = 0; i < 6; i++) {
+            if (_mins(t[i]) > nm) {
+              next = i;
+              break;
+            }
+          }
+          int diff;
+          if (next < 0) {
+            next = 0; // hepsi geçti: yarının imsakı
+            diff = 1440 - nm + _mins(t[0]);
+          } else {
+            diff = _mins(t[next]) - nm;
+          }
+          text = tx('{0} {1} kaldı.', [tx(_dative[next]), _left(diff)]);
+        }
+        return Container(
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+          decoration: BoxDecoration(
+            color: p.card,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: p.line),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () {
+              if (t == null && !prayer.loading) {
+                prayer.ensure(force: true);
+                return;
+              }
+              widget.onTap();
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  Icon(Icons.mosque_rounded, size: 20, color: p.accent),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(text,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: p.ink)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}

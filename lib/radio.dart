@@ -182,6 +182,8 @@ class RadioTab extends StatelessWidget {
       for (final c in store.radCats)
         for (final s in c.stations)
           if (s.fav) MapEntry(c, s),
+      for (final s in store.radFavKeep)
+        MapEntry(RadioCat(id: 'favkeep', name: tx('Favoriler')), s),
     ];
     if (items.isEmpty) {
       return Center(
@@ -767,8 +769,13 @@ class _RadioBrowserPageState extends State<RadioBrowserPage> {
                                 : Icons.play_circle_outline_rounded),
                           ),
                           IconButton(
-                            tooltip: tx('Ekle'),
-                            onPressed: have ? null : () => _add(r),
+                            tooltip: have ? tx('Kaldır') : tx('Ekle'),
+                            onPressed: have
+                                ? () {
+                                    store.removeStationByUrl(r.url, _cat);
+                                    setState(() {});
+                                  }
+                                : () => _add(r),
                             icon: Icon(have
                                 ? Icons.check_circle_rounded
                                 : Icons.add_circle_outline_rounded),

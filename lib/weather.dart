@@ -162,6 +162,23 @@ Color wxColor(int code) {
 
 String _deg(double t) => '${t.round()}°';
 
+/// WMO hava kodu -> kısa Türkçe açıklama ("açık", "yağmurlu" gibi)
+String wxText(int code) {
+  if (code == 0) return tx('hava açık');
+  if (code == 1) return tx('çoğunlukla açık');
+  if (code == 2) return tx('parçalı bulutlu');
+  if (code == 3) return tx('bulutlu');
+  if (code == 45 || code == 48) return tx('sisli');
+  if (code >= 51 && code <= 57) return tx('çisenti');
+  if (code == 66 || code == 67) return tx('dondurucu yağmurlu');
+  if (code >= 61 && code <= 65) return tx('yağmurlu');
+  if (code >= 80 && code <= 82) return tx('sağanak yağışlı');
+  if (code == 85 || code == 86) return tx('kar sağanaklı');
+  if (code >= 71 && code <= 77) return tx('karlı');
+  if (code >= 95) return tx('gök gürültülü fırtınalı');
+  return tx('bulutlu');
+}
+
 bool _isToday(String date) => date == dKey(DateTime.now());
 
 /// Saatlik listedeki bir hücre: saat verisi + hangi güne ait olduğu
@@ -826,6 +843,117 @@ class _WxSideState extends State<WxSide> {
                 ),
               ),
             ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+
+// ---------------------------------------------------------------
+// Ana ekran: tek satır hava durumu yazısı ("Şu an açık, 12°. Bugün yağmurlu.")
+// Dokununca saatlik panel açılır / kapanır.
+// ---------------------------------------------------------------
+class WxLine extends StatelessWidget {
+  final String date;
+  final bool open;
+  final VoidCallback onTap;
+  const WxLine(
+      {super.key, required this.date, required this.open, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palOf(context);
+    return ListenableBuilder(
+      listenable: Listenable.merge([weather, store]),
+      builder: (context, _) {
+        if (!store.wxOn) return const SizedBox.shrink();
+        final d = weather.data;
+        IconData icon = Icons.cloud_queue_rounded;
+        Color color = p.soft;
+        String text;
+        var warn = false;
+        if (d == null) {
+          if (weather.loading) {
+            text = tx('Hava durumu alınıyor…');
+          } else if (weather.failed) {
+            text = tx('Hava durumu alınamadı. Dokun, yeniden dene.');
+          } else {
+            return const SizedBox.shrink();
+          }
+        } else {
+          final day = d.days[date];
+          if (_isToday(date)) {
+            final hr = DateTime.now().hour;
+            final parts = <String>[];
+            if (d.nowCode != null && d.nowTemp != null) {
+              icon = wxIcon(d.nowCode!, night: hr < 6 || hr >= 20);
+              color = wxColor(d.nowCode!);
+              parts.add(tx('Şu an {0}, {1}.', [wxText(d.nowCode!), _deg(d.nowTemp!)]));
+            }
+            if (day != null) {
+              if (parts.isEmpty) {
+                icon = wxIcon(day.code);
+                color = wxColor(day.code);
+              }
+              parts.add(tx('Bugün {0}.', [wxText(day.code)]));
+            }
+            if (parts.isEmpty) return const SizedBox.shrink();
+            text = parts.join(' ');
+          } else if (day != null) {
+            icon = wxIcon(day.code);
+            color = wxColor(day.code);
+            final t = parseKey(date);
+            final tom = DateTime.now().add(const Duration(days: 1));
+            final lbl = dKey(tom) == date ? tx('Yarın') : '${t.day} ${monName(t.month)}';
+            text = tx('{0} {1}, {2} / {3}.',
+                [lbl, wxText(day.code), _deg(day.tmax), _deg(day.tmin)]);
+          } else {
+            return const SizedBox.shrink();
+          }
+          warn = wxAlerts(d).isNotEmpty;
+        }
+        return Container(
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+          decoration: BoxDecoration(
+            color: p.card,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: p.line),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () {
+              if (d == null && weather.failed) {
+                weather.ensure(force: true);
+                return;
+              }
+              onTap();
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  Icon(icon, size: 20, color: color),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(text,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: p.ink)),
+                  ),
+                  if (warn)
+                    const Padding(
+                      padding: EdgeInsets.only(left: 6),
+                      child: Icon(Icons.warning_amber_rounded,
+                          size: 20, color: Color(0xFFE8883A)),
+                    ),
+                ],
+              ),
+            ),
           ),
         );
       },

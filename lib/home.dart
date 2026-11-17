@@ -18,6 +18,7 @@ import 'theme.dart';
 import 'todos.dart';
 import 'ui.dart';
 import 'prayer.dart';
+import 'shortcuts.dart';
 import 'weather.dart';
 
 // ---------------------------------------------------------------
@@ -64,7 +65,8 @@ Widget _swipeBg(Color color, IconData icon, Alignment align) => Container(
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   DateTime day = dayOnly(DateTime.now());
-  bool get _wxOpen => store.wxBarOpen; // saatlik hava paneli açık mı (kalıcı)
+  bool get _wxOpen => store.wxBarOpen; // saatlik hava paneli açık mı
+  bool _prOpen = false; // namaz vakitleri listesi açık mı
   // Rutinlerin altındaki açılır başlıklar ('todo', 'note', 'rem')
   final Set<String> _openSec = {};
   String? _catFilter; // null: tüm kategoriler, aksi halde seçili kategori kimliği
@@ -97,7 +99,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// Herhangi bir sayfada aşağı çekilince: ana ekran ilk haline döner
   void _onHomeReset() {
     if (!mounted) return;
+    store.setWxBarOpen(false); // yenilenince hava ve namaz yalnız yazı olarak kalır
     setState(() {
+      _prOpen = false;
       day = dayOnly(DateTime.now());
       _openSec.clear();
       _catFilter = null;
@@ -617,6 +621,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       icon: Icons.task_alt_rounded,
                       title: tx('Yapılacaklar'),
                       tone: const Color(0xFF2FB38A),
+                      onAdd: () async {
+                        final ok = await showAddTodo(context, date);
+                        if (ok && mounted) setState(() => _openSec.add('todo'));
+                      },
                       badge: () {
                         final n = store
                             .todosFor(date)
@@ -651,6 +659,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       icon: Icons.notifications_active_outlined,
                       title: tx('Hatırlatıcı'),
                       tone: const Color(0xFFF08A3C),
+                      onAdd: () => showReminderSheet(context),
                       badge: () {
                         final n = store.reminders
                             .where((r) => r.enabled && !reminderFinished(r))
@@ -696,26 +705,37 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             scrolledUnderElevation: 0,
             centerTitle: true,
             titleSpacing: 0,
-            leadingWidth: 92,
+            leadingWidth: 118,
             leading: Row(
               children: [
                 IconButton(
                   visualDensity: VisualDensity.compact,
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                  constraints: const BoxConstraints(minWidth: 40, minHeight: 44),
                   icon: const Icon(Icons.menu_rounded),
                   onPressed: () => _scaffoldKey.currentState?.openDrawer(),
                 ),
-                if (!store.appHidden('study'))
+                if (!store.appHidden('study') &&
+                    !(store.appHidden('study_lgs') && store.appHidden('study_dil')))
                 IconButton(
                   visualDensity: VisualDensity.compact,
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                  constraints: const BoxConstraints(minWidth: 40, minHeight: 44),
                   tooltip: tx('Ders çalışma'),
                   icon: const Icon(Icons.menu_book_rounded),
                   onPressed: () => Navigator.of(context)
                       .push(slideFromRight(const StudyPage())),
                 ),
+                if (!store.appHidden('shortcuts'))
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 38, minHeight: 44),
+                    tooltip: tx('Kısayollar'),
+                    icon: const Icon(Icons.apps_rounded),
+                    onPressed: () => Navigator.of(context)
+                        .push(slideFromRight(const ShortcutsPage())),
+                  ),
               ],
             ),
             // Tarih seçici en üstte: < Bugün • 3 Kasım >
@@ -783,40 +803,41 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ],
           ),
           body: Builder(builder: (context) {
-            // Hava simgesi hava + namaz vakitleri çubuğunu açar/kapatır (sabit kalır).
-            // Hava kapalıysa namaz vakitleri her zaman görünür.
-            final open = _wxOpen || !store.wxOn;
-            final topWx = _wxOpen && store.wxOn && store.wxPlace == 0;
-            final sideWx = _wxOpen && store.wxOn && store.wxPlace == 1;
-            final topPr = store.prayOn && store.prayPlace == 0 && open;
-            final sidePr = store.prayOn && store.prayPlace == 1 && open;
+            // Hava ve namaz: tek satır yazı; dokununca altına açılır.
+            // Ekran yenilenince (aşağı çekip ana sayfaya dönünce) yalnız yazı kalır.
             return Column(
               children: [
-                if (topWx) WxPanel(key: ValueKey('wx_$date'), date: date),
-                if (topPr) const PrayerBar(),
-                Expanded(
-                  child: (sideWx || sidePr)
-                      ? Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            SizedBox(
-                              width: 76,
-                              child: Column(
-                                children: [
-                                  if (sideWx)
-                                    Expanded(
-                                        child: WxSide(
-                                            key: ValueKey('wxs_$date'),
-                                            date: date)),
-                                  if (sidePr) const PrayerBar(vertical: true),
-                                ],
-                              ),
-                            ),
-                            Expanded(child: body),
-                          ],
-                        )
-                      : body,
-                ),
+                if (store.wxOn)
+                  WxLine(
+                    key: ValueKey('wxl_$date'),
+                    date: date,
+                    open: _wxOpen,
+                    onTap: () => store.setWxBarOpen(!store.wxBarOpen),
+                  ),
+                if (store.wxOn && _wxOpen)
+                  WxPanel(key: ValueKey('wx_$date'), date: date),
+                if (store.prayOn)
+                  PrayerLine(
+                    open: _prOpen,
+                    onTap: () => setState(() => _prOpen = !_prOpen),
+                  ),
+                if (store.prayOn && _prOpen) ...[
+                  const PrayerBar(),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 16, bottom: 6),
+                      child: TextButton.icon(
+                        onPressed: () => Navigator.of(context)
+                            .push(slideFromRight(const NamazPage())),
+                        icon: const Icon(Icons.notifications_active_outlined,
+                            size: 18),
+                        label: Text(tx('Uyarılar ve kaza namazı')),
+                      ),
+                    ),
+                  ),
+                ],
+                Expanded(child: body),
               ],
             );
           }),
@@ -874,8 +895,10 @@ class _HomeSection extends StatelessWidget {
   final String badge; // sayı ya da "•"; boşsa görünmez
   final bool open;
   final VoidCallback onToggle;
+  final VoidCallback? onAdd; // başlıktaki + düğmesi
   final Widget child;
   const _HomeSection({
+    this.onAdd,
     required this.icon,
     required this.title,
     required this.tone,
@@ -931,6 +954,16 @@ class _HomeSection extends StatelessWidget {
                         child: Text(badge,
                             style: TextStyle(
                                 fontWeight: FontWeight.w700, color: p.ink)),
+                      ),
+                    if (onAdd != null)
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints:
+                            const BoxConstraints(minWidth: 36, minHeight: 36),
+                        tooltip: tx('Ekle'),
+                        onPressed: onAdd,
+                        icon: Icon(Icons.add_circle_outline_rounded, color: tone),
                       ),
                     const SizedBox(width: 4),
                     AnimatedRotation(

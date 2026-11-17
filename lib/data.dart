@@ -349,6 +349,17 @@ class LaunchItem {
   bool onDay(int weekday) => days.isEmpty || days.contains(weekday);
 }
 
+/// Kısayol: telefondaki bir uygulama (paket adı ile)
+class AppShortcut {
+  final String id;
+  String name;
+  String pkg;
+  AppShortcut(this.id, this.name, this.pkg);
+  Map<String, dynamic> toJson() => {'id': id, 'n': name, 'p': pkg};
+  factory AppShortcut.fromJson(Map<String, dynamic> j) => AppShortcut(
+      (j['id'] ?? '').toString(), (j['n'] ?? '').toString(), (j['p'] ?? '').toString());
+}
+
 /// Konuya yazılan not
 class StudyNote {
   final String id;
@@ -766,7 +777,7 @@ class Todo {
       );
 }
 
-/// Hatırlatıcı: kind = once (tek sefer) | interval (aralıklı) | daily (her gün)
+/// Hatırlatıcı: kind = once (tek sefer) | interval (aralıklı) | daily (her gün) | repeat (tarihli tekrar)
 class Reminder {
   final String id;
   int nid; // bildirim numarası
@@ -776,8 +787,12 @@ class Reminder {
   int startMs; // once / interval için başlangıç
   int every; // interval: dakika
   int count; // interval: kaç kez
-  int hour; // daily
-  int minute; // daily
+  int hour; // daily / repeat: saat
+  int minute; // daily / repeat: dakika
+  // repeat (tarihli tekrar: araç muayenesi, sigorta gibi): her [rep] [unit] bir
+  int rep; // kaç birimde bir
+  String unit; // d = gün, w = hafta, m = ay, y = yıl
+  int early; // kaç gün önceden de haber ver (0 = yalnız o gün)
   Reminder({
     required this.id,
     required this.nid,
@@ -789,6 +804,9 @@ class Reminder {
     this.count = 1,
     this.hour = 9,
     this.minute = 0,
+    this.rep = 1,
+    this.unit = 'y',
+    this.early = 0,
   });
 
   Map<String, dynamic> toJson() => {
@@ -802,6 +820,9 @@ class Reminder {
         'count': count,
         'h': hour,
         'm': minute,
+        'rep': rep,
+        'unit': unit,
+        'early': early,
       };
 
   factory Reminder.fromJson(Map<String, dynamic> j) => Reminder(
@@ -815,6 +836,9 @@ class Reminder {
         count: (j['count'] ?? 1) as int,
         hour: (j['h'] ?? 9) as int,
         minute: (j['m'] ?? 0) as int,
+        rep: (j['rep'] ?? 1) as int,
+        unit: (j['unit'] ?? 'y') as String,
+        early: (j['early'] ?? 0) as int,
       );
 }
 
@@ -863,10 +887,20 @@ List<DateTime> reminderTimes(Reminder r, DateTime now) {
     }
   } else if (r.kind == 'interval') {
     final start = DateTime.fromMillisecondsSinceEpoch(r.startMs);
-    for (var k = 0; k < r.count; k++) {
-      final t = start.add(Duration(minutes: r.every * k));
-      if (t.isAfter(now)) out.add(t);
+    // count = 0: sınırsız; önümüzdeki 24 tekrar kurulur, uygulama açıldıkça yenilenir
+    if (r.count <= 0) {
+      for (var k = 0; k < 100000 && out.length < 24; k++) {
+        final t = start.add(Duration(minutes: r.every * k));
+        if (t.isAfter(now)) out.add(t);
+      }
+    } else {
+      for (var k = 0; k < r.count && k < 99; k++) {
+        final t = start.add(Duration(minutes: r.every * k));
+        if (t.isAfter(now)) out.add(t);
+      }
     }
+  } else if (r.kind == 'repeat') {
+    out.addAll(repeatTimes(r, now));
   } else {
     final t = DateTime.fromMillisecondsSinceEpoch(r.startMs);
     if (t.isAfter(now)) out.add(t);
@@ -874,9 +908,43 @@ List<DateTime> reminderTimes(Reminder r, DateTime now) {
   return out;
 }
 
+/// Tarihli tekrar: k. oluşum tarihi (ay/yıl eklerken ayın son gününe taşmaz)
+DateTime repeatOccurrence(Reminder r, int k) {
+  final st = DateTime.fromMillisecondsSinceEpoch(r.startMs);
+  final n = (r.rep < 1 ? 1 : r.rep) * k;
+  switch (r.unit) {
+    case 'd':
+      return DateTime(st.year, st.month, st.day + n, r.hour, r.minute);
+    case 'w':
+      return DateTime(st.year, st.month, st.day + 7 * n, r.hour, r.minute);
+    default:
+      final months = r.unit == 'y' ? 12 * n : n;
+      final total = st.year * 12 + (st.month - 1) + months;
+      final y = total ~/ 12;
+      final m = total % 12 + 1;
+      final last = DateTime(y, m + 1, 0).day;
+      return DateTime(y, m, st.day > last ? last : st.day, r.hour, r.minute);
+  }
+}
+
+/// Tarihli tekrar: önümüzdeki bildirim zamanları (varsa "kaç gün önce" uyarısıyla)
+List<DateTime> repeatTimes(Reminder r, DateTime now) {
+  final out = <DateTime>[];
+  for (var k = 0; k < 400 && out.length < 24; k++) {
+    final d = repeatOccurrence(r, k);
+    if (r.early > 0) {
+      final e = DateTime(d.year, d.month, d.day - r.early, r.hour, r.minute);
+      if (e.isAfter(now)) out.add(e);
+    }
+    if (d.isAfter(now)) out.add(d);
+  }
+  out.sort();
+  return out.length > 24 ? out.sublist(0, 24) : out;
+}
+
 /// Tek seferlik / aralıklı hatırlatıcı bitti mi? (her gün olanlar bitmez)
 bool reminderFinished(Reminder r) {
-  if (r.kind == 'daily') return false;
+  if (r.kind == 'daily' || r.kind == 'repeat') return false;
   return reminderTimes(r, DateTime.now()).isEmpty;
 }
 
@@ -1089,6 +1157,9 @@ class AppStore extends ChangeNotifier {
 
   List<Playlist> playlists = [];
   List<RadioCat> radCats = [];
+  // Listeden kaldırılsa bile favori kalan radyo / podcast'ler
+  List<Station> radFavKeep = [];
+  List<Podcast> podFavKeep = [];
   bool _radLoaded = false;
   List<PodCat> podCats = [];
   List<NewsCat> newsCats = [];
@@ -1370,6 +1441,30 @@ class AppStore extends ChangeNotifier {
   }
 
   void touchLauncher() => _commit();
+
+  // ----- Kısayollar (uygulama başlatma) -----
+  List<AppShortcut> shortcuts = [];
+
+  bool hasShortcut(String pkg) => shortcuts.any((x) => x.pkg == pkg);
+
+  void addShortcut(String name, String pkg) {
+    if (hasShortcut(pkg)) return;
+    shortcuts.add(AppShortcut(newId(), name, pkg));
+    _commit();
+  }
+
+  /// Kısayolu siler; ona bağlı otomatik başlatmalar da silinir
+  List<LaunchItem> removeShortcut(String id) {
+    final sc = shortcuts.where((x) => x.id == id).toList();
+    shortcuts.removeWhere((x) => x.id == id);
+    final gone = <LaunchItem>[];
+    for (final x in sc) {
+      gone.addAll(launchers.where((l) => l.kind == 'app' && l.ref == x.pkg));
+    }
+    launchers.removeWhere((l) => gone.contains(l));
+    _commit();
+    return gone;
+  }
 
   void deleteLauncher(String id) {
     launchers.removeWhere((a) => a.id == id);
@@ -1744,6 +1839,7 @@ class AppStore extends ChangeNotifier {
   void restoreStation(String catId, Station s, int index) {
     final c = radCatById(catId) ?? (radCats.isEmpty ? null : radCats.first);
     if (c == null || c.stations.any((x) => x.id == s.id)) return;
+    radFavKeep.removeWhere((x) => x.id == s.id);
     c.stations.insert(index.clamp(0, c.stations.length).toInt(), s);
     _commit();
   }
@@ -1751,6 +1847,7 @@ class AppStore extends ChangeNotifier {
   void restorePodcast(String catId, Podcast p, int index) {
     final c = podCatById(catId) ?? (podCats.isEmpty ? null : podCats.first);
     if (c == null || podcasts.any((x) => x.id == p.id)) return;
+    podFavKeep.removeWhere((x) => x.id == p.id);
     c.pods.insert(index.clamp(0, c.pods.length).toInt(), p);
     _commit();
   }
@@ -1826,8 +1923,16 @@ class AppStore extends ChangeNotifier {
   /// id == null: yeni radyo; değilse düzenle (kategori değiştiyse taşınır)
   void saveStation(String catId, String? id, String name, String url) {
     if (id == null) {
-      radCatById(catId)?.stations
-          .add(Station(id: newId(), name: name, url: url));
+      // daha önce kaldırılmış ama favori kalmış radyo geri eklenirse yıldızı korunur
+      final k = radFavKeep.indexWhere((x) => x.url == url);
+      if (k >= 0) {
+        final kept = radFavKeep.removeAt(k);
+        radCatById(catId)?.stations
+            .add(Station(id: kept.id, name: name, url: url, fav: true));
+      } else {
+        radCatById(catId)?.stations
+            .add(Station(id: newId(), name: name, url: url));
+      }
     } else {
       Station? found;
       for (final c in radCats) {
@@ -1851,8 +1956,35 @@ class AppStore extends ChangeNotifier {
   }
 
   void removeStation(String catId, String id) {
-    radCatById(catId)?.stations.removeWhere((s) => s.id == id);
+    final c = radCatById(catId);
+    if (c != null) {
+      for (final st in c.stations.where((s) => s.id == id)) {
+        // favori radyo listeden kalksa da Favoriler'de kalır
+        if (st.fav && !radFavKeep.any((x) => x.url == st.url)) {
+          radFavKeep.add(Station(id: st.id, name: st.name, url: st.url, fav: true));
+        }
+      }
+      c.stations.removeWhere((s) => s.id == id);
+    }
     _commit();
+  }
+
+  /// Arama listesinde ✓'ye basınca: radyoyu (önce seçili kategoriden) listeden kaldırır
+  void removeStationByUrl(String url, String prefCat) {
+    final pref = radCatById(prefCat);
+    if (pref != null && pref.stations.any((s) => s.url == url)) {
+      for (final s in [...pref.stations.where((s) => s.url == url)]) {
+        removeStation(pref.id, s.id);
+      }
+      return;
+    }
+    for (final c in radCats) {
+      final hit = c.stations.where((s) => s.url == url).toList();
+      if (hit.isNotEmpty) {
+        removeStation(c.id, hit.first.id);
+        return;
+      }
+    }
   }
 
   void moveStation(String catId, int from, int to) {
@@ -1915,13 +2047,40 @@ class AppStore extends ChangeNotifier {
     if (isFollowing(feed)) return;
     final c = podCatById(catId) ?? (podCats.isEmpty ? null : podCats.first);
     if (c == null) return;
-    c.pods.add(Podcast(
-        id: newId(), title: title, author: author, feed: feed, art: art));
+    final k = podFavKeep.indexWhere((x) => x.feed == feed);
+    if (k >= 0) {
+      // daha önce kaldırılmış favori podcast geri eklenirse yıldızı korunur
+      final kept = podFavKeep.removeAt(k);
+      c.pods.add(Podcast(
+          id: kept.id, title: title, author: author, feed: feed, art: art, fav: true));
+    } else {
+      c.pods.add(Podcast(
+          id: newId(), title: title, author: author, feed: feed, art: art));
+    }
     _commit();
+  }
+
+  void _keepFavPod(String id) {
+    for (final c in podCats) {
+      for (final p in c.pods.where((p) => p.id == id && p.fav)) {
+        if (!podFavKeep.any((x) => x.feed == p.feed)) {
+          podFavKeep.add(Podcast(
+              id: p.id, title: p.title, author: p.author, feed: p.feed, art: p.art, fav: true));
+        }
+      }
+    }
+  }
+
+  /// Arama listesinde ✓'ye basınca: podcast takipten çıkar (favoriyse Favoriler'de kalır)
+  void unfollowByFeed(String feed) {
+    for (final p in podcasts.where((p) => p.feed == feed).toList()) {
+      removePodcast(p.id);
+    }
   }
 
   /// Takipten çıkarır ama dinleme konumlarını silmez ("Geri al" için)
   void unfollowKeep(String id) {
+    _keepFavPod(id);
     for (final c in podCats) {
       c.pods.removeWhere((p) => p.id == id);
     }
@@ -1929,11 +2088,15 @@ class AppStore extends ChangeNotifier {
   }
 
   void removePodcast(String id) {
+    final keep = podcasts.any((p) => p.id == id && p.fav);
+    _keepFavPod(id);
     for (final c in podCats) {
       c.pods.removeWhere((p) => p.id == id);
     }
-    epPos.removeWhere((k, v) => k.startsWith('$id|'));
-    epDone.removeWhere((k) => k.startsWith('$id|'));
+    if (!keep) {
+      epPos.removeWhere((k, v) => k.startsWith('$id|'));
+      epDone.removeWhere((k) => k.startsWith('$id|'));
+    }
     _commit();
   }
 
@@ -1944,6 +2107,8 @@ class AppStore extends ChangeNotifier {
         if (st.id == id) st.fav = !st.fav;
       }
     }
+    // listede olmayan (yalnız favori) radyonun yıldızı kalkınca tamamen silinir
+    radFavKeep.removeWhere((x) => x.id == id);
     _commit();
   }
 
@@ -1951,6 +2116,7 @@ class AppStore extends ChangeNotifier {
     for (final pd in podcasts) {
       if (pd.id == id) pd.fav = !pd.fav;
     }
+    podFavKeep.removeWhere((x) => x.id == id);
     _commit();
   }
 
@@ -1965,7 +2131,7 @@ class AppStore extends ChangeNotifier {
   }
 
   void togglePodcast(String id) {
-    for (final p in podcasts) {
+    for (final p in [...podcasts, ...podFavKeep]) {
       if (p.id == id) p.open = !p.open;
     }
     _commit();
@@ -2132,6 +2298,12 @@ class AppStore extends ChangeNotifier {
         ),
       ];
     }
+    radFavKeep = ((j['radfk'] as List?) ?? [])
+        .map((e) => Station.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+    podFavKeep = ((j['podfk'] as List?) ?? [])
+        .map((e) => Podcast.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
     if (j['radcats'] is List) {
       radCats = (j['radcats'] as List)
           .map((e) => RadioCat.fromJson(e as Map<String, dynamic>))
@@ -2236,6 +2408,9 @@ class AppStore extends ChangeNotifier {
     }
     alarms = ((j['alarms'] as List?) ?? [])
         .map((e) => AlarmItem.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+    shortcuts = ((j['appsc'] as List?) ?? [])
+        .map((e) => AppShortcut.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
     launchers = ((j['launch'] as List?) ?? [])
         .map((e) => LaunchItem.fromJson(Map<String, dynamic>.from(e as Map)))
@@ -2475,6 +2650,8 @@ class AppStore extends ChangeNotifier {
         'nextNid': nextNid,
         'lists': playlists.map((p) => p.toJson()).toList(),
         'radcats': radCats.map((c) => c.toJson()).toList(),
+        'radfk': radFavKeep.map((c) => c.toJson()).toList(),
+        'podfk': podFavKeep.map((c) => c.toJson()).toList(),
         'podcats': podCats.map((c) => c.toJson()).toList(),
         'newscats': newsCats.map((c) => c.toJson()).toList(),
         'jamkey': jamendoKey,
@@ -2516,6 +2693,7 @@ class AppStore extends ChangeNotifier {
         'wxsec': wxSecOrder,
         'alarms': alarms.map((a) => a.toJson()).toList(),
         'launch': launchers.map((a) => a.toJson()).toList(),
+        'appsc': shortcuts.map((a) => a.toJson()).toList(),
         'eppos': epPos,
         'epdone': epDone.toList(),
         'rep': repeatMode,

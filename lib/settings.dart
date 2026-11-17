@@ -136,56 +136,24 @@ class SettingsPage extends StatelessWidget {
                   secondary: const Icon(Icons.wb_sunny_outlined),
                   title: Text(tx('Hava durumunu göster')),
                   subtitle:
-                      Text(tx('Ana ekranda seçili yerin havası gösterilir.')),
+                      Text(tx('Ana ekranda tek satır hava yazısı; dokununca saatlik hava açılır.')),
                   value: store.wxOn,
                   onChanged: (v) {
                     store.setWxOn(v);
                     if (v) weather.ensure();
                   },
                 ),
-                if (store.wxOn)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4, bottom: 8),
-                    child: Wrap(spacing: 8, children: [
-                      ChoiceChip(
-                        label: Text(tx('Üst bar')),
-                        selected: store.wxPlace == 0,
-                        onSelected: (_) => store.setWxPlace(0),
-                      ),
-                      ChoiceChip(
-                        label: Text(tx('Sol sütun')),
-                        selected: store.wxPlace == 1,
-                        onSelected: (_) => store.setWxPlace(1),
-                      ),
-                    ]),
-                  ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   secondary: const Icon(Icons.mosque_rounded),
                   title: Text(tx('Namaz vakitlerini göster')),
-                  subtitle: Text(tx('Seçili yere göre (Diyanet yöntemi). Hava simgesine dokununca açılır.')),
+                  subtitle: Text(tx('Seçili yere göre (Diyanet yöntemi). Ana ekranda tek satır yazı; dokununca tüm vakitler açılır.')),
                   value: store.prayOn,
                   onChanged: (v) {
                     store.setPrayOn(v);
                     if (v) prayer.ensure();
                   },
                 ),
-                if (store.prayOn)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4, bottom: 8),
-                    child: Wrap(spacing: 8, children: [
-                      ChoiceChip(
-                        label: Text(tx('Üst bar')),
-                        selected: store.prayPlace == 0,
-                        onSelected: (_) => store.setPrayPlace(0),
-                      ),
-                      ChoiceChip(
-                        label: Text(tx('Sol sütun')),
-                        selected: store.prayPlace == 1,
-                        onSelected: (_) => store.setPrayPlace(1),
-                      ),
-                    ]),
-                  ),
               ]),
               sec(tx('Uygulamalar'), [
                 Padding(
@@ -200,6 +168,9 @@ class SettingsPage extends StatelessWidget {
                   ('rem', 'Hatırlatıcı', Icons.notifications_active_outlined),
                   ('wallet', 'Cüzdan', Icons.account_balance_wallet_rounded),
                   ('study', 'Ders çalışma', Icons.school_rounded),
+                  ('study_lgs', 'LGS', Icons.menu_book_rounded),
+                  ('study_dil', 'Yabancı dil', Icons.translate_rounded),
+                  ('shortcuts', 'Kısayollar', Icons.apps_rounded),
                   ('tools', 'Araçlar', Icons.handyman_outlined),
                   ('media', 'Müzik ve Radyo', Icons.headphones_rounded),
                   ('music', 'Müzik', Icons.music_note_rounded),

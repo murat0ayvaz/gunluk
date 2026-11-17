@@ -4,5 +4,5 @@
 // aynı olmalı (appVersion = X.Y.Z, appBuild = N). appBuild değişince
 // uygulama ilk açılışta "Uygulama güncellendi" penceresini gösterir.
 // ---------------------------------------------------------------
-const appVersion = '1.25.6';
-const appBuild = 39;
+const appVersion = '1.25.7';
+const appBuild = 40;

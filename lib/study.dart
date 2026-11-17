@@ -202,10 +202,21 @@ class _StudyPageState extends State<StudyPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeAsk());
   }
 
-  String get _tab => store.studyTab == 'dil' ? 'dil' : 'lgs';
+  /// Ayarlar > Uygulamalar'da açık olan bölümler
+  List<String> get _tabs => [
+        for (final t in const ['lgs', 'dil'])
+          if (!store.appHidden('study_$t')) t
+      ];
+
+  String get _tab {
+    final want = store.studyTab == 'dil' ? 'dil' : 'lgs';
+    final v = _tabs;
+    if (v.isEmpty || v.contains(want)) return want;
+    return v.first;
+  }
 
   Future<void> _maybeAsk() async {
-    if (!mounted || _asking) return;
+    if (!mounted || _asking || _tabs.isEmpty) return;
     final g = _tab;
     if (store.studyAsked.contains(g)) return;
     _asking = true;
@@ -258,6 +269,22 @@ class _StudyPageState extends State<StudyPage> {
       listenable: store,
       builder: (context, _) {
         final p = palOf(context);
+        final tabs = _tabs;
+        if (tabs.isEmpty) {
+          return Scaffold(
+            backgroundColor: p.bg,
+            appBar: AppBar(title: Text(tx('Ders çalışma'))),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Text(
+                    tx('Tüm bölümler Ayarlar > Uygulamalar bölümünden kapatılmış.'),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: p.soft, height: 1.4)),
+              ),
+            ),
+          );
+        }
         final tab = _tab;
         final all = studySubjects.where((s) => s.group == tab).toList();
         final list = all.where((s) => store.studyPk.contains(s.id)).toList();
@@ -290,16 +317,20 @@ class _StudyPageState extends State<StudyPage> {
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
-              SegmentedButton<String>(
-                segments: [
-                  ButtonSegment(value: 'lgs', label: Text(tx('LGS'))),
-                  ButtonSegment(value: 'dil', label: Text(tx('Yabancı dil'))),
-                ],
-                selected: {tab},
-                showSelectedIcon: false,
-                onSelectionChanged: (s) => _setTab(s.first),
-              ),
-              const SizedBox(height: 10),
+              if (tabs.length > 1) ...[
+                SegmentedButton<String>(
+                  segments: [
+                    for (final t in tabs)
+                      ButtonSegment(
+                          value: t,
+                          label: Text(t == 'lgs' ? tx('LGS') : tx('Yabancı dil'))),
+                  ],
+                  selected: {tab},
+                  showSelectedIcon: false,
+                  onSelectionChanged: (s) => _setTab(s.first),
+                ),
+                const SizedBox(height: 10),
+              ],
               _planCard(context, p),
               const SizedBox(height: 10),
               for (final s in list) _subjectCard(context, p, s),

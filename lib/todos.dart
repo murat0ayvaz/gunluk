@@ -152,45 +152,7 @@ class _TodosBodyState extends State<TodosBody> {
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ----- Madde ekleme kutusu -----
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _c,
-                      textCapitalization: TextCapitalization.sentences,
-                      textInputAction: TextInputAction.done,
-                      onSubmitted: (_) => _add(),
-                      decoration: InputDecoration(
-                        hintText: tx('Yeni madde ekle'),
-                        isDense: true,
-                        filled: true,
-                        fillColor: p.card,
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: p.line),
-                        ),
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: tx('Sesle ekle'),
-                    onPressed: _addVoice,
-                    icon: const Icon(Icons.mic_rounded, size: 28),
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  IconButton(
-                    onPressed: _add,
-                    icon: const Icon(Icons.add_circle_rounded, size: 30),
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ],
-              ),
-            ),
+
             if (done.isNotEmpty)
               Align(
                 alignment: Alignment.centerRight,
@@ -203,7 +165,7 @@ class _TodosBodyState extends State<TodosBody> {
               Padding(
                 padding: const EdgeInsets.all(20),
                 child: Text(
-                  tx('Bu gün için madde yok. Yukarıdan ekleyebilirsin.'),
+                  tx('Bu gün için madde yok. Başlıktaki + ile ekleyebilirsin.'),
                   textAlign: TextAlign.center,
                   style: TextStyle(color: p.soft),
                 ),
@@ -353,4 +315,52 @@ class _TodosBodyState extends State<TodosBody> {
       },
     );
   }
+}
+
+
+/// Yapılacaklar başlığındaki + düğmesi: madde ekleme penceresi (yazı veya sesle)
+Future<bool> showAddTodo(BuildContext context, String date) async {
+  final c = TextEditingController();
+  final r = await showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(tx('Yeni madde')),
+      content: TextField(
+        controller: c,
+        autofocus: true,
+        textCapitalization: TextCapitalization.sentences,
+        textInputAction: TextInputAction.done,
+        onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+        decoration: InputDecoration(hintText: tx('Yeni madde ekle')),
+      ),
+      actions: [
+        IconButton(
+          tooltip: tx('Sesle ekle'),
+          onPressed: () => Navigator.pop(ctx, '\u0000voice'),
+          icon: const Icon(Icons.mic_rounded),
+        ),
+        TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tx('Vazgeç'))),
+        FilledButton(
+            onPressed: () => Navigator.pop(ctx, c.text.trim()),
+            child: Text(tx('Ekle'))),
+      ],
+    ),
+  );
+  c.dispose();
+  if (r == null || r.isEmpty) return false;
+  if (r == '\u0000voice') {
+    if (!context.mounted) return false;
+    final name = await recordVoice(context);
+    if (name == null || !context.mounted) return false;
+    final n = DateTime.now();
+    final def =
+        '${tx('Ses kaydı')} ${n.hour.toString().padLeft(2, '0')}:${n.minute.toString().padLeft(2, '0')}';
+    final t = await askText(context, tx('Başlık'),
+        initial: def, label: tx('Madde başlığı'));
+    final title = (t == null || t.trim().isEmpty) ? def : t.trim();
+    store.addTodo(title, voice: name, day: date);
+    return true;
+  }
+  store.addTodo(r, day: date);
+  return true;
 }

@@ -199,6 +199,8 @@ class PodcastTab extends StatelessWidget {
       for (final c in store.podCats)
         for (final pd in c.pods)
           if (pd.fav) MapEntry(c, pd),
+      for (final pd in store.podFavKeep)
+        MapEntry(PodCat(id: 'favkeep', name: tx('Favoriler')), pd),
     ];
     if (items.isEmpty) {
       return Center(
@@ -796,8 +798,13 @@ class _PodcastSearchPageState extends State<PodcastSearchPage> {
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(color: p.soft, fontSize: 12)),
                             trailing: IconButton(
-                              tooltip: tx('Takip et'),
-                              onPressed: have ? null : () => _follow(r),
+                              tooltip: have ? tx('Takibi bırak') : tx('Takip et'),
+                              onPressed: have
+                                  ? () {
+                                      store.unfollowByFeed(r.feed);
+                                      setState(() {});
+                                    }
+                                  : () => _follow(r),
                               icon: Icon(have
                                   ? Icons.check_circle_rounded
                                   : Icons.add_circle_outline_rounded),

@@ -47,8 +47,6 @@ String _groupTitle(String g) {
       return tx('Zaman ve sayaçlar');
     case 'para':
       return tx('Para');
-    case 'namaz':
-      return tx('Namaz');
     case 'din':
       return tx('Dini');
     default:
@@ -56,7 +54,7 @@ String _groupTitle(String g) {
   }
 }
 
-const _defaultGroupOrder = ['health', 'time', 'weather', 'para', 'namaz', 'din'];
+const _defaultGroupOrder = ['health', 'time', 'weather', 'para', 'din'];
 
 IconData _groupIcon(String g) {
   switch (g) {
@@ -66,7 +64,6 @@ IconData _groupIcon(String g) {
       return Icons.timer_rounded;
     case 'para':
       return Icons.account_balance_wallet_rounded;
-    case 'namaz':
     case 'din':
       return Icons.mosque_rounded;
     default:
@@ -74,8 +71,8 @@ IconData _groupIcon(String g) {
   }
 }
 
-// Kapalı (daraltılmış) gruplar; çekmece kapanıp açılınca da hatırlanır
-final Set<String> _closedGroups = {};
+// Açık gruplar; çekmece kapanıp açılınca da hatırlanır
+final Set<String> _openGroups = {}; // varsayılan: tüm başlıklar kapalı
 
 /// Hazır sıra (varsayılan); kullanıcının sıralaması bunun üstüne uygulanır
 List<_ToolInfo> _allTools() => [
@@ -102,10 +99,10 @@ List<_ToolInfo> _allTools() => [
           group: 'din'),
       _ToolInfo('namaz', Icons.access_time_rounded, tx('Vakitler ve uyarılar'),
           const Color(0xFF2E9E8F), () => const NamazPage(),
-          group: 'namaz'),
+          group: 'din'),
       _ToolInfo('kaza', Icons.event_repeat_rounded, tx('Kaza namazı'),
           const Color(0xFF5C7CFA), () => const KazaPage(),
-          group: 'namaz'),
+          group: 'din'),
       _ToolInfo('zamanlama', Icons.alarm_rounded, tx('Zamanlama'),
           const Color(0xFF7E57C2), () => const ZamanlamaPage(),
           group: 'time'),
@@ -252,7 +249,7 @@ class _ToolsDrawerState extends State<ToolsDrawer> {
   Widget _groupHeader(Pal p, String g, int i, int n) {
     // Hava durumu tek araç: başlıksız (yalnız sıralama kipinde görünür)
     if ((g == 'weather' || g == 'para') && !_edit) return const SizedBox(height: 4);
-    final closed = _closedGroups.contains(g) && !_edit;
+    final closed = !_openGroups.contains(g) && !_edit;
     const black = Color(0xFF111111);
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
@@ -264,7 +261,7 @@ class _ToolsDrawerState extends State<ToolsDrawer> {
           onTap: _edit
               ? null
               : () => setState(() {
-                    if (!_closedGroups.remove(g)) _closedGroups.add(g);
+                    if (!_openGroups.remove(g)) _openGroups.add(g);
                   }),
           child: Container(
             padding: const EdgeInsets.fromLTRB(14, 8, 6, 8),
@@ -400,7 +397,7 @@ class _ToolsDrawerState extends State<ToolsDrawer> {
                           )
                         else if (groups[gi].$1 == 'weather' ||
                             groups[gi].$1 == 'para' ||
-                            !_closedGroups.contains(groups[gi].$1))
+                            _openGroups.contains(groups[gi].$1))
                           for (final t in groups[gi].$2) _tile(p, t),
                       ],
                       const SizedBox(height: 16),
@@ -3015,7 +3012,6 @@ class NamazPage extends StatefulWidget {
 }
 
 class _NamazPageState extends State<NamazPage> {
-  static const _opts = [0, 5, 10, 15, 30];
 
   @override
   void initState() {
@@ -3023,9 +3019,9 @@ class _NamazPageState extends State<NamazPage> {
     prayer.ensure();
   }
 
-  Future<void> _change(int i, int v) async {
+  Future<void> _change(int i, int v, {bool ask = false}) async {
     store.setPrayAlert(i, v);
-    if (v >= 0) {
+    if (ask && v >= 0) {
       final msg = await permissionMessage();
       if (msg != null && mounted) {
         ScaffoldMessenger.of(context)
@@ -3051,7 +3047,7 @@ class _NamazPageState extends State<NamazPage> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             children: [
               Text(
-                  tx('Her vakit için uyarıyı aç/kapat ve kaç dakika önce çalacağını seç. Vakitler Aladhan (Diyanet yöntemi) ile hesaplanır.'),
+                  tx('Her vakit için uyarıyı aç/kapat; − / + ile kaç dakika önce çalacağını istediğin kadar ayarla. Vakitler Aladhan (Diyanet yöntemi) ile hesaplanır.'),
                   style: TextStyle(color: p.soft, height: 1.4)),
               const SizedBox(height: 14),
               if (t == null)
@@ -3093,27 +3089,37 @@ class _NamazPageState extends State<NamazPage> {
                             ],
                           ),
                         ),
-                        if (store.prayAlert[i] >= 0)
-                          DropdownButton<int>(
-                            value: _opts.contains(store.prayAlert[i])
-                                ? store.prayAlert[i]
-                                : 5,
-                            underline: const SizedBox.shrink(),
-                            items: [
-                              for (final o in _opts)
-                                DropdownMenuItem(
-                                    value: o,
-                                    child: Text(o == 0
-                                        ? tx('Vaktinde')
-                                        : tx('{0} dk önce', [o]))),
-                            ],
-                            onChanged: (v) {
-                              if (v != null) _change(i, v);
-                            },
+                        if (store.prayAlert[i] >= 0) ...[
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            onPressed: store.prayAlert[i] <= 0
+                                ? null
+                                : () => _change(i, store.prayAlert[i] - 1),
+                            icon: const Icon(Icons.remove_circle_outline),
                           ),
+                          SizedBox(
+                            width: 62,
+                            child: Text(
+                                store.prayAlert[i] == 0
+                                    ? tx('Vaktinde')
+                                    : tx('{0} dk önce', [store.prayAlert[i]]),
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                    color: p.ink,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13)),
+                          ),
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            onPressed: store.prayAlert[i] >= 180
+                                ? null
+                                : () => _change(i, store.prayAlert[i] + 1),
+                            icon: const Icon(Icons.add_circle_outline),
+                          ),
+                        ],
                         Switch(
                           value: store.prayAlert[i] >= 0,
-                          onChanged: (on) => _change(i, on ? 5 : -1),
+                          onChanged: (on) => _change(i, on ? 5 : -1, ask: true),
                         ),
                       ],
                     ),

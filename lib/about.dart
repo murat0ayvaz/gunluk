@@ -10,13 +10,14 @@ import 'version.dart';
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
       tx('Verilerin korundu.'),
-      tx('Namaz: ana ekrandaki vakit çubuğuna dokununca Namaz sayfası açılır. Araçlar > Namaz altında Vakitler ve uyarılar ile Kaza namazı. Her vakit için uyarı aç/kapa ve kaç dakika önce (vaktinde, 5, 10, 15, 30).'),
-      tx('Haber: yeni Etkinlikler başlığı; Hazır kaynaklardan belediye, valilik ve kültür kaynakları eklenir (çalışanlar listelenir).'),
-      tx('Hava durumu barı yalnız simgeyle açılıp kapanır; yenileyince veya gün değişince kapanmaz, uygulama kapanıp açılınca da kalır.'),
-      tx('Saatlik hava gece yarısından sonra da yarının saatleriyle devam eder; bugün şimdiki saatin 3 saat gerisinden başlar.'),
-      tx('Ayarlar > Uygulamalar: Yapılacaklar, Günlük, Hatırlatıcı, Cüzdan, Ders, Araçlar, Müzik/Radyo/Podcast/Haber/Online tek tek açılıp kapanır (veriler silinmez).'),
-      tx('Ana ekranda Rutinler ile Yapılacaklar arasındaki fazla boşluk giderildi.'),
+      tx('Ana ekranda hava ve namaz tek satır yazı: "Şu an hava açık, 12°. Bugün yağmurlu." ve "Öğleye 20 dk kaldı." Dokununca saatlik hava / tüm vakitler açılır; ekranı yenileyince yalnız yazı kalır. Sol sütun seçeneği kalktı.'),
+      tx('Kısayollar: Ders ikonunun yanındaki yeni ikonla telefondaki uygulamaları ekle, dokununca aç. İstersen saat ayarla; o saatte bildirime dokununca uygulama açılır.'),
+      tx('Hatırlatıcı: aralık süresi ve kaç kez elle yazılır, Sınırsız seçeneği var. Yeni Tarihli tekrar: araç muayenesi (2 yılda bir), sigorta (her yıl) gibi; kaç gün önce de haber verir.'),
+      tx('Yapılacaklar ve Hatırlatıcı başlıklarında + düğmesi; içteki ekleme kutusu kalktı.'),
+      tx('Radyo ve podcast aramasında ✓ işaretine basınca kaldırır. Listeden kaldırdığın favoriler, Favoriler\'de kalır.'),
+      tx('Ayarlar > Uygulamalar: Ders çalışma içinde LGS ve Yabancı dil ile Kısayollar da açılıp kapanır.'),
     ];
+
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {
   return showDialog<void>(
     context: context,

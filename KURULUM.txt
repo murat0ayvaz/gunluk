@@ -1,17 +1,21 @@
-DAILY ROUTINE v29.6 (1.25.6) - TAM PAKET
+DAILY ROUTINE v29.7 (1.25.7) - TAM PAKET
 
 Bu zipte projenin TAMAMI var: .github, assets, lib, debug.keystore, pubspec.yaml.
 1) Zipi çıkar. GitHub'da "gunluk" reposunun ANA sayfasında: Add file > Upload files.
 2) Çıkan klasörlerin ve dosyaların HEPSİNİ (.github, assets, lib, debug.keystore, pubspec.yaml) sürükle-bırak > Commit changes.
+   (YENİ: lib/shortcuts.dart. .github/workflows/build.yml de güncel: kısayollar için Android adımı eklendi, mutlaka yükle.)
 3) Actions > yeşil tik > Artifacts > gunluk-apk indir, telefona kur (veriler kalır).
 Derleme hatası olursa Actions'taki kırmızı satırları gönder.
 
-v29.6 yenilikleri:
-- Namaz: ana ekrandaki vakit çubuğuna dokununca Namaz sayfası açılır. Araçlar > Namaz: "Vakitler ve uyarılar" + "Kaza namazı" (Zikirmatik Dini'de kaldı).
-  Her vakit (İmsak, Güneş, Öğle, İkindi, Akşam, Yatsı) için uyarı aç/kapa ve vaktinde / 5 / 10 / 15 / 30 dk önce seçimi (varsayılan 5 dk, kapalı başlar).
-  Uyarılar bugün + 2 gün için kurulur, uygulama açıldıkça yenilenir.
-- Haber: yeni "Etkinlikler" başlığı. Kaynak eklerken Hazır kaynaklar > Etkinlikler: belediye/valilik/kültür adresleri denenir, çalışanlar listelenir. Elle adres de eklenebilir.
-- Hava durumu barı yalnız simgeyle açılıp kapanır; yenileyince/gün değişince kapanmaz, uygulama yeniden açılınca da korunur.
-- Saatlik hava gece yarısından sonra yarının saatleriyle devam eder (00 işaretinde "Yarın"); bugün şimdiki saatin 3 saat gerisinden başlar.
-- Ayarlar > Uygulamalar: Yapılacaklar, Günlük, Hatırlatıcı, Cüzdan, Ders çalışma, Araçlar, Müzik ve Radyo ile Müzik/Radyo/Podcast/Haber/Online sekmeleri tek tek açılıp kapanır (veriler silinmez).
-- Ana ekranda Rutinler ile Yapılacaklar arasındaki fazla boşluk giderildi.
+v29.7 yenilikleri:
+- Ana ekran: hava ve namaz tek satır yazı ("Şu an hava açık, 12°. Bugün yağmurlu." / "Öğleye 20 dk kaldı.").
+  Dokununca saatlik hava / tüm vakitler açılır. Ekranı yenileyince (aşağı çekince) yalnız yazı kalır. Sol sütun seçeneği kalktı.
+  Açılan namaz listesinde "Uyarılar ve kaza namazı" düğmesi var.
+- Kısayollar: Ders ikonunun yanında yeni ikon. Telefondan uygulama ekle, dokununca açılır; alarm düğmesiyle saat/gün ayarla,
+  o saatte bildirime dokununca uygulama açılır. (Android 10+ uygulamayı bildirime dokunmadan açmaya izin vermez.)
+- Hatırlatıcı: aralık süresi (dk/saat/gün) ve kaç kez elle yazılır, "Sınırsız" seçeneği (24 tekrar kurulur, uygulama açılınca yenilenir).
+  Yeni tür "Tarihli tekrar": her N gün/hafta/ay/yıl (araç muayenesi 2 yıl, sigorta 1 yıl gibi), "kaç gün önce de haber ver" seçeneği.
+- Yapılacaklar ve Hatırlatıcı başlıklarında + düğmesi (içteki ekleme kutusu kalktı).
+- Radyo ve podcast aramasında ✓ işaretine basınca kaldırır (bildirimsiz). Listeden kaldırılan favoriler Favoriler'de kalır.
+- Ayarlar > Uygulamalar: Ders çalışma içinde LGS ve Yabancı dil ayrı, Kısayollar da açılıp kapanır.
+- Araçlar: başlıklar kapalı başlar; Namaz vakitleri ve kaza namazı Dini altında; uyarı dakikası − / + ile.
