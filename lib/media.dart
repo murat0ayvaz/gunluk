@@ -618,7 +618,8 @@ List<String> mediaTabIds() => [
     ];
 
 class MediaPage extends StatelessWidget {
-  const MediaPage({super.key});
+  final String? initial; // açılacak sekme: music | radio | podcast | news | online
+  const MediaPage({super.key, this.initial});
 
   @override
   Widget build(BuildContext context) {
@@ -667,6 +668,7 @@ class MediaPage extends StatelessWidget {
         return DefaultTabController(
           key: ValueKey(ids.join(',')),
           length: ids.length,
+          initialIndex: (initial != null && ids.contains(initial)) ? ids.indexOf(initial!) : 0,
           child: Scaffold(
             backgroundColor: p.bg,
             appBar: AppBar(

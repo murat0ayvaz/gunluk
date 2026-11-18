@@ -42,6 +42,11 @@ class AppsChannel {
   }
 }
 
+/// Telefondaki uygulamalardan birini seçtirir: (ad, paket); vazgeçilirse null
+Future<(String, String)?> pickPhoneApp(BuildContext context) =>
+    showDialog<(String, String)>(
+        context: context, builder: (_) => const _AppPicker());
+
 class ShortcutsPage extends StatelessWidget {
   const ShortcutsPage({super.key});
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'data.dart';
+import 'links.dart';
+import 'notify.dart';
 import 'strings.dart';
 import 'theme.dart';
 import 'ui.dart';
@@ -223,6 +225,13 @@ class _BellDialog extends StatefulWidget {
 class _BellDialogState extends State<_BellDialog> {
   late int _h = widget.sub.rh < 0 ? 9 : widget.sub.rh;
   late int _m = widget.sub.rm;
+  late String _link = widget.sub.link;
+
+  Future<void> _setLink(String v) async {
+    store.setRoutineLink(widget.sub.id, v);
+    setState(() => _link = v);
+    await Notifier.syncSub(widget.sub); // bildirime dokununca bağlı yer açılsın
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -249,6 +258,51 @@ class _BellDialogState extends State<_BellDialog> {
             icon: const Icon(Icons.schedule_rounded, size: 18),
             label: Text(_hm(_h, _m)),
           ),
+          const SizedBox(height: 14),
+          Divider(color: p.line, height: 1),
+          const SizedBox(height: 10),
+          Text(tx('Bağlı yer'), style: TextStyle(fontSize: 12.5, color: p.soft)),
+          const SizedBox(height: 4),
+          if (_link.isEmpty)
+            OutlinedButton.icon(
+              onPressed: () async {
+                final v = await pickLink(context);
+                if (v != null) await _setLink(v);
+              },
+              icon: const Icon(Icons.link_rounded, size: 18),
+              label: Text(tx('Uygulama / araç bağla')),
+            )
+          else ...[
+            Row(
+              children: [
+                Icon(linkIcon(_link), size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                      linkLabel(_link).isEmpty ? tx('Bağlı yer') : linkLabel(_link),
+                      style: TextStyle(color: p.ink, fontWeight: FontWeight.w600)),
+                ),
+              ],
+            ),
+            Wrap(
+              spacing: 8,
+              children: [
+                TextButton(
+                  onPressed: () async {
+                    final v = await pickLink(context);
+                    if (v != null) await _setLink(v);
+                  },
+                  child: Text(tx('Değiştir')),
+                ),
+                TextButton(
+                  onPressed: () => _setLink(''),
+                  child: Text(tx('Bağlantıyı kaldır')),
+                ),
+              ],
+            ),
+          ],
+          Text(tx('Rutinin adına dokununca bağlı yer açılır.'),
+              style: TextStyle(fontSize: 12, color: p.soft)),
         ],
       ),
       actions: [

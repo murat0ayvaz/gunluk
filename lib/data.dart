@@ -169,6 +169,7 @@ class SubCat {
   int rh; // rutin hatırlatma saati (-1 = hatırlatma yok)
   int rm; // rutin hatırlatma dakikası
   int nid; // bildirim numarası (0 = yok)
+  String link; // rutine bağlı yer ('' = yok): in:... (uygulama içi) | app:paket|ad (telefon uygulaması)
 
   SubCat({
     required this.id,
@@ -184,6 +185,7 @@ class SubCat {
     this.rh = -1,
     this.rm = 0,
     this.nid = 0,
+    this.link = '',
   })  : days = days ?? {1, 2, 3, 4, 5, 6, 7},
         skip = skip ?? <String>{};
 
@@ -205,6 +207,7 @@ class SubCat {
         'rh': rh,
         'rm': rm,
         'nid': nid,
+        'link': link,
       };
 
   factory SubCat.fromJson(Map<String, dynamic> j) => SubCat(
@@ -223,6 +226,7 @@ class SubCat {
         rh: (j['rh'] ?? -1) as int,
         rm: (j['rm'] ?? 0) as int,
         nid: (j['nid'] ?? 0) as int,
+        link: (j['link'] ?? '') as String,
       );
 }
 
@@ -2458,6 +2462,8 @@ class AppStore extends ChangeNotifier {
     kaza = [for (var i = 0; i < 5; i++) i < kz.length ? kz[i] : 0];
     prayOn = (j['prayon'] as bool?) ?? true;
     wxBarOpen = (j['wxbar'] as bool?) ?? false;
+    linesOn = (j['lines'] as bool?) ?? true;
+    homeTheme = ((j['htheme'] as num?)?.toInt() ?? 1) == 2 ? 2 : 1;
     hiddenApps = {for (final x in ((j['apphid'] as List?) ?? [])) x.toString()};
     evtCat = (j['evtcat'] as bool?) ?? false;
     final pa = [for (final x in ((j['pralert'] as List?) ?? [])) (x as num).toInt()];
@@ -2705,6 +2711,8 @@ class AppStore extends ChangeNotifier {
         'kaza': kaza,
         'prayon': prayOn,
         'wxbar': wxBarOpen,
+        'lines': linesOn,
+        'htheme': homeTheme,
         'apphid': hiddenApps.toList(),
         'evtcat': evtCat,
         'pralert': prayAlert,
@@ -2965,6 +2973,15 @@ class AppStore extends ChangeNotifier {
     _commit();
   }
 
+  /// Rutine uygulama / araç bağlar (boş = bağlantıyı kaldır)
+  void setRoutineLink(String subId, String link) {
+    final s = subById(subId);
+    if (s == null) return;
+    s.link = link;
+    if (link.isNotEmpty && s.nid == 0) s.nid = newNid();
+    _commit();
+  }
+
   void setGoal(String subId, double? goal) {
     final s = subById(subId);
     if (s == null) return;
@@ -3135,6 +3152,18 @@ class AppStore extends ChangeNotifier {
     } else {
       hiddenApps.remove(id);
     }
+    _commit();
+  }
+
+  bool linesOn = true; // hava ve namaz yazı satırları görünsün mü (başlıktaki simgeyle)
+  void setLinesOn(bool v) {
+    linesOn = v;
+    _commit();
+  }
+
+  int homeTheme = 1; // ana sayfa teması: 1 = eski düzen, 2 = üst bar + tarih satırı
+  void setHomeTheme(int v) {
+    homeTheme = v == 2 ? 2 : 1;
     _commit();
   }
 

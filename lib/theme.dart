@@ -44,7 +44,8 @@ Color accentBase(int i) =>
 /// Koyu temada vurgu rengi biraz sönükleştirilir (göz yormasın diye)
 Color accentFor(int i, bool dark) {
   final c = accentBase(i);
-  return dark ? Color.lerp(c, const Color(0xFF1F2125), 0.3)! : c;
+  // koyu temada pastel yerine soğuk gri-gümüş ton
+  return dark ? Color.lerp(c, const Color(0xFFAEB5C0), 0.82)! : c;
 }
 
 /// Ekranlarda kullanılan renk paleti. Saf beyaz / saf siyah kullanılmaz.
@@ -60,10 +61,14 @@ class Pal {
   Color get line => dark ? const Color(0xFF454A53) : const Color(0xFFE6E2D9);
 
   // Hedefe ulaşılan satırın pastel yeşili
-  Color get okBg => dark ? const Color(0xFF2E4A3A) : const Color(0xFFD6EDDC);
+  Color get okBg => dark ? const Color(0xFF3A4048) : const Color(0xFFD6EDDC);
   // Kaydırma arka planları (sağa = düzenle, sola = sil)
-  Color get editBg => dark ? const Color(0xFF34475E) : const Color(0xFFD6E5F6);
-  Color get delBg => dark ? const Color(0xFF5B3B40) : const Color(0xFFF6D5D5);
+  Color get editBg => dark ? const Color(0xFF383E47) : const Color(0xFFD6E5F6);
+  Color get delBg => dark ? const Color(0xFF4A4046) : const Color(0xFFF6D5D5);
+
+  /// Renkli başlık / kutu tonları: koyu temada pastel yerine gri-gümüş
+  Color tint(Color c) =>
+      dark ? Color.lerp(c, const Color(0xFFAEB5C0), 0.85)! : c;
 
   // Vurgu rengi üzerindeki yazı rengi
   Color get onAccent =>

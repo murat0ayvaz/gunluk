@@ -10,12 +10,8 @@ import 'version.dart';
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
       tx('Verilerin korundu.'),
-      tx('Ana ekranda hava ve namaz tek satır yazı: "Şu an hava açık, 12°. Bugün yağmurlu." ve "Öğleye 20 dk kaldı." Dokununca saatlik hava / tüm vakitler açılır; ekranı yenileyince yalnız yazı kalır. Sol sütun seçeneği kalktı.'),
-      tx('Kısayollar: Ders ikonunun yanındaki yeni ikonla telefondaki uygulamaları ekle, dokununca aç. İstersen saat ayarla; o saatte bildirime dokununca uygulama açılır.'),
-      tx('Hatırlatıcı: aralık süresi ve kaç kez elle yazılır, Sınırsız seçeneği var. Yeni Tarihli tekrar: araç muayenesi (2 yılda bir), sigorta (her yıl) gibi; kaç gün önce de haber verir.'),
-      tx('Yapılacaklar ve Hatırlatıcı başlıklarında + düğmesi; içteki ekleme kutusu kalktı.'),
-      tx('Radyo ve podcast aramasında ✓ işaretine basınca kaldırır. Listeden kaldırdığın favoriler, Favoriler\'de kalır.'),
-      tx('Ayarlar > Uygulamalar: Ders çalışma içinde LGS ve Yabancı dil ile Kısayollar da açılıp kapanır.'),
+      tx('Sağ alttaki DR düğmesi kalktı. Rutin eklemek için Rutinler satırındaki + düğmesine bas (diğer başlıklardaki gibi).'),
+      tx('Rutinler satırı rutin yokken de görünür; böylece ilk rutini + ile ekleyebilirsin.'),
     ];
 
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {

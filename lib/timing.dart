@@ -7,6 +7,7 @@ import 'media.dart';
 import 'net.dart' show fetchEpisodes;
 import 'notify.dart';
 import 'reminders.dart' show permissionMessage;
+import 'links.dart' show openLink;
 import 'shortcuts.dart' show AppsChannel;
 import 'strings.dart';
 import 'theme.dart' show Pal;
@@ -816,6 +817,14 @@ Future<void> showAppSchedule(BuildContext context, AppShortcut sc) async {
 // Bildirime dokunulunca
 // ---------------------------------------------------------------
 Future<void> handleNotifPayload(NavigatorState nav, String payload) async {
+  if (payload.startsWith('sub:')) {
+    // rutin hatırlatması: bağlı yer varsa açılır
+    final sub = store.subById(payload.substring(4));
+    if (sub != null && sub.link.isNotEmpty && nav.context.mounted) {
+      await openLink(nav.context, sub.link);
+    }
+    return;
+  }
   if (!payload.startsWith('launch:')) return;
   final id = payload.substring(7);
   LaunchItem? a;

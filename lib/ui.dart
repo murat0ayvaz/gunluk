@@ -657,7 +657,8 @@ class _PullHomeState extends State<PullHome> {
       final ctx = n.context;
       final route = ctx == null ? null : ModalRoute.of(ctx);
       // pencere / alt panel / yazı yazarken devre dışı
-      _active = route is PageRoute && !_typing() && !store.locked;
+      // yalnız ana ekranda (ilk sayfa) çalışır; diğer sayfalarda çekince bir şey olmaz
+      _active = route is PageRoute && route.isFirst && !_typing() && !store.locked;
     } else if (n is OverscrollNotification) {
       if (_active &&
           n.dragDetails != null &&
@@ -677,8 +678,6 @@ class _PullHomeState extends State<PullHome> {
       _active = false;
       _prog.value = 0;
       if (go) {
-        final nav = widget.navKey.currentState;
-        nav?.popUntil((r) => r.isFirst);
         homeReset.value++;
       }
     }

@@ -5,7 +5,9 @@ import 'net.dart';
 import 'strings.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'theme.dart' show Pal;
+import 'media.dart' show slideFromRight;
 import 'ui.dart';
+import 'wxdetail.dart' show WxDetailPage;
 
 // ---------------------------------------------------------------
 // HAVA DURUMU (servis Ayarlar'dan seçilir; şehir adı veya GPS)
@@ -161,6 +163,39 @@ Color wxColor(int code) {
 }
 
 String _deg(double t) => '${t.round()}°';
+
+/// Türkçede saat eki: sıfır->da, bir->de, üç->te ... (örn. 15'te, 16'da)
+String _atHour(int h, bool tomorrow) {
+  final two = h.toString().padLeft(2, '0');
+  if (appLang == 'en') return '${tomorrow ? 'tomorrow ' : ''}$two:00';
+  const suf = [
+    'da', 'de', 'de', 'te', 'te', 'te', 'da', 'de', 'de', 'da', 'da', 'de',
+    'de', 'te', 'te', 'te', 'da', 'de', 'de', 'da', 'de', 'de', 'de', 'te'
+  ];
+  return '${tomorrow ? 'yarın ' : ''}$two\'${suf[h]}';
+}
+
+/// Hava yazısı, yağış odaklı: "bulutlu, 15'te yağmur %50" ya da "bulutlu, yağış yok"
+String _precipText(WeatherData d, String date, String desc) {
+  final now = DateTime.now();
+  final cells = wxCells(d, date);
+  for (final c in cells) {
+    final isToday = c.key == date;
+    if (isToday && c.h.hour < now.hour) continue;
+    if (!isToday && c.h.hour > now.hour) continue; // yalnız önümüzdeki 24 saat
+    final h = c.h;
+    final snow = (h.code >= 71 && h.code <= 77) || h.code == 85 || h.code == 86;
+    final wet = (h.code >= 51 && h.code <= 67) || (h.code >= 80 && h.code <= 86);
+    final storm = h.code >= 95;
+    final strong = h.rain >= 40 || (h.rain < 0 && h.mm >= 0.2);
+    if (!(storm || (wet && strong))) continue;
+    final kind = storm ? tx('fırtına') : (snow ? tx('kar') : tx('yağmur'));
+    final at = _atHour(h.hour, !isToday);
+    if (h.rain >= 0) return tx('{0}, {1} {2} %{3}', [desc, at, kind, h.rain]);
+    return tx('{0}, {1} {2} ({3} mm)', [desc, at, kind, h.mm.toStringAsFixed(1)]);
+  }
+  return tx('{0}, yağış yok', [desc]);
+}
 
 /// WMO hava kodu -> kısa Türkçe açıklama ("açık", "yağmurlu" gibi)
 String wxText(int code) {
@@ -373,7 +408,11 @@ class _WxPanelState extends State<WxPanel> {
         final nowHr = DateTime.now().hour;
         final today = _isToday(widget.date);
         final alerts = wxAlerts(d);
-        return Container(
+        return GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: () => Navigator.of(context)
+              .push(slideFromRight(const WxDetailPage())),
+          child: Container(
           margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
           decoration: BoxDecoration(
             color: p.card,
@@ -449,7 +488,7 @@ class _WxPanelState extends State<WxPanel> {
               ),
             ],
           ),
-        );
+        ));
       },
     );
   }
@@ -884,38 +923,36 @@ class WxLine extends StatelessWidget {
           }
         } else {
           final day = d.days[date];
-          if (_isToday(date)) {
+          final todayKey = _isToday(date);
+          final tomKey = dKey(DateTime.now().add(const Duration(days: 1))) == date;
+          if (todayKey) {
             final hr = DateTime.now().hour;
-            final parts = <String>[];
-            if (d.nowCode != null && d.nowTemp != null) {
-              icon = wxIcon(d.nowCode!, night: hr < 6 || hr >= 20);
-              color = wxColor(d.nowCode!);
-              parts.add(tx('Şu an {0}, {1}.', [wxText(d.nowCode!), _deg(d.nowTemp!)]));
-            }
-            if (day != null) {
-              if (parts.isEmpty) {
-                icon = wxIcon(day.code);
-                color = wxColor(day.code);
-              }
-              parts.add(tx('Bugün {0}.', [wxText(day.code)]));
-            }
-            if (parts.isEmpty) return const SizedBox.shrink();
-            text = parts.join(' ');
+            int? code = d.nowCode ?? day?.code;
+            if (code == null) return const SizedBox.shrink();
+            icon = wxIcon(code, night: hr < 6 || hr >= 20);
+            color = wxColor(code);
+            text = _precipText(d, date, wxText(code));
           } else if (day != null) {
             icon = wxIcon(day.code);
             color = wxColor(day.code);
             final t = parseKey(date);
-            final tom = DateTime.now().add(const Duration(days: 1));
-            final lbl = dKey(tom) == date ? tx('Yarın') : '${t.day} ${monName(t.month)}';
-            text = tx('{0} {1}, {2} / {3}.',
-                [lbl, wxText(day.code), _deg(day.tmax), _deg(day.tmin)]);
+            final lbl = tomKey ? tx('Yarın') : '${t.day} ${monName(t.month)}';
+            text = day.rain >= 0
+                ? tx('{0}: {1}, {2} / {3}, yağış %{4}',
+                    [lbl, wxText(day.code), _deg(day.tmax), _deg(day.tmin), day.rain])
+                : tx('{0}: {1}, {2} / {3}',
+                    [lbl, wxText(day.code), _deg(day.tmax), _deg(day.tmin)]);
           } else {
             return const SizedBox.shrink();
           }
-          warn = wxAlerts(d).isNotEmpty;
+          final al = (todayKey || tomKey) ? wxAlerts(d) : const <WxAlert>[];
+          warn = al.isNotEmpty;
+          if (warn) {
+            text = '$text ${tx('Uyarı: {0}.', [al.first.text])}';
+          }
         }
         return Container(
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           decoration: BoxDecoration(
             color: p.card,
             borderRadius: BorderRadius.circular(16),
@@ -931,17 +968,17 @@ class WxLine extends StatelessWidget {
               onTap();
             },
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Row(
                 children: [
-                  Icon(icon, size: 20, color: color),
-                  const SizedBox(width: 10),
+                  Icon(icon, size: 18, color: color),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(text,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: p.ink)),
                   ),
@@ -949,7 +986,7 @@ class WxLine extends StatelessWidget {
                     const Padding(
                       padding: EdgeInsets.only(left: 6),
                       child: Icon(Icons.warning_amber_rounded,
-                          size: 20, color: Color(0xFFE8883A)),
+                          size: 18, color: Color(0xFFE8883A)),
                     ),
                 ],
               ),

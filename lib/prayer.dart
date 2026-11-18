@@ -27,6 +27,72 @@ class PrayerCtl extends ChangeNotifier {
 
   String _dayKey(DateTime d) => '${d.year}-${d.month}-${d.day}';
 
+  // Başka günler için (yarın vb.) saatler; bellekte tutulur
+  final Map<String, List<String>> _dayCache = {};
+  final Set<String> _dayLoading = {};
+  final Map<String, DateTime> _dayFailAt = {};
+
+  String _locKeyNow() {
+    final sel = store.wxSel;
+    final fav = (sel >= 0 && sel < store.wxFavs.length) ? store.wxFavs[sel] : null;
+    return fav == null ? 'gps' : '${fav.lat},${fav.lon}';
+  }
+
+  bool _isToday(DateTime d) {
+    final n = DateTime.now();
+    return d.year == n.year && d.month == n.month && d.day == n.day;
+  }
+
+  /// Seçili günün vakitleri: bugün = günlük veri, diğer günler = o güne ait çekilmiş veri
+  /// (yoksa null döner ve arka planda çekilir)
+  List<String>? timesFor(DateTime d) {
+    if (_isToday(d)) return times;
+    final k = '${_dayKey(d)}|${_locKeyNow()}';
+    final c = _dayCache[k];
+    if (c == null) ensureDate(d);
+    return c;
+  }
+
+  Future<void> ensureDate(DateTime d) async {
+    if (!store.prayOn || _isToday(d)) return;
+    final k = '${_dayKey(d)}|${_locKeyNow()}';
+    if (_dayCache.containsKey(k) || _dayLoading.contains(k)) return;
+    final fail = _dayFailAt[k];
+    if (fail != null && DateTime.now().difference(fail).inSeconds < 60) return;
+    _dayLoading.add(k);
+    try {
+      final sel = store.wxSel;
+      final fav = (sel >= 0 && sel < store.wxFavs.length) ? store.wxFavs[sel] : null;
+      final double lat;
+      final double lon;
+      if (fav != null) {
+        lat = fav.lat;
+        lon = fav.lon;
+      } else {
+        final pos = await weather.locate();
+        if (pos == null) throw Exception('gpsoff');
+        lat = pos.$1;
+        lon = pos.$2;
+      }
+      final ds =
+          '${d.day.toString().padLeft(2, '0')}-${d.month.toString().padLeft(2, '0')}-${d.year}';
+      final j = await httpGetJson(Uri.parse(
+          'https://api.aladhan.com/v1/timings/$ds?latitude=$lat&longitude=$lon&method=13'));
+      final t = (j as Map)['data']['timings'] as Map;
+      final out = <String>[];
+      for (final key in _apiKeys) {
+        final v = '${t[key]}'.trim();
+        out.add(v.length >= 5 ? v.substring(0, 5) : v);
+      }
+      _dayCache[k] = out;
+      _dayFailAt.remove(k);
+    } catch (_) {
+      _dayFailAt[k] = DateTime.now();
+    }
+    _dayLoading.remove(k);
+    notifyListeners();
+  }
+
   Future<void> ensure({bool force = false}) async {
     if (!store.prayOn) return;
     final today = _dayKey(DateTime.now());
@@ -105,7 +171,8 @@ int _mins(String hm) {
 class PrayerBar extends StatefulWidget {
   /// vertical: sol sütunda alt alta
   final bool vertical;
-  const PrayerBar({super.key, this.vertical = false});
+  final DateTime? day; // seçili gün (başka günse o günün vakitleri gösterilir)
+  const PrayerBar({super.key, this.vertical = false, this.day});
 
   @override
   State<PrayerBar> createState() => _PrayerBarState();
@@ -163,7 +230,8 @@ class _PrayerBarState extends State<PrayerBar> {
       listenable: Listenable.merge([prayer, store]),
       builder: (context, _) {
         if (!store.prayOn) return const SizedBox.shrink();
-        final t = prayer.times;
+        final other = widget.day != null && !prayer._isToday(widget.day!);
+        final t = other ? prayer.timesFor(widget.day!) : prayer.times;
         Widget inner;
         if (t == null) {
           inner = Padding(
@@ -189,11 +257,13 @@ class _PrayerBarState extends State<PrayerBar> {
         } else {
           final now = DateTime.now();
           final nm = now.hour * 60 + now.minute;
-          var next = 0; // hepsi geçtiyse yarının imsakı
-          for (var i = 0; i < 6; i++) {
-            if (_mins(t[i]) > nm) {
-              next = i;
-              break;
+          var next = other ? -1 : 0; // hepsi geçtiyse yarının imsakı
+          if (!other) {
+            for (var i = 0; i < 6; i++) {
+              if (_mins(t[i]) > nm) {
+                next = i;
+                break;
+              }
             }
           }
           final cells = [
@@ -234,8 +304,10 @@ const _dative = ['İmsaka', 'Güneşe', 'Öğleye', 'İkindiye', 'Akşama', 'Yat
 
 class PrayerLine extends StatefulWidget {
   final bool open;
+  final DateTime day; // seçili gün
   final VoidCallback onTap;
-  const PrayerLine({super.key, required this.open, required this.onTap});
+  const PrayerLine(
+      {super.key, required this.open, required this.day, required this.onTap});
 
   @override
   State<PrayerLine> createState() => _PrayerLineState();
@@ -277,12 +349,25 @@ class _PrayerLineState extends State<PrayerLine> {
       listenable: Listenable.merge([prayer, store]),
       builder: (context, _) {
         if (!store.prayOn) return const SizedBox.shrink();
-        final t = prayer.times;
+        final other = !prayer._isToday(widget.day);
+        final t = other ? prayer.timesFor(widget.day) : prayer.times;
         String text;
         if (t == null) {
-          text = prayer.loading
+          text = (prayer.loading || other)
               ? tx('Namaz vakitleri alınıyor…')
               : tx('Namaz vakitleri alınamadı. Dokun, yeniden dene.');
+        } else if (other) {
+          final tom = DateTime.now().add(const Duration(days: 1));
+          final dd = widget.day;
+          final lbl = (dd.year == tom.year && dd.month == tom.month && dd.day == tom.day)
+              ? tx('Yarın')
+              : '${dd.day} ${monName(dd.month)}';
+          text = tx('{0}: {1} {2} • {3} {4} • {5} {6}', [
+            lbl,
+            tx('İmsak'), t[0],
+            tx('Öğle'), t[2],
+            tx('Akşam'), t[4],
+          ]);
         } else {
           final now = DateTime.now();
           final nm = now.hour * 60 + now.minute;
@@ -303,7 +388,7 @@ class _PrayerLineState extends State<PrayerLine> {
           text = tx('{0} {1} kaldı.', [tx(_dative[next]), _left(diff)]);
         }
         return Container(
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           decoration: BoxDecoration(
             color: p.card,
             borderRadius: BorderRadius.circular(16),
@@ -319,17 +404,17 @@ class _PrayerLineState extends State<PrayerLine> {
               widget.onTap();
             },
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Row(
                 children: [
-                  Icon(Icons.mosque_rounded, size: 20, color: p.accent),
-                  const SizedBox(width: 10),
+                  Icon(Icons.mosque_rounded, size: 18, color: p.accent),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(text,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: p.ink)),
                   ),

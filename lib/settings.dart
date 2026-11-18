@@ -131,6 +131,26 @@ class SettingsPage extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
             children: [
               sec(tx('Ana ekran'), [
+                Text(tx('Ana sayfa teması'), style: TextStyle(color: p.soft)),
+                const SizedBox(height: 6),
+                Wrap(spacing: 8, children: [
+                  ChoiceChip(
+                    label: Text(tx('Tema 1')),
+                    selected: store.homeTheme == 1,
+                    onSelected: (_) => store.setHomeTheme(1),
+                  ),
+                  ChoiceChip(
+                    label: Text(tx('Tema 2')),
+                    selected: store.homeTheme == 2,
+                    onSelected: (_) => store.setHomeTheme(2),
+                  ),
+                ]),
+                Padding(
+                  padding: const EdgeInsets.only(top: 6, bottom: 4),
+                  child: Text(
+                      tx('Tema 2: üst barda yalnız programlar, altında "Bugün 18.11.2026 Perşembe" tarih satırı; iki bar sabit durur.'),
+                      style: TextStyle(color: p.soft, fontSize: 12.5, height: 1.35)),
+                ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   secondary: const Icon(Icons.wb_sunny_outlined),

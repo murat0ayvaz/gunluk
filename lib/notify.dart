@@ -202,7 +202,8 @@ class Notifier {
         final t = DateTime(day.year, day.month, day.day, s.rh, s.rm);
         if (t.isAfter(now) && s.scheduledOn(day)) times.add(t);
       }
-      await _plan(s.nid, s.name, times);
+      await _plan(s.nid, s.name, times,
+          payload: s.link.isEmpty ? null : 'sub:${s.id}');
     } catch (_) {}
   }
 

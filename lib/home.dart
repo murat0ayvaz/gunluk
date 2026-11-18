@@ -17,6 +17,7 @@ import 'strings.dart';
 import 'theme.dart';
 import 'todos.dart';
 import 'ui.dart';
+import 'links.dart';
 import 'prayer.dart';
 import 'shortcuts.dart';
 import 'weather.dart';
@@ -100,6 +101,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void _onHomeReset() {
     if (!mounted) return;
     store.setWxBarOpen(false); // yenilenince hava ve namaz yalnız yazı olarak kalır
+    weather.ensure(force: true); // hava ve namaz verileri yenilenir
+    prayer.ensure(force: true);
     setState(() {
       _prOpen = false;
       day = dayOnly(DateTime.now());
@@ -166,8 +169,78 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     return '${two(d.day)}.${two(d.month)}.${d.year}';
   }
 
-  /// Ekle paneli: sağ alttaki DR düğmesinin üstünde, ekranın yarısına kadar açılır.
-  /// DR düğmesi görünür kalır; tekrar basınca panel kapanır.
+  /// Tarih satırı: < Bugün • 3 Kasım • hava simgesi >
+  /// long = Tema 2: "Bugün 18.11.2026 Perşembe"
+  Widget _dateRow(Pal p, {required bool long}) {
+    final date = dKey(day);
+    return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints:
+                        const BoxConstraints(minWidth: 32, minHeight: 40),
+                    onPressed: () => _shift(-1),
+                    icon: const Icon(Icons.chevron_left_rounded)),
+                Flexible(
+                  child: TextButton(
+                    onPressed: _pickDate,
+                    style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        minimumSize: const Size(0, 40)),
+                    child: Text(long ? _longLabel() : _label(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 15.5,
+                            fontWeight: FontWeight.w600,
+                            color: p.ink)),
+                  ),
+                ),
+                // Hava durumu: bugün = şimdiki, diğer günler = günlük simge
+                if (store.wxOn)
+                  WxChip(
+                    date: date,
+                    open: store.linesOn,
+                    onTap: () => store.setLinesOn(!store.linesOn),
+                  )
+                else if (store.prayOn)
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints:
+                        const BoxConstraints(minWidth: 32, minHeight: 40),
+                    tooltip: tx('Namaz vakitleri'),
+                    onPressed: () => store.setLinesOn(!store.linesOn),
+                    icon: Icon(Icons.mosque_rounded,
+                        size: 20, color: store.linesOn ? p.accent : p.soft),
+                  ),
+                IconButton(
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints:
+                        const BoxConstraints(minWidth: 32, minHeight: 40),
+                    onPressed: () => _shift(1),
+                    icon: const Icon(Icons.chevron_right_rounded)),
+              ],
+            );
+  }
+
+  String _longLabel() {
+    final now = DateTime.now();
+    final t = DateTime.utc(now.year, now.month, now.day);
+    final d = DateTime.utc(day.year, day.month, day.day);
+    final diff = d.difference(t).inDays;
+    String two(int n) => n.toString().padLeft(2, '0');
+    final pre = diff == 0
+        ? '${tx('Bugün')} '
+        : (diff == 1 ? '${tx('Yarın')} ' : (diff == -1 ? '${tx('Dün')} ' : ''));
+    return '$pre${two(d.day)}.${two(d.month)}.${d.year} ${wdName(d.weekday)}';
+  }
+
+  /// Ekle paneli: Rutinler satırındaki + ile açılır, ekranın yarısına kadar çıkar.
+  /// Dışarı dokununca veya geri tuşuyla kapanır.
   void _openAdd() {
     final p = palOf(context);
     final date = dKey(day);
@@ -182,9 +255,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         final m = MediaQuery.of(ctx);
         final kb = m.viewInsets.bottom; // klavye açıksa panel yukarı kayar
         final keyboard = kb > 0;
-        // DR düğmesinin yüksekliği (56) + kenar boşlukları
-        final btnBottom = 16 + m.padding.bottom;
-        final panelBottom = keyboard ? kb + 8 : btnBottom + 56 + 10;
+        final panelBottom = keyboard ? kb + 8 : 16 + m.padding.bottom;
         final panelH = keyboard
             ? (m.size.height - kb - m.padding.top - 20)
             : m.size.height * 0.5;
@@ -226,18 +297,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ),
               ),
             ),
-            // DR düğmesi panelin altında görünür kalır; basınca panel kapanır
-            if (!keyboard)
-              Positioned(
-                right: 16,
-                bottom: btnBottom,
-                child: _CornerBtn(
-                  letter: 'DR',
-                  tooltip: 'Daily Routine',
-                  active: true,
-                  onTap: () => Navigator.of(ctx).pop(),
-                ),
-              ),
           ],
         );
       },
@@ -550,8 +609,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
         // Rutinler ve Diğer kayıtlar: açılır başlıklar (açılışta kapalı)
         final children = <Widget>[
-          if (routinesTotal > 0)
-            _HomeSection(
+          _HomeSection(
+              onAdd: _openAdd,
               icon: Icons.checklist_rounded,
               title: tx('Rutinler'),
               tone: const Color(0xFF4F8EF7),
@@ -739,46 +798,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ],
             ),
             // Tarih seçici en üstte: < Bugün • 3 Kasım >
-            title: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints:
-                        const BoxConstraints(minWidth: 32, minHeight: 40),
-                    onPressed: () => _shift(-1),
-                    icon: const Icon(Icons.chevron_left_rounded)),
-                Flexible(
-                  child: TextButton(
-                    onPressed: _pickDate,
-                    style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        minimumSize: const Size(0, 40)),
-                    child: Text(_label(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            fontSize: 15.5,
-                            fontWeight: FontWeight.w600,
-                            color: p.ink)),
-                  ),
-                ),
-                // Hava durumu: bugün = şimdiki, diğer günler = günlük simge
-                WxChip(
-                  date: date,
-                  open: _wxOpen,
-                  onTap: () => store.setWxBarOpen(!store.wxBarOpen),
-                ),
-                IconButton(
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints:
-                        const BoxConstraints(minWidth: 32, minHeight: 40),
-                    onPressed: () => _shift(1),
-                    icon: const Icon(Icons.chevron_right_rounded)),
-              ],
-            ),
+            title: store.homeTheme == 2 ? null : _dateRow(p, long: false),
             actions: [
               // Sağdan açılan Araçlar menüsü
               if (!store.appHidden('tools'))
@@ -803,40 +823,34 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ],
           ),
           body: Builder(builder: (context) {
-            // Hava ve namaz: tek satır yazı; dokununca altına açılır.
-            // Ekran yenilenince (aşağı çekip ana sayfaya dönünce) yalnız yazı kalır.
+            // Hava ve namaz: tek satır yazı. Başlıktaki hava simgesi satırları getirir/götürür;
+            // yazıya dokununca altına saatlik hava / tüm vakitler açılır.
+            // Ekran yenilenince (ana ekranda aşağı çekince) açılan barlar kapanır, yazılar kalır.
+            final lines = store.linesOn;
             return Column(
               children: [
-                if (store.wxOn)
+                // Tema 2: tarih satırı üst barın altında, sabit
+                if (store.homeTheme == 2)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 2),
+                    child: Center(child: _dateRow(p, long: true)),
+                  ),
+                if (lines && store.wxOn)
                   WxLine(
                     key: ValueKey('wxl_$date'),
                     date: date,
                     open: _wxOpen,
                     onTap: () => store.setWxBarOpen(!store.wxBarOpen),
                   ),
-                if (store.wxOn && _wxOpen)
+                if (lines && store.wxOn && _wxOpen)
                   WxPanel(key: ValueKey('wx_$date'), date: date),
-                if (store.prayOn)
+                if (lines && store.prayOn)
                   PrayerLine(
                     open: _prOpen,
+                    day: day,
                     onTap: () => setState(() => _prOpen = !_prOpen),
                   ),
-                if (store.prayOn && _prOpen) ...[
-                  const PrayerBar(),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 16, bottom: 6),
-                      child: TextButton.icon(
-                        onPressed: () => Navigator.of(context)
-                            .push(slideFromRight(const NamazPage())),
-                        icon: const Icon(Icons.notifications_active_outlined,
-                            size: 18),
-                        label: Text(tx('Uyarılar ve kaza namazı')),
-                      ),
-                    ),
-                  ),
-                ],
+                if (lines && store.prayOn && _prOpen) PrayerBar(day: day),
                 Expanded(child: body),
               ],
             );
@@ -866,16 +880,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           child: Stack(
             children: [
               scaffold,
-              // Sağ altta yuvarlak DR düğmesi: Ekle panelini açar
-              Positioned(
-                right: 16,
-                bottom: 16 + MediaQuery.of(context).padding.bottom,
-                child: _CornerBtn(
-                  letter: 'DR',
-                  tooltip: 'Daily Routine',
-                  onTap: _openAdd,
-                ),
-              ),
             ],
           ),
         );
@@ -911,6 +915,7 @@ class _HomeSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = palOf(context);
+    final tone = p.tint(this.tone);
     final head =
         Color.alphaBlend(tone.withOpacity(p.dark ? 0.20 : 0.13), p.card);
     return Container(
@@ -1121,19 +1126,36 @@ class _DayRowState extends State<_DayRow> {
               ),
             ),
           Expanded(
-            child: Column(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: sub.link.isEmpty
+                  ? null
+                  : () => openLink(context, sub.link),
+              child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(sub.name,
-                    style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: p.ink)),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(sub.name,
+                          style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: p.ink)),
+                    ),
+                    if (sub.link.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 6),
+                        child: Icon(linkIcon(sub.link), size: 15, color: p.soft),
+                      ),
+                  ],
+                ),
                 Text(info,
                     style: TextStyle(fontSize: 11.5, color: p.soft),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis),
               ],
+            ),
             ),
           ),
           if (e != null)

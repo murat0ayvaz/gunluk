@@ -114,6 +114,14 @@ List<_ToolInfo> _allTools() => [
           group: 'para'),
     ];
 
+/// Bir aracın sayfası (rutine bağlamak için); araç yoksa null
+Widget? toolPageOf(String id) {
+  for (final t in _allTools()) {
+    if (t.id == id) return t.page();
+  }
+  return null;
+}
+
 /// Ayarlar'daki araç seçimi için: (kimlik, ad, simge, renk)
 List<(String, String, IconData, Color)> toolList() =>
     [for (final t in _allTools()) (t.id, t.name, t.icon, t.tone)];
@@ -207,7 +215,7 @@ class _ToolsDrawerState extends State<ToolsDrawer> {
       key: ValueKey('t_${t.id}'),
       padding: const EdgeInsets.fromLTRB(14, 5, 14, 5),
       child: Material(
-        color: Color.alphaBlend(t.tone.withOpacity(p.dark ? 0.22 : 0.14), p.card),
+        color: Color.alphaBlend(p.tint(t.tone).withOpacity(p.dark ? 0.22 : 0.14), p.card),
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
@@ -224,7 +232,7 @@ class _ToolsDrawerState extends State<ToolsDrawer> {
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [t.tone, t.tone.withOpacity(0.65)],
+                      colors: [p.tint(t.tone), p.tint(t.tone).withOpacity(0.65)],
                     ),
                   ),
                   child: Icon(t.icon, color: Colors.white, size: 22),
@@ -237,7 +245,7 @@ class _ToolsDrawerState extends State<ToolsDrawer> {
                           fontWeight: FontWeight.w700,
                           color: p.ink)),
                 ),
-                handle ?? Icon(Icons.chevron_right_rounded, color: t.tone),
+                handle ?? Icon(Icons.chevron_right_rounded, color: p.tint(t.tone)),
               ],
             ),
           ),
@@ -677,7 +685,7 @@ Widget _page(BuildContext context, String title, Widget body,
         colors: [
           tone == null
               ? p.bg
-              : Color.alphaBlend(tone.withOpacity(p.dark ? 0.30 : 0.22), p.bg),
+              : Color.alphaBlend(p.tint(tone).withOpacity(p.dark ? 0.30 : 0.22), p.bg),
           p.bg,
         ],
       ),
