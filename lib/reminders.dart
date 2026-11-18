@@ -154,7 +154,7 @@ class _RemindersBodyState extends State<RemindersBody> {
                 onPressed: () => showReminderHelp(context),
                 icon: const Icon(Icons.help_outline_rounded),
               ),
-            ),,
+            ),
             if (list.isEmpty)
               Padding(
                 padding: const EdgeInsets.all(20),
