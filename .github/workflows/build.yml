@@ -117,6 +117,78 @@ jobs:
           PY
           grep -n "audioservice\|INTERNET\|Cleartext" android/app/src/main/AndroidManifest.xml
 
+      # Kısayollar: telefondaki uygulamaları listeleme ve başlatma (MainActivity kanalı)
+      - name: Android ayarları (kısayollar)
+        run: |
+          python3 - <<'PY'
+          import os, re
+          m = 'android/app/src/main/AndroidManifest.xml'
+          s = open(m, encoding='utf-8').read()
+          intent = '        <intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent>\n'
+          if 'android.intent.category.LAUNCHER"/></intent>' not in s:
+              if '</queries>' in s:
+                  s = s.replace('</queries>', intent + '    </queries>', 1)
+              else:
+                  s = s.replace('<application', '    <queries>\n' + intent + '    </queries>\n    <application', 1)
+          open(m, 'w', encoding='utf-8').write(s)
+          found = False
+          for root, _, files in os.walk('android/app/src/main'):
+              for fn in files:
+                  if fn == 'MainActivity.kt':
+                      p = os.path.join(root, fn)
+                      t = open(p, encoding='utf-8').read()
+                      pk = re.search(r'^package\s+([\w.]+)', t, re.M).group(1)
+                      kt = (
+                          'package ' + pk + '\n\n'
+                          'import android.content.Intent\n'
+                          'import com.ryanheise.audioservice.AudioServiceActivity\n'
+                          'import io.flutter.embedding.engine.FlutterEngine\n'
+                          'import io.flutter.plugin.common.MethodChannel\n\n'
+                          'class MainActivity : AudioServiceActivity() {\n'
+                          '    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {\n'
+                          '        super.configureFlutterEngine(flutterEngine)\n'
+                          '        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "gunluk/apps").setMethodCallHandler { call, result ->\n'
+                          '            when (call.method) {\n'
+                          '                "list" -> {\n'
+                          '                    val out = ArrayList<Map<String, String>>()\n'
+                          '                    try {\n'
+                          '                        val pm = packageManager\n'
+                          '                        val i = Intent(Intent.ACTION_MAIN)\n'
+                          '                        i.addCategory(Intent.CATEGORY_LAUNCHER)\n'
+                          '                        val seen = HashSet<String>()\n'
+                          '                        for (ri in pm.queryIntentActivities(i, 0)) {\n'
+                          '                            val pkg = ri.activityInfo.packageName\n'
+                          '                            if (pkg == packageName || !seen.add(pkg)) continue\n'
+                          '                            out.add(mapOf("name" to ri.loadLabel(pm).toString(), "pkg" to pkg))\n'
+                          '                        }\n'
+                          '                    } catch (e: Exception) {\n'
+                          '                    }\n'
+                          '                    result.success(out)\n'
+                          '                }\n'
+                          '                "launch" -> {\n'
+                          '                    val pkg = call.argument<String>("pkg")\n'
+                          '                    val li = if (pkg == null) null else packageManager.getLaunchIntentForPackage(pkg)\n'
+                          '                    if (li != null) {\n'
+                          '                        li.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)\n'
+                          '                        startActivity(li)\n'
+                          '                        result.success(true)\n'
+                          '                    } else {\n'
+                          '                        result.success(false)\n'
+                          '                    }\n'
+                          '                }\n'
+                          '                else -> result.notImplemented()\n'
+                          '            }\n'
+                          '        }\n'
+                          '    }\n'
+                          '}\n')
+                      open(p, 'w', encoding='utf-8').write(kt)
+                      found = True
+                      print(kt)
+          if not found:
+              print('UYARI: MainActivity.kt bulunamadi')
+          PY
+          grep -n "LAUNCHER" android/app/src/main/AndroidManifest.xml
+
       # Hava durumu için konum izni (telefonun konumunu kullan seçeneği)
       - name: Android ayarları (konum)
         run: |
