@@ -244,6 +244,24 @@ jobs:
           PY
           grep -n "minSdk\|RECORD_AUDIO" android/app/build.gradle* android/app/src/main/AndroidManifest.xml
 
+      # Sesli komut: telefonun ses tanıma servisini görebilmek için (Android 11+ paket görünürlüğü)
+      - name: Android ayarları (sesli komut)
+        run: |
+          python3 - <<'PY'
+          m = 'android/app/src/main/AndroidManifest.xml'
+          s = open(m, encoding='utf-8').read()
+          if 'RECORD_AUDIO' not in s:
+              s = s.replace('<application', '    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <application', 1)
+          if 'android.speech.RecognitionService' not in s:
+              add = '        <intent><action android:name="android.speech.RecognitionService"/></intent>\n'
+              if '</queries>' in s:
+                  s = s.replace('</queries>', add + '    </queries>', 1)
+              else:
+                  s = s.replace('<application', '    <queries>\n' + add + '    </queries>\n    <application', 1)
+          open(m, 'w', encoding='utf-8').write(s)
+          PY
+          grep -n "RecognitionService\|RECORD_AUDIO" android/app/src/main/AndroidManifest.xml
+
       # Her derlemede AYNI imza anahtarı kullanılsın: yeni APK eskisinin üstüne kurulsun.
       # debug.keystore yoksa derleme bilerek hata verir.
       - name: Sabit imza anahtarı
