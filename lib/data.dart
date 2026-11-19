@@ -2463,7 +2463,7 @@ class AppStore extends ChangeNotifier {
     prayOn = (j['prayon'] as bool?) ?? true;
     wxBarOpen = (j['wxbar'] as bool?) ?? false;
     linesOn = (j['lines'] as bool?) ?? true;
-    homeTheme = ((j['htheme'] as num?)?.toInt() ?? 1) == 2 ? 2 : 1;
+    homeTheme = (((j['htheme'] as num?)?.toInt() ?? 1).clamp(1, 3)).toInt();
     hiddenApps = {for (final x in ((j['apphid'] as List?) ?? [])) x.toString()};
     evtCat = (j['evtcat'] as bool?) ?? false;
     final pa = [for (final x in ((j['pralert'] as List?) ?? [])) (x as num).toInt()];
@@ -3161,9 +3161,9 @@ class AppStore extends ChangeNotifier {
     _commit();
   }
 
-  int homeTheme = 1; // ana sayfa teması: 1 = eski düzen, 2 = üst bar + tarih satırı
+  int homeTheme = 1; // ana sayfa teması: 1 = eski düzen, 2 = üst bar + tarih satırı, 3 = alt bar düzeni
   void setHomeTheme(int v) {
-    homeTheme = v == 2 ? 2 : 1;
+    homeTheme = v.clamp(1, 3).toInt();
     _commit();
   }
 

@@ -319,11 +319,14 @@ class _TodosBodyState extends State<TodosBody> {
 
 
 /// Yapılacaklar başlığındaki + düğmesi: madde ekleme penceresi (yazı veya sesle)
-Future<bool> showAddTodo(BuildContext context, String date) async {
+Future<bool> showAddTodo(BuildContext context, String date,
+    {Offset? origin}) async {
   final c = TextEditingController();
-  final r = await showDialog<String>(
-    context: context,
-    builder: (ctx) => AlertDialog(
+  final r = await showGrow<String>(
+    context,
+    origin,
+    card: false,
+    (ctx) => AlertDialog(
       title: Text(tx('Yeni madde')),
       content: TextField(
         controller: c,

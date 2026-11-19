@@ -144,11 +144,16 @@ class SettingsPage extends StatelessWidget {
                     selected: store.homeTheme == 2,
                     onSelected: (_) => store.setHomeTheme(2),
                   ),
+                  ChoiceChip(
+                    label: Text(tx('Tema 3')),
+                    selected: store.homeTheme == 3,
+                    onSelected: (_) => store.setHomeTheme(3),
+                  ),
                 ]),
                 Padding(
                   padding: const EdgeInsets.only(top: 6, bottom: 4),
                   child: Text(
-                      tx('Tema 2: üst barda yalnız programlar, altında "Bugün 18.11.2026 Perşembe" tarih satırı; iki bar sabit durur.'),
+                      tx('Tema 2: üst barda yalnız programlar, altında "Bugün 18.11.2026 Perşembe" tarih satırı; iki bar sabit durur. Tema 3: üstte programlar, en altta sabit namaz, hava ve tarih satırı; paneller yukarı açılır.'),
                       style: TextStyle(color: p.soft, fontSize: 12.5, height: 1.35)),
                 ),
                 SwitchListTile(

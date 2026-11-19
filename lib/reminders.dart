@@ -251,7 +251,20 @@ class _RemindersBodyState extends State<RemindersBody> {
 // ===============================================================
 // Yeni / düzenle formu
 // ===============================================================
-Future<void> showReminderSheet(BuildContext context, {Reminder? edit}) {
+Future<void> showReminderSheet(BuildContext context,
+    {Reminder? edit, Offset? origin}) {
+  // + düğmesinden açılırsa ekranın ortasında büyüyen pencere; düzenlemede eski alt panel
+  if (origin != null) {
+    return showGrow<void>(
+      context,
+      origin,
+      (_) => Padding(
+        padding: const EdgeInsets.only(top: 16),
+        child: _ReminderForm(edit: edit),
+      ),
+      heightFactor: 0.9,
+    );
+  }
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,

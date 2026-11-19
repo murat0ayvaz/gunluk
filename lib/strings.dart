@@ -1850,4 +1850,12 @@ const _en = <String, String>{
   '{0}: {1}, {2} / {3}, yağış %{4}': '{0}: {1}, {2} / {3}, precipitation {4}%',
   'Sağ alttaki DR düğmesi kalktı. Rutin eklemek için Rutinler satırındaki + düğmesine bas (diğer başlıklardaki gibi).': 'The DR button at the bottom right is gone. To add a routine, tap the + on the Routines row (like the other headers).',
   'Rutinler satırı rutin yokken de görünür; böylece ilk rutini + ile ekleyebilirsin.': 'The Routines row is shown even when there are no routines, so you can add the first one with +.',
+  'Ayarlar > Ana ekran > Tema 3: tarih, hava ve namaz satırları en altta sabit; paneller yukarı açılır. Tema 2 ve 3\'te üst bar simgeleri eşit aralıklı.': 'Settings > Home screen > Theme 3: the date, weather and prayer rows are fixed at the bottom; panels open upward. In Themes 2 and 3 the top bar icons are evenly spaced.',
+  'Aşağı çekip yenileme için çekme mesafesi artırıldı (kazara tetiklenmesin).': 'The pull distance for pull-to-refresh was increased (so it is not triggered by accident).',
+  'Bölümleri (hava, namaz, Rutinler, Yapılacaklar, Günlük, Hatırlatıcı, Diğer) sola itince geçici gizlenir; aşağı çekip yenileyince geri gelir. Boş ekranda kaydırma günü değiştirmeye devam eder.': 'Pushing a section (weather, prayer, Routines, To-dos, Diary, Reminders, Other) to the left hides it temporarily; pull down to refresh brings it back. Swiping on an empty area still changes the day.',
+  'Ekle (+) panelleri ortada açılır: Rutinler, Yapılacaklar ve Hatırlatıcı + düğmesinden büyüyerek çıkar.': 'The add (+) panels open in the center: Routines, To-dos and Reminders grow out of their + button.',
+  'Kısayollarım': 'My shortcuts',
+  'Rutine uygulama bağlarken Kısayollar\'a eklediğin uygulamalar da görünür (en üstte).': 'When linking an app to a routine, the apps you added to Shortcuts are also shown (at the top).',
+  'Tema 2: üst barda yalnız programlar, altında "Bugün 18.11.2026 Perşembe" tarih satırı; iki bar sabit durur. Tema 3: üstte programlar, en altta sabit namaz, hava ve tarih satırı; paneller yukarı açılır.': 'Theme 2: only the apps in the top bar, with a "Today 18.11.2026 Thursday" date row below it; both bars stay fixed. Theme 3: apps on top, with the prayer, weather and date rows fixed at the very bottom; panels open upward.',
+  'Tema 3': 'Theme 3',
 };

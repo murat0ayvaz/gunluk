@@ -1,12 +1,13 @@
-DAILY ROUTINE v29.9 (1.25.9) - TAM PAKET
+DAILY ROUTINE v29.10 (1.25.10) - TAM PAKET
 
 Bu zipte projenin TAMAMI var: .github, assets, lib, debug.keystore, pubspec.yaml.
 1) Zipi çıkar. GitHub'da "gunluk" reposunun ANA sayfasında: Add file > Upload files.
 2) Çıkan klasörlerin ve dosyaların HEPSİNİ (.github, assets, lib, debug.keystore, pubspec.yaml) sürükle-bırak > Commit changes.
    (YENİ: lib/links.dart. v29.7'den gelen lib/shortcuts.dart ve .github/workflows/build.yml de pakette.)
 3) Actions > yeşil tik > Artifacts > gunluk-apk indir, telefona kur (veriler kalır).
-Derleme hatası olursa Actions'taki kırmızı satırları gönder.
-
-v29.9 yenilikleri:
-- Sağ alttaki DR düğmesi kalktı. Rutin eklemek için Rutinler satırındaki + düğmesine bas.
-- Rutinler satırı rutin yokken de görünür.
+Derleme hatası olursa Actions'taki kırmızı satırları gönder.v29.10 yenilikleri:
+- Ekle (+) panelleri (Rutinler, Yapılacaklar, Hatırlatıcı) ekranın ortasında, + düğmesinden büyüyerek açılır.
+- Ayarlar > Ana ekran > Tema 3: tarih, hava ve namaz en altta sabit, paneller yukarı açılır. Tema 2/3'te üst bar simgeleri eşit aralıklı.
+- Bölümleri sola itince geçici gizlenir, aşağı çekip yenileyince geri gelir.
+- Aşağı çekip yenileme eşiği 110 piksel.
+- Rutine uygulama bağlarken Kısayollar'daki uygulamalar da seçilebilir.

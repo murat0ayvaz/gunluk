@@ -43,9 +43,10 @@ class AppsChannel {
 }
 
 /// Telefondaki uygulamalardan birini seçtirir: (ad, paket); vazgeçilirse null
+/// Rutine bağlamak için kullanılır: Kısayollar'a eklenmiş uygulamalar da listelenir (üstte).
 Future<(String, String)?> pickPhoneApp(BuildContext context) =>
     showDialog<(String, String)>(
-        context: context, builder: (_) => const _AppPicker());
+        context: context, builder: (_) => const _AppPicker(forLink: true));
 
 class ShortcutsPage extends StatelessWidget {
   const ShortcutsPage({super.key});
@@ -172,7 +173,8 @@ class ShortcutsPage extends StatelessWidget {
 
 /// Telefondaki uygulamalardan seçim (arama kutulu)
 class _AppPicker extends StatefulWidget {
-  const _AppPicker();
+  final bool forLink; // true: eklenmiş kısayollar da görünür (rutine bağlama)
+  const _AppPicker({this.forLink = false});
 
   @override
   State<_AppPicker> createState() => _AppPickerState();
@@ -199,10 +201,19 @@ class _AppPickerState extends State<_AppPicker> {
         ? <(String, String)>[]
         : [
             for (final a in all)
-              if (!store.hasShortcut(a.$2) &&
+              if ((widget.forLink || !store.hasShortcut(a.$2)) &&
                   (q.isEmpty || a.$1.toLowerCase().contains(q)))
                 a
           ];
+    if (widget.forLink) {
+      // Kısayollarıma eklediklerim en üstte
+      list.sort((a, b) {
+        final sa = store.hasShortcut(a.$2) ? 0 : 1;
+        final sb = store.hasShortcut(b.$2) ? 0 : 1;
+        if (sa != sb) return sa.compareTo(sb);
+        return a.$1.toLowerCase().compareTo(b.$1.toLowerCase());
+      });
+    }
     return AlertDialog(
       title: Text(tx('Uygulama seç')),
       content: SizedBox(
@@ -243,6 +254,10 @@ class _AppPickerState extends State<_AppPicker> {
                             ),
                             title: Text(list[i].$1,
                                 maxLines: 1, overflow: TextOverflow.ellipsis),
+                            subtitle: widget.forLink && store.hasShortcut(list[i].$2)
+                                ? Text(tx('Kısayollarım'),
+                                    style: TextStyle(color: p.accent, fontSize: 12))
+                                : null,
                             onTap: () => Navigator.pop(context, list[i]),
                           ),
                         ),

@@ -638,7 +638,7 @@ class PullHome extends StatefulWidget {
 }
 
 class _PullHomeState extends State<PullHome> {
-  static const double _need = 75; // yaklaşık 2 cm
+  static const double _need = 110; // yaklaşık 3 cm
   double _pull = 0;
   bool _active = false;
   final ValueNotifier<double> _prog = ValueNotifier<double>(0);
@@ -742,4 +742,95 @@ class _PullHomeState extends State<PullHome> {
       ),
     );
   }
+}
+
+// ---------------------------------------------------------------
+// Ortada açılan pencere: dokunulan + düğmesinin konumundan büyüyerek çıkar,
+// kapanırken aynı noktaya küçülür. origin yoksa normal pencere gibi açılır.
+// card = true ise içerik yuvarlak köşeli bir kartın içine konur (AlertDialog kendi kartını getirir).
+// Klavye açılınca pencere yukarı kayar ve yüksekliği daralır.
+// ---------------------------------------------------------------
+Future<T?> showGrow<T>(BuildContext context, Offset? origin,
+    Widget Function(BuildContext) builder,
+    {bool card = true, double heightFactor = 0.8, bool fixed = false}) {
+  if (origin == null) {
+    return showDialog<T>(
+      context: context,
+      builder: (ctx) => card
+          ? Dialog(
+              backgroundColor: palOf(ctx).bg,
+              insetPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 24),
+              child: builder(ctx))
+          : builder(ctx),
+    );
+  }
+  return showGeneralDialog<T>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: tx('Kapat'),
+    barrierColor: Colors.black45,
+    transitionDuration: const Duration(milliseconds: 280),
+    pageBuilder: (ctx, a, b) {
+      final m = MediaQuery.of(ctx);
+      final kb = m.viewInsets.bottom;
+      final maxH = (m.size.height - kb - m.padding.top - m.padding.bottom - 24)
+          .clamp(200.0, 4000.0)
+          .toDouble();
+      final h = maxH < m.size.height * heightFactor
+          ? maxH
+          : m.size.height * heightFactor;
+      final p = palOf(ctx);
+      final inner = MediaQuery(
+        // klavye payını dışarıda ele aldık; içerideki formlar tekrar eklemesin
+        data: m.copyWith(viewInsets: EdgeInsets.zero),
+        child: card
+            ? Material(
+                color: p.bg,
+                elevation: 12,
+                borderRadius: BorderRadius.circular(24),
+                clipBehavior: Clip.antiAlias,
+                child: fixed
+                    ? SizedBox(height: h, child: builder(ctx))
+                    : builder(ctx),
+              )
+            : builder(ctx),
+      );
+      return Padding(
+        padding: EdgeInsets.only(bottom: kb),
+        child: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                    maxWidth: 560, maxHeight: card ? h : maxH),
+                child: inner,
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+    transitionBuilder: (ctx, a, b, child) {
+      final m = MediaQuery.of(ctx);
+      final center = Offset(m.size.width / 2, m.size.height / 2);
+      final delta = origin - center;
+      final t = CurvedAnimation(
+          parent: a,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic);
+      return AnimatedBuilder(
+        animation: t,
+        builder: (_, w) => Opacity(
+          opacity: a.value.clamp(0.0, 1.0).toDouble(),
+          child: Transform.translate(
+            offset: delta * (1 - t.value),
+            child: Transform.scale(scale: t.value.clamp(0.0, 1.0).toDouble(), child: w),
+          ),
+        ),
+        child: child,
+      );
+    },
+  );
 }

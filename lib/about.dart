@@ -10,8 +10,11 @@ import 'version.dart';
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
       tx('Verilerin korundu.'),
-      tx('Sağ alttaki DR düğmesi kalktı. Rutin eklemek için Rutinler satırındaki + düğmesine bas (diğer başlıklardaki gibi).'),
-      tx('Rutinler satırı rutin yokken de görünür; böylece ilk rutini + ile ekleyebilirsin.'),
+      tx('Ekle (+) panelleri ortada açılır: Rutinler, Yapılacaklar ve Hatırlatıcı + düğmesinden büyüyerek çıkar.'),
+      tx('Ayarlar > Ana ekran > Tema 3: tarih, hava ve namaz satırları en altta sabit; paneller yukarı açılır. Tema 2 ve 3\'te üst bar simgeleri eşit aralıklı.'),
+      tx('Bölümleri (hava, namaz, Rutinler, Yapılacaklar, Günlük, Hatırlatıcı, Diğer) sola itince geçici gizlenir; aşağı çekip yenileyince geri gelir. Boş ekranda kaydırma günü değiştirmeye devam eder.'),
+      tx('Aşağı çekip yenileme için çekme mesafesi artırıldı (kazara tetiklenmesin).'),
+      tx('Rutine uygulama bağlarken Kısayollar\'a eklediğin uygulamalar da görünür (en üstte).'),
     ];
 
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {

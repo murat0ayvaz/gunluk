@@ -71,6 +71,28 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   // Rutinlerin altındaki açılır başlıklar ('todo', 'note', 'rem')
   final Set<String> _openSec = {};
   String? _catFilter; // null: tüm kategoriler, aksi halde seçili kategori kimliği
+  // Sola itilip geçici gizlenen bölümler/çubuklar (veri silinmez; yenileyince geri gelir)
+  final Set<String> _hidden = {};
+  /// Hava / namaz çubuğunu sola itince gizler, sağa itince önceki güne geçer
+  Widget _bar(String id, Widget w) => GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onHorizontalDragEnd: (d) {
+          final v = d.primaryVelocity ?? 0;
+          if (v < -250) {
+            _swipeSec(id, true);
+          } else if (v > 250) {
+            _swipeSec(id, false);
+          }
+        },
+        child: w,
+      );
+  void _swipeSec(String id, bool left) {
+    if (left) {
+      setState(() => _hidden.add(id));
+    } else {
+      _shift(-1); // sağa itme: önceki gün (boş ekrandaki gibi)
+    }
+  }
 
   @override
   void initState() {
@@ -107,6 +129,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _prOpen = false;
       day = dayOnly(DateTime.now());
       _openSec.clear();
+      _hidden.clear();
       _catFilter = null;
     });
   }
@@ -239,68 +262,28 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     return '$pre${two(d.day)}.${two(d.month)}.${d.year} ${wdName(d.weekday)}';
   }
 
-  /// Ekle paneli: Rutinler satırındaki + ile açılır, ekranın yarısına kadar çıkar.
+  /// Ekle paneli: Rutinler satırındaki + düğmesinden büyüyerek ekranın ortasında açılır.
   /// Dışarı dokununca veya geri tuşuyla kapanır.
-  void _openAdd() {
-    final p = palOf(context);
+  Future<void> _openAdd(Offset origin) {
     final date = dKey(day);
-    Navigator.of(context).push(PageRouteBuilder<void>(
-      opaque: false,
-      barrierDismissible: true,
-      barrierLabel: tx('Kapat'),
-      barrierColor: Colors.black38,
-      transitionDuration: const Duration(milliseconds: 320),
-      reverseTransitionDuration: const Duration(milliseconds: 240),
-      pageBuilder: (ctx, a, b) {
-        final m = MediaQuery.of(ctx);
-        final kb = m.viewInsets.bottom; // klavye açıksa panel yukarı kayar
-        final keyboard = kb > 0;
-        final panelBottom = keyboard ? kb + 8 : 16 + m.padding.bottom;
-        final panelH = keyboard
-            ? (m.size.height - kb - m.padding.top - 20)
-            : m.size.height * 0.5;
-        final scale = CurvedAnimation(
-            parent: a,
-            curve: Curves.easeOutCubic,
-            reverseCurve: Curves.easeInCubic);
-        return Stack(
-          children: [
-            Positioned(
-              left: 10,
-              right: 10,
-              bottom: panelBottom,
-              height: panelH,
-              child: ScaleTransition(
-                scale: scale,
-                alignment: Alignment.bottomRight,
-                child: FadeTransition(
-                  opacity: scale,
-                  child: Material(
-                    color: p.bg,
-                    elevation: 10,
-                    borderRadius: BorderRadius.circular(24),
-                    clipBehavior: Clip.antiAlias,
-                    child: Column(
-                      children: [
-                        Container(
-                          margin: const EdgeInsets.only(top: 8, bottom: 2),
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                              color: p.line,
-                              borderRadius: BorderRadius.circular(2)),
-                        ),
-                        Expanded(child: AddSheet(date: date)),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    ));
+    return showGrow<void>(
+      context,
+      origin,
+      (ctx) => Column(
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 8, bottom: 2),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+                color: palOf(ctx).line, borderRadius: BorderRadius.circular(2)),
+          ),
+          Expanded(child: AddSheet(date: date)),
+        ],
+      ),
+      heightFactor: 0.72,
+      fixed: true,
+    );
   }
 
   // ----- Satır işlemleri -----
@@ -609,7 +592,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
         // Rutinler ve Diğer kayıtlar: açılır başlıklar (açılışta kapalı)
         final children = <Widget>[
-          _HomeSection(
+          if (!_hidden.contains('routine')) _HomeSection(
+              onSwipe: (l) => _swipeSec('routine', l),
               onAdd: _openAdd,
               icon: Icons.checklist_rounded,
               title: tx('Rutinler'),
@@ -631,7 +615,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
             ),
           if (othersTotal > 0)
-            _HomeSection(
+            if (!_hidden.contains('other')) _HomeSection(
+              onSwipe: (l) => _swipeSec('other', l),
               icon: Icons.more_horiz_rounded,
               title: tx('Diğer kayıtlar'),
               tone: const Color(0xFF17A9C4),
@@ -676,12 +661,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         ),
                       ),
                     // ----- Açılır başlıklar: Yapılacaklar / Günlük / Hatırlatıcı -----
-                    if (!store.appHidden('todo')) _HomeSection(
+                    if (!store.appHidden('todo') && !_hidden.contains('todo')) _HomeSection(
+                      onSwipe: (l) => _swipeSec('todo', l),
                       icon: Icons.task_alt_rounded,
                       title: tx('Yapılacaklar'),
                       tone: const Color(0xFF2FB38A),
-                      onAdd: () async {
-                        final ok = await showAddTodo(context, date);
+                      onAdd: (o) async {
+                        final ok = await showAddTodo(context, date, origin: o);
                         if (ok && mounted) setState(() => _openSec.add('todo'));
                       },
                       badge: () {
@@ -697,7 +683,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           : _openSec.add('todo')),
                       child: TodosBody(date: date),
                     ),
-                    if (!store.appHidden('diary')) _HomeSection(
+                    if (!store.appHidden('diary') && !_hidden.contains('note')) _HomeSection(
+                      onSwipe: (l) => _swipeSec('note', l),
                       icon: Icons.menu_book_rounded,
                       title: tx('Günlük'),
                       tone: const Color(0xFF9A6BF0),
@@ -714,11 +701,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             title: _label()),
                       ),
                     ),
-                    if (!store.appHidden('rem')) _HomeSection(
+                    if (!store.appHidden('rem') && !_hidden.contains('rem')) _HomeSection(
+                      onSwipe: (l) => _swipeSec('rem', l),
                       icon: Icons.notifications_active_outlined,
                       title: tx('Hatırlatıcı'),
                       tone: const Color(0xFFF08A3C),
-                      onAdd: () => showReminderSheet(context),
+                      onAdd: (o) => showReminderSheet(context, origin: o),
                       badge: () {
                         final n = store.reminders
                             .where((r) => r.enabled && !reminderFinished(r))
@@ -753,6 +741,60 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           child: bodyColumn,
         );
 
+        // Üst bar simgeleri (Tema 2 ve 3'te ekran genişliğine eşit aralıkla dağılır)
+        final iMenu = IconButton(
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 40, minHeight: 44),
+          icon: const Icon(Icons.menu_rounded),
+          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+        );
+        final Widget? iStudy = (!store.appHidden('study') &&
+                !(store.appHidden('study_lgs') && store.appHidden('study_dil')))
+            ? IconButton(
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 40, minHeight: 44),
+                tooltip: tx('Ders çalışma'),
+                icon: const Icon(Icons.menu_book_rounded),
+                onPressed: () => Navigator.of(context)
+                    .push(slideFromRight(const StudyPage())),
+              )
+            : null;
+        final Widget? iShort = !store.appHidden('shortcuts')
+            ? IconButton(
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 38, minHeight: 44),
+                tooltip: tx('Kısayollar'),
+                icon: const Icon(Icons.apps_rounded),
+                onPressed: () => Navigator.of(context)
+                    .push(slideFromRight(const ShortcutsPage())),
+              )
+            : null;
+        final Widget? iTools = !store.appHidden('tools')
+            ? IconButton(
+                tooltip: tx('Araçlar'),
+                onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
+                icon: const Icon(Icons.handyman_outlined),
+              )
+            : null;
+        final Widget? iMedia =
+            (!store.appHidden('media') && mediaTabIds().isNotEmpty)
+                ? ListenableBuilder(
+                    listenable: media,
+                    builder: (context, _) => IconButton(
+                      tooltip: tx('Müzik ve Radyo'),
+                      onPressed: () => Navigator.of(context)
+                          .push(slideFromRight(const MediaPage())),
+                      icon: Icon(media.nowId != null && media.playing
+                          ? Icons.graphic_eq_rounded
+                          : Icons.headphones_rounded),
+                    ),
+                  )
+                : null;
+        final fixedBars = store.homeTheme >= 2; // Tema 2 ve 3
+
         final scaffold = Scaffold(
           key: _scaffoldKey,
           drawer: const AppDrawer(),
@@ -764,69 +806,83 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             scrolledUnderElevation: 0,
             centerTitle: true,
             titleSpacing: 0,
-            leadingWidth: 118,
-            leading: Row(
-              children: [
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 40, minHeight: 44),
-                  icon: const Icon(Icons.menu_rounded),
-                  onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-                ),
-                if (!store.appHidden('study') &&
-                    !(store.appHidden('study_lgs') && store.appHidden('study_dil')))
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 40, minHeight: 44),
-                  tooltip: tx('Ders çalışma'),
-                  icon: const Icon(Icons.menu_book_rounded),
-                  onPressed: () => Navigator.of(context)
-                      .push(slideFromRight(const StudyPage())),
-                ),
-                if (!store.appHidden('shortcuts'))
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 38, minHeight: 44),
-                    tooltip: tx('Kısayollar'),
-                    icon: const Icon(Icons.apps_rounded),
-                    onPressed: () => Navigator.of(context)
-                        .push(slideFromRight(const ShortcutsPage())),
-                  ),
-              ],
-            ),
-            // Tarih seçici en üstte: < Bugün • 3 Kasım >
-            title: store.homeTheme == 2 ? null : _dateRow(p, long: false),
-            actions: [
-              // Sağdan açılan Araçlar menüsü
-              if (!store.appHidden('tools'))
-              IconButton(
-                tooltip: tx('Araçlar'),
-                onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
-                icon: const Icon(Icons.handyman_outlined),
-              ),
-              // Sağdan açılan Müzik ve Radyo sayfası
-              if (!store.appHidden('media') && mediaTabIds().isNotEmpty)
-              ListenableBuilder(
-                listenable: media,
-                builder: (context, _) => IconButton(
-                  tooltip: tx('Müzik ve Radyo'),
-                  onPressed: () =>
-                      Navigator.of(context).push(slideFromRight(const MediaPage())),
-                  icon: Icon(media.nowId != null && media.playing
-                      ? Icons.graphic_eq_rounded
-                      : Icons.headphones_rounded),
-                ),
-              ),
-            ],
+            automaticallyImplyLeading: false,
+            leadingWidth: fixedBars ? 0 : 118,
+            leading: fixedBars
+                ? const SizedBox.shrink()
+                : Row(children: [iMenu, if (iStudy != null) iStudy, if (iShort != null) iShort]),
+            // Tema 1: tarih seçici üstte. Tema 2/3: simgeler eşit aralıkla.
+            title: fixedBars
+                ? Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      iMenu,
+                      if (iStudy != null) iStudy,
+                      if (iShort != null) iShort,
+                      if (iTools != null) iTools,
+                      if (iMedia != null) iMedia,
+                    ],
+                  )
+                : _dateRow(p, long: false),
+            actions: fixedBars
+                ? const []
+                : [
+                    if (iTools != null) iTools,
+                    if (iMedia != null) iMedia,
+                  ],
           ),
           body: Builder(builder: (context) {
             // Hava ve namaz: tek satır yazı. Başlıktaki hava simgesi satırları getirir/götürür;
             // yazıya dokununca altına saatlik hava / tüm vakitler açılır.
             // Ekran yenilenince (ana ekranda aşağı çekince) açılan barlar kapanır, yazılar kalır.
             final lines = store.linesOn;
+            final wxLine = (lines && store.wxOn && !_hidden.contains('wx'))
+                ? WxLine(
+                    key: ValueKey('wxl_$date'),
+                    date: date,
+                    open: _wxOpen,
+                    onTap: () => store.setWxBarOpen(!store.wxBarOpen),
+                  )
+                : null;
+            final wxPanel = (lines && store.wxOn && _wxOpen && !_hidden.contains('wx'))
+                ? WxPanel(key: ValueKey('wx_$date'), date: date)
+                : null;
+            final prLine = (lines && store.prayOn && !_hidden.contains('pr'))
+                ? PrayerLine(
+                    open: _prOpen,
+                    day: day,
+                    onTap: () => setState(() => _prOpen = !_prOpen),
+                  )
+                : null;
+            final prBar =
+                (lines && store.prayOn && _prOpen && !_hidden.contains('pr'))
+                    ? PrayerBar(day: day)
+                    : null;
+            if (store.homeTheme == 3) {
+              // Tema 3: tarih, hava ve namaz en altta sabit; paneller yukarı doğru açılır.
+              // En alttan yukarı: Bugün satırı, hava, namaz.
+              return Column(
+                children: [
+                  Expanded(child: body),
+                  SafeArea(
+                    top: false,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (prBar != null) prBar,
+                        if (prLine != null) _bar('pr', prLine),
+                        if (wxPanel != null) wxPanel,
+                        if (wxLine != null) _bar('wx', wxLine),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2, bottom: 2),
+                          child: Center(child: _dateRow(p, long: true)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            }
             return Column(
               children: [
                 // Tema 2: tarih satırı üst barın altında, sabit
@@ -835,22 +891,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     padding: const EdgeInsets.only(bottom: 2),
                     child: Center(child: _dateRow(p, long: true)),
                   ),
-                if (lines && store.wxOn)
-                  WxLine(
-                    key: ValueKey('wxl_$date'),
-                    date: date,
-                    open: _wxOpen,
-                    onTap: () => store.setWxBarOpen(!store.wxBarOpen),
-                  ),
-                if (lines && store.wxOn && _wxOpen)
-                  WxPanel(key: ValueKey('wx_$date'), date: date),
-                if (lines && store.prayOn)
-                  PrayerLine(
-                    open: _prOpen,
-                    day: day,
-                    onTap: () => setState(() => _prOpen = !_prOpen),
-                  ),
-                if (lines && store.prayOn && _prOpen) PrayerBar(day: day),
+                if (wxLine != null) _bar('wx', wxLine),
+                if (wxPanel != null) wxPanel,
+                if (prLine != null) _bar('pr', prLine),
+                if (prBar != null) prBar,
                 Expanded(child: body),
               ],
             );
@@ -899,10 +943,12 @@ class _HomeSection extends StatelessWidget {
   final String badge; // sayı ya da "•"; boşsa görünmez
   final bool open;
   final VoidCallback onToggle;
-  final VoidCallback? onAdd; // başlıktaki + düğmesi
+  final void Function(Offset origin)? onAdd; // başlıktaki + düğmesi (konumu verir)
+  final void Function(bool left)? onSwipe; // sola/sağa itme (sola: bölüm gizlenir)
   final Widget child;
   const _HomeSection({
     this.onAdd,
+    this.onSwipe,
     required this.icon,
     required this.title,
     required this.tone,
@@ -918,7 +964,7 @@ class _HomeSection extends StatelessWidget {
     final tone = p.tint(this.tone);
     final head =
         Color.alphaBlend(tone.withOpacity(p.dark ? 0.20 : 0.13), p.card);
-    return Container(
+    final box = Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: p.card,
@@ -961,14 +1007,19 @@ class _HomeSection extends StatelessWidget {
                                 fontWeight: FontWeight.w700, color: p.ink)),
                       ),
                     if (onAdd != null)
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints:
-                            const BoxConstraints(minWidth: 36, minHeight: 36),
-                        tooltip: tx('Ekle'),
-                        onPressed: onAdd,
-                        icon: Icon(Icons.add_circle_outline_rounded, color: tone),
+                      Builder(
+                        builder: (bc) => IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints:
+                              const BoxConstraints(minWidth: 36, minHeight: 36),
+                          tooltip: tx('Ekle'),
+                          onPressed: () {
+                            final rb = bc.findRenderObject() as RenderBox;
+                            onAdd!(rb.localToGlobal(rb.size.center(Offset.zero)));
+                          },
+                          icon: Icon(Icons.add_circle_outline_rounded, color: tone),
+                        ),
                       ),
                     const SizedBox(width: 4),
                     AnimatedRotation(
@@ -990,6 +1041,20 @@ class _HomeSection extends StatelessWidget {
           ),
         ],
       ),
+    );
+    if (onSwipe == null) return box;
+    // Başlığı/boş yeri sola itince bölüm gider; satırların kendi kaydırması (sil/düzenle) öncelikli kalır
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragEnd: (d) {
+        final v = d.primaryVelocity ?? 0;
+        if (v < -250) {
+          onSwipe!(true);
+        } else if (v > 250) {
+          onSwipe!(false);
+        }
+      },
+      child: box,
     );
   }
 }
