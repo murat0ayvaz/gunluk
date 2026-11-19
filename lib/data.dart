@@ -2463,6 +2463,7 @@ class AppStore extends ChangeNotifier {
     prayOn = (j['prayon'] as bool?) ?? true;
     wxBarOpen = (j['wxbar'] as bool?) ?? false;
     linesOn = (j['lines'] as bool?) ?? true;
+    lastRadioId = (j['lrad'] ?? '').toString();
     homeTheme = (((j['htheme'] as num?)?.toInt() ?? 1).clamp(1, 3)).toInt();
     hiddenApps = {for (final x in ((j['apphid'] as List?) ?? [])) x.toString()};
     evtCat = (j['evtcat'] as bool?) ?? false;
@@ -2712,6 +2713,7 @@ class AppStore extends ChangeNotifier {
         'prayon': prayOn,
         'wxbar': wxBarOpen,
         'lines': linesOn,
+        'lrad': lastRadioId,
         'htheme': homeTheme,
         'apphid': hiddenApps.toList(),
         'evtcat': evtCat,
@@ -3152,6 +3154,13 @@ class AppStore extends ChangeNotifier {
     } else {
       hiddenApps.remove(id);
     }
+    _commit();
+  }
+
+  String lastRadioId = ''; // en son çalınan radyo (sesli komut: "radyo çal")
+  void setLastRadio(String id) {
+    if (lastRadioId == id) return;
+    lastRadioId = id;
     _commit();
   }
 

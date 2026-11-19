@@ -196,6 +196,7 @@ class SettingsPage extends StatelessWidget {
                   ('study_lgs', 'LGS', Icons.menu_book_rounded),
                   ('study_dil', 'Yabancı dil', Icons.translate_rounded),
                   ('shortcuts', 'Kısayollar', Icons.apps_rounded),
+                  ('voice', 'Sesli komut', Icons.mic_rounded),
                   ('tools', 'Araçlar', Icons.handyman_outlined),
                   ('media', 'Müzik ve Radyo', Icons.headphones_rounded),
                   ('music', 'Müzik', Icons.music_note_rounded),

@@ -10,11 +10,9 @@ import 'version.dart';
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
       tx('Verilerin korundu.'),
-      tx('Ekle (+) panelleri ortada açılır: Rutinler, Yapılacaklar ve Hatırlatıcı + düğmesinden büyüyerek çıkar.'),
-      tx('Ayarlar > Ana ekran > Tema 3: tarih, hava ve namaz satırları en altta sabit; paneller yukarı açılır. Tema 2 ve 3\'te üst bar simgeleri eşit aralıklı.'),
-      tx('Bölümleri (hava, namaz, Rutinler, Yapılacaklar, Günlük, Hatırlatıcı, Diğer) sola itince geçici gizlenir; aşağı çekip yenileyince geri gelir. Boş ekranda kaydırma günü değiştirmeye devam eder.'),
-      tx('Aşağı çekip yenileme için çekme mesafesi artırıldı (kazara tetiklenmesin).'),
-      tx('Rutine uygulama bağlarken Kısayollar\'a eklediğin uygulamalar da görünür (en üstte).'),
+      tx('Üst barda mikrofon: sesli komut. Örnekler: "Yarın saat 3\'te muayene hatırlat", "yapılacak süt al", "cüzdana bin iki yüz lira peşin market harcaması ekle", "rutin kitap 5 sayfa".'),
+      tx('Sesle aç/çal: "radyo aç", "müzik aç", "WhatsApp\'ı aç", "haber oku", "radyo çal", "durdur". Kayıt ekleyen komutlar önce onay sorar.'),
+      tx('Ayarlar > Uygulamalar > Sesli komut ile mikrofon düğmesi kapatılabilir. Ses tanıma için telefonda Google ses tanıma gerekir.'),
     ];
 
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {

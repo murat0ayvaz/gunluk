@@ -1007,3 +1007,7 @@ class _VoiceDialogState extends State<_VoiceDialog> {
     );
   }
 }
+
+/// Sesli komut ("haber oku"): tüm kaynakların haberlerini sesli okumaya başlar
+Future<void> startNewsReading(BuildContext context) =>
+    const NewsTab()._readAll(context);

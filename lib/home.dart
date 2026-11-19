@@ -17,6 +17,7 @@ import 'strings.dart';
 import 'theme.dart';
 import 'todos.dart';
 import 'ui.dart';
+import 'voicecmd.dart';
 import 'links.dart';
 import 'prayer.dart';
 import 'shortcuts.dart';
@@ -793,6 +794,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     ),
                   )
                 : null;
+        final Widget? iMic = !store.appHidden('voice')
+            ? IconButton(
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 38, minHeight: 44),
+                tooltip: tx('Sesli komut'),
+                icon: const Icon(Icons.mic_rounded),
+                onPressed: () => voiceCommand(context),
+              )
+            : null;
         final fixedBars = store.homeTheme >= 2; // Tema 2 ve 3
 
         final scaffold = Scaffold(
@@ -819,6 +830,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       iMenu,
                       if (iStudy != null) iStudy,
                       if (iShort != null) iShort,
+                      if (iMic != null) iMic,
                       if (iTools != null) iTools,
                       if (iMedia != null) iMedia,
                     ],
@@ -827,6 +839,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             actions: fixedBars
                 ? const []
                 : [
+                    if (iMic != null) iMic,
                     if (iTools != null) iTools,
                     if (iMedia != null) iMedia,
                   ],

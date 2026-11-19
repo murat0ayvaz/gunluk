@@ -230,6 +230,7 @@ class MediaCtl extends ChangeNotifier {
   }
 
   Future<void> playStation(Station r) async {
+    store.setLastRadio(r.id);
     final u = Uri.tryParse(r.url);
     if (u == null || !(u.isScheme('http') || u.isScheme('https'))) {
       _start();
