@@ -640,8 +640,33 @@ class _CityDialogState extends State<_CityDialog> {
 class WxAlert {
   final int level; // 1 dikkat, 2 uyarı
   final String text;
-  final String when;
-  const WxAlert(this.level, this.text, this.when);
+  final String when; // "Yarın 14:00-16:00" (ayrıntı penceresi için)
+  final int day; // 0 = bugün, 1 = yarın
+  final String at; // yalnız saat aralığı ("14:00-16:00"); günlük uyarılarda boş
+  const WxAlert(this.level, this.text, this.when, {this.day = 0, this.at = ''});
+}
+
+String _lowerFirst(String s) =>
+    s.isEmpty ? s : s.substring(0, 1).toLowerCase() + s.substring(1);
+
+/// Hava satırının sonuna eklenecek uyarı yazısı. [viewDay]: satırın gösterdiği gün
+/// (0 bugün, 1 yarın). Bugün satırında yarının uyarıları "yarın" diye belirtilir,
+/// yarın satırında yalnız yarının uyarıları gösterilir. Boşsa '' döner.
+String wxAlertLine(List<WxAlert> all, int viewDay) {
+  final al = [
+    for (final a in all)
+      if (a.day == viewDay || (viewDay == 0 && a.day == 1)) a
+  ];
+  if (al.isEmpty) return '';
+  String one(WxAlert a) {
+    final pre = a.day > viewDay ? '${tx('yarın')} ' : '';
+    final at = a.at.isEmpty ? '' : '${a.at} ';
+    return '$pre$at${_lowerFirst(a.text)}';
+  }
+
+  final shown = al.take(2).map(one).join(' • ');
+  final extra = al.length > 2 ? ' ${tx('+{0} uyarı daha', [al.length - 2])}' : '';
+  return '${tx('Uyarı: {0}.', [shown])}$extra';
 }
 
 String _hh(int h) => '${h.toString().padLeft(2, '0')}:00';
@@ -676,24 +701,27 @@ List<WxAlert> wxAlerts(WeatherData d) {
     }
     if (heavy.isNotEmpty) {
       out.add(WxAlert(maxMm >= 10 ? 2 : 1, tx('Yoğun yağış bekleniyor'),
-          '$label ${span(heavy)}'));
+          '$label ${span(heavy)}', day: k, at: span(heavy)));
     }
     if (storm.isNotEmpty) {
       out.add(WxAlert(2, tx('Gök gürültülü fırtına bekleniyor'),
-          '$label ${span(storm)}'));
+          '$label ${span(storm)}', day: k, at: span(storm)));
     }
     if (snow.isNotEmpty) {
-      out.add(WxAlert(1, tx('Kar yağışı bekleniyor'), '$label ${span(snow)}'));
+      out.add(WxAlert(1, tx('Kar yağışı bekleniyor'), '$label ${span(snow)}',
+          day: k, at: span(snow)));
     }
     final dd = d.days[key];
     if (dd != null) {
       if (dd.tmax >= 35) {
         out.add(WxAlert(dd.tmax >= 40 ? 2 : 1,
-            tx('Çok sıcak (en yüksek {0})', [_deg(dd.tmax)]), label));
+            tx('Çok sıcak (en yüksek {0})', [_deg(dd.tmax)]), label,
+            day: k));
       }
       if (dd.tmin <= 0) {
         out.add(WxAlert(dd.tmin <= -5 ? 2 : 1,
-            tx('Dondurucu soğuk (en düşük {0})', [_deg(dd.tmin)]), label));
+            tx('Dondurucu soğuk (en düşük {0})', [_deg(dd.tmin)]), label,
+            day: k));
       }
     }
   }
@@ -945,11 +973,12 @@ class WxLine extends StatelessWidget {
           } else {
             return const SizedBox.shrink();
           }
-          final al = (todayKey || tomKey) ? wxAlerts(d) : const <WxAlert>[];
-          warn = al.isNotEmpty;
-          if (warn) {
-            text = '$text ${tx('Uyarı: {0}.', [al.first.text])}';
-          }
+          // Uyarı: hangi gün ve saatte olduğuyla birlikte (yarının uyarısı bugünküymüş gibi görünmesin)
+          final line = (todayKey || tomKey)
+              ? wxAlertLine(wxAlerts(d), todayKey ? 0 : 1)
+              : '';
+          warn = line.isNotEmpty;
+          if (warn) text = '$text $line';
         }
         return Container(
           margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),

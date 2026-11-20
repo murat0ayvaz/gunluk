@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'data.dart';
 import 'links.dart';
@@ -540,6 +541,28 @@ void _snack(BuildContext context, String m) {
     ..showSnackBar(SnackBar(content: Text(m)));
 }
 
+FlutterTts? _sayTts;
+
+/// Kısa sesli yanıt (Ayarlar > Sesli komut > Sesli yanıt açıksa)
+Future<void> _say(String m) async {
+  if (!store.voiceSpeak) return;
+  try {
+    final t = _sayTts ?? FlutterTts();
+    if (_sayTts == null) {
+      _sayTts = t;
+      await t.setLanguage('tr-TR');
+      await t.awaitSpeakCompletion(true);
+    }
+    await t.speak(m);
+  } catch (_) {}
+}
+
+/// Başarılı işlem: yazılı bildirim + (açıksa) sesli yanıt
+void _ok(BuildContext context, String m) {
+  _snack(context, m);
+  _say(m);
+}
+
 Future<void> runVoiceText(BuildContext context, String heard) async {
   final raw = heard
       .replaceAll('₺', ' TL ')
@@ -559,7 +582,7 @@ Future<void> runVoiceText(BuildContext context, String heard) async {
   if (RegExp(r'\b(durdur\w*|sustur\w*|dur)\b').hasMatch(n)) {
     if (newsReader.reading) await newsReader.stop();
     if (media.nowId != null) await media.stop();
-    _snack(context, tx('Durduruldu.'));
+    _ok(context, tx('Durduruldu.'));
     return;
   }
   // 2) Haber oku
@@ -718,7 +741,9 @@ Future<void> _playRadio(BuildContext context, String n) async {
 // ---------- Onay penceresi ----------
 Future<bool> _confirm(BuildContext context, String title,
     Widget Function(BuildContext, StateSetter) body,
-    {bool Function()? canOk, String okLabel = ''}) async {
+    {bool Function()? canOk, String okLabel = '', bool skip = false}) async {
+  // Ayarlarda "onay iste" kapalıysa ve komut eksiksiz anlaşıldıysa pencere açılmaz
+  if (skip && !store.voiceConfirm) return true;
   final r = await showDialog<bool>(
     context: context,
     builder: (ctx) => StatefulBuilder(
@@ -815,6 +840,7 @@ Future<void> _doReminder(BuildContext context, String heard, List<String> raw,
       ],
     ),
     canOk: () => c.text.trim().isNotEmpty && ms != null,
+    skip: ms != null && c.text.trim().isNotEmpty,
   );
   final text = c.text.trim();
   c.dispose();
@@ -832,7 +858,10 @@ Future<void> _doReminder(BuildContext context, String heard, List<String> raw,
   ));
   final msg = await permissionMessage();
   await Notifier.syncReminder(r);
-  if (context.mounted) _snack(context, msg ?? tx('Hatırlatıcı eklendi.'));
+  if (context.mounted) {
+    _snack(context, msg ?? tx('Hatırlatıcı eklendi.'));
+    _say(tx('Hatırlatıcı eklendi.'));
+  }
 }
 
 // ---------- Yapılacak ----------
@@ -868,12 +897,13 @@ Future<void> _doTodo(BuildContext context, String heard, List<String> raw,
       ],
     ),
     canOk: () => c.text.trim().isNotEmpty,
+    skip: c.text.trim().isNotEmpty,
   );
   final text = c.text.trim();
   c.dispose();
   if (!ok || text.isEmpty) return;
   store.addTodo(text, day: dKey(day));
-  _snack(context, tx('Yapılacaklara eklendi.'));
+  _ok(context, tx('Yapılacaklara eklendi.'));
 }
 
 // ---------- Cüzdan ----------
@@ -1012,6 +1042,7 @@ Future<void> _doWallet(BuildContext context, String heard, List<String> raw,
         ],
       );
     },
+    skip: true,
   );
   final noteText = note.text.trim();
   note.dispose();
@@ -1026,7 +1057,7 @@ Future<void> _doWallet(BuildContext context, String heard, List<String> raw,
       curCat,
       curIncome ? 0 : curPay,
       noteText));
-  _snack(context, tx('Cüzdana eklendi.'));
+  _ok(context, tx('Cüzdana eklendi.'));
 }
 
 // ---------- Rutin değeri ----------
@@ -1085,10 +1116,11 @@ Future<bool> _doRoutine(
       ],
     ),
     okLabel: tx('Gir'),
+    skip: true,
   );
   if (!ok) return true;
   store.setEntry(sub.id, date, val);
-  _snack(context, tx('Değer girildi.'));
+  _ok(context, tx('Değer girildi.'));
   return true;
 }
 
@@ -1120,3 +1152,174 @@ Future<void> _fallback(BuildContext context, String heard) async {
     await _doTodo(context, heard, raw, [for (final x in raw) vNorm(x)]);
   }
 }
+
+
+// ---------------------------------------------------------------
+// SÜREKLİ DİNLEME (Ayarlar > Sesli komut > Sürekli dinle)
+//  Uygulama ön plandayken mikrofon uyandırma kelimesini ("Günlük" ...) bekler.
+//  Cümle uyandırma kelimesiyle başlıyorsa kalanı komut olarak çalıştırılır;
+//  yalnız kelime söylenirse dinleme penceresi açılır. Kelime yoksa cümle yok sayılır.
+//  Uygulama arka plana geçince ya da komut çalışırken dinleme durur.
+// ---------------------------------------------------------------
+class VoiceListener extends ChangeNotifier with WidgetsBindingObserver {
+  final SpeechToText _stt = SpeechToText();
+  BuildContext? ctx; // ana ekranın bağlamı (pencereler bunun üstünde açılır)
+  bool listening = false; // şu an mikrofon açık mı (göstergede görünür)
+  bool _want = false; // dinleme istendi mi
+  bool _busy = false; // komut işleniyor / başka mikrofon kullanımı
+  bool _inited = false;
+  bool _observing = false;
+  bool _fg = true; // uygulama ön planda mı
+  int _gen = 0;
+
+  /// Ayara göre başlatır ya da durdurur
+  Future<void> sync() async {
+    if (!_observing) {
+      _observing = true;
+      WidgetsBinding.instance.addObserver(this);
+    }
+    if (store.voiceListen) {
+      _want = true;
+      await _loop();
+    } else {
+      _want = false;
+      await _halt();
+    }
+  }
+
+  /// Başka bir mikrofon kullanımı (ses kaydı gibi) için geçici durdurma
+  Future<void> pause() async {
+    _busy = true;
+    await _halt();
+  }
+
+  void resume() {
+    _busy = false;
+    if (_want && store.voiceListen) _loop();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _fg = true;
+      if (_want && store.voiceListen && !_busy) _loop();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      _fg = false;
+      _halt();
+    }
+  }
+
+  Future<void> _halt() async {
+    _gen++;
+    try {
+      await _stt.cancel();
+    } catch (_) {}
+    if (listening) {
+      listening = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _loop() async {
+    if (!_want || _busy || !_fg || listening) return;
+    final g = ++_gen;
+    if (!_inited) {
+      try {
+        _inited = await _stt.initialize(
+          // Olaylar her zaman o anki dinleme turuna sayılır (_gen); ilk turun g'sine bağlı kalmaz
+          onStatus: (s) {
+            if (s == 'done' || s == 'notListening') _restart(_gen);
+          },
+          onError: (e) => _restart(_gen, delay: 1500),
+        );
+      } catch (_) {
+        _inited = false;
+      }
+      if (!_inited) return;
+    }
+    if (g != _gen) return;
+    try {
+      listening = true;
+      notifyListeners();
+      await _stt.listen(
+        onResult: (r) {
+          if (g != _gen) return;
+          if (r.finalResult) _onFinal(r.recognizedWords);
+        },
+        localeId: 'tr_TR',
+        listenFor: const Duration(seconds: 55),
+        pauseFor: const Duration(seconds: 4),
+      );
+    } catch (_) {
+      listening = false;
+      notifyListeners();
+      _restart(g, delay: 2000);
+    }
+  }
+
+  void _restart(int g, {int delay = 500}) {
+    if (g != _gen) return;
+    listening = false;
+    notifyListeners();
+    Future<void>.delayed(Duration(milliseconds: delay), () {
+      if (_want && !_busy && _fg && g == _gen && store.voiceListen) {
+        _gen++; // eski oturumun olayları geçersiz
+        _loop();
+      }
+    });
+  }
+
+  Future<void> _onFinal(String text) async {
+    final raw = text
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((e) => e.isNotEmpty)
+        .toList();
+    if (raw.isEmpty) return;
+    final nt = [for (final r in raw) vNorm(r).replaceAll(RegExp(r'[.,!?;]+$'), '')];
+    final wake = vNorm(store.voiceWake)
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((e) => e.isNotEmpty)
+        .toList();
+    if (wake.isEmpty) return;
+    var at = -1;
+    for (var i = 0; i + wake.length <= nt.length; i++) {
+      var ok = true;
+      for (var j = 0; j < wake.length; j++) {
+        final a = nt[i + j];
+        final b = wake[j];
+        if (!(j == wake.length - 1 ? a.startsWith(b) : a == b)) {
+          ok = false;
+          break;
+        }
+      }
+      if (ok) {
+        at = i;
+        break;
+      }
+    }
+    if (at < 0 || at > 1) return; // cümle uyandırma kelimesiyle başlamıyor
+    final cmd = raw.sublist(at + wake.length).join(' ').trim();
+    final c = ctx;
+    if (c == null || !c.mounted) return;
+    _busy = true;
+    await _halt();
+    try {
+      if (cmd.isEmpty) {
+        await voiceCommand(c); // yalnız kelime: komutu sor
+      } else {
+        await runVoiceText(c, cmd);
+      }
+    } catch (_) {}
+    _busy = false;
+    if (_want && store.voiceListen) {
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      _loop();
+    }
+  }
+}
+
+final voiceListener = VoiceListener();

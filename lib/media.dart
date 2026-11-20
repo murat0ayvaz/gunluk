@@ -61,7 +61,7 @@ const _kOnline = 'online';
 const _kNews = 'news';
 
 class MediaCtl extends ChangeNotifier {
-  final AudioPlayer player = AudioPlayer();
+  AudioPlayer player = AudioPlayer(); // ✕ ile kapatınca yenisi oluşturulur (bildirimi kaldırmak için)
   final Random _rnd = Random();
   String? nowId; // çalan şarkı / radyo / bölüm kimliği
   String nowTitle = '';
@@ -487,8 +487,16 @@ class MediaCtl extends ChangeNotifier {
     error = null;
     loading = false;
     notifyListeners();
+    // Çaları tamamen kapatıp yenisini oluştururuz: telefondaki medya bildirimi ve
+    // oturumu da kapanır (yalnız stop() bildirimi ekranda bırakıyordu).
+    final old = player;
+    player = AudioPlayer();
+    _started = false; // sonraki çalmada dinleyiciler yeni çaların üstüne bağlanır
     try {
-      await player.stop();
+      await old.stop();
+    } catch (_) {}
+    try {
+      await old.dispose();
     } catch (_) {}
     notifyListeners();
   }

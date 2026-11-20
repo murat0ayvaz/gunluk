@@ -12,6 +12,7 @@ import 'tools.dart' show toolList;
 import 'strings.dart';
 import 'theme.dart';
 import 'ui.dart';
+import 'voicecmd.dart' show voiceListener;
 import 'version.dart';
 import 'weather.dart';
 
@@ -196,7 +197,6 @@ class SettingsPage extends StatelessWidget {
                   ('study_lgs', 'LGS', Icons.menu_book_rounded),
                   ('study_dil', 'Yabancı dil', Icons.translate_rounded),
                   ('shortcuts', 'Kısayollar', Icons.apps_rounded),
-                  ('voice', 'Sesli komut', Icons.mic_rounded),
                   ('tools', 'Araçlar', Icons.handyman_outlined),
                   ('media', 'Müzik ve Radyo', Icons.headphones_rounded),
                   ('music', 'Müzik', Icons.music_note_rounded),
@@ -212,6 +212,57 @@ class SettingsPage extends StatelessWidget {
                     value: !store.appHidden(a.$1),
                     onChanged: (v) => store.setAppHidden(a.$1, !v),
                   ),
+              ]),
+              sec(tx('Sesli komut'), [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: const Icon(Icons.mic_rounded),
+                  title: Text(tx('Mikrofon düğmesi')),
+                  subtitle: Text(tx('Üst barda mikrofon görünsün; basınca komutu söylersin.')),
+                  value: !store.appHidden('voice'),
+                  onChanged: (v) => store.setAppHidden('voice', !v),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: const Icon(Icons.hearing_rounded),
+                  title: Text(tx('Sürekli dinle')),
+                  subtitle: Text(tx('Uygulama açıkken uyandırma kelimesini bekler (örn. "Günlük, radyo aç"). Pil harcar; uygulama arka plana geçince durur.')),
+                  value: store.voiceListen,
+                  onChanged: (v) {
+                    store.setVoiceListen(v);
+                    voiceListener.sync();
+                  },
+                ),
+                if (store.voiceListen)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.record_voice_over_rounded),
+                    title: Text(tx('Uyandırma kelimesi')),
+                    subtitle: Text(store.voiceWake),
+                    trailing: const Icon(Icons.edit_rounded, size: 18),
+                    onTap: () async {
+                      final w = await askText(context, tx('Uyandırma kelimesi'),
+                          initial: store.voiceWake, label: tx('Kelime'));
+                      if (w == null) return;
+                      store.setVoiceWake(w);
+                    },
+                  ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: const Icon(Icons.volume_up_rounded),
+                  title: Text(tx('Sesli yanıt')),
+                  subtitle: Text(tx('Komut anlaşılınca kısa sesli onay verir.')),
+                  value: store.voiceSpeak,
+                  onChanged: store.setVoiceSpeak,
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: const Icon(Icons.fact_check_outlined),
+                  title: Text(tx('Kayıttan önce onay iste')),
+                  subtitle: Text(tx('Kapalıysa komut eksiksiz anlaşılınca onay sormadan kaydeder.')),
+                  value: store.voiceConfirm,
+                  onChanged: store.setVoiceConfirm,
+                ),
               ]),
               sec(tx('Araçlar'), [
                 Padding(

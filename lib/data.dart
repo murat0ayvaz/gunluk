@@ -2464,6 +2464,12 @@ class AppStore extends ChangeNotifier {
     wxBarOpen = (j['wxbar'] as bool?) ?? false;
     linesOn = (j['lines'] as bool?) ?? true;
     lastRadioId = (j['lrad'] ?? '').toString();
+    voiceListen = (j['vlisten'] as bool?) ?? false;
+    voiceWake = ((j['vwake'] ?? 'Günlük').toString().trim().isEmpty)
+        ? 'Günlük'
+        : (j['vwake'] ?? 'Günlük').toString().trim();
+    voiceSpeak = (j['vspeak'] as bool?) ?? true;
+    voiceConfirm = (j['vconf'] as bool?) ?? true;
     homeTheme = (((j['htheme'] as num?)?.toInt() ?? 1).clamp(1, 3)).toInt();
     hiddenApps = {for (final x in ((j['apphid'] as List?) ?? [])) x.toString()};
     evtCat = (j['evtcat'] as bool?) ?? false;
@@ -2714,6 +2720,10 @@ class AppStore extends ChangeNotifier {
         'wxbar': wxBarOpen,
         'lines': linesOn,
         'lrad': lastRadioId,
+        'vlisten': voiceListen,
+        'vwake': voiceWake,
+        'vspeak': voiceSpeak,
+        'vconf': voiceConfirm,
         'htheme': homeTheme,
         'apphid': hiddenApps.toList(),
         'evtcat': evtCat,
@@ -3154,6 +3164,32 @@ class AppStore extends ChangeNotifier {
     } else {
       hiddenApps.remove(id);
     }
+    _commit();
+  }
+
+  // Sesli komut ayarları
+  bool voiceListen = false; // uygulama açıkken uyandırma kelimesini sürekli dinle
+  String voiceWake = 'Günlük'; // uyandırma kelimesi
+  bool voiceSpeak = true; // komut anlaşılınca kısa sesli yanıt
+  bool voiceConfirm = true; // kayıt eklemeden önce onay iste
+  void setVoiceListen(bool v) {
+    voiceListen = v;
+    _commit();
+  }
+
+  void setVoiceWake(String v) {
+    final t = v.trim();
+    voiceWake = t.isEmpty ? 'Günlük' : t;
+    _commit();
+  }
+
+  void setVoiceSpeak(bool v) {
+    voiceSpeak = v;
+    _commit();
+  }
+
+  void setVoiceConfirm(bool v) {
+    voiceConfirm = v;
     _commit();
   }
 

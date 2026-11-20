@@ -7,6 +7,7 @@ import 'media.dart';
 import 'reminders.dart';
 import 'strings.dart';
 import 'ui.dart';
+import 'voicecmd.dart' show voiceListener;
 
 // ---------------------------------------------------------------
 // SES KAYDI
@@ -17,11 +18,17 @@ import 'ui.dart';
 
 /// Kayıt penceresini açar; "Bitir" ile kaydedilen dosyanın ADINI döndürür
 /// (vazgeçilirse null).
-Future<String?> recordVoice(BuildContext context) {
-  return showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const _RecorderDialog());
+Future<String?> recordVoice(BuildContext context) async {
+  // Sürekli dinleme açıksa mikrofon çakışmasın: kayıt boyunca dinleme durur
+  await voiceListener.pause();
+  try {
+    return await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const _RecorderDialog());
+  } finally {
+    voiceListener.resume();
+  }
 }
 
 class _RecorderDialog extends StatefulWidget {

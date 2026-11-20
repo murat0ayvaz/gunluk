@@ -63,8 +63,8 @@ class Pal {
   // Hedefe ulaşılan satırın pastel yeşili
   Color get okBg => dark ? const Color(0xFF3A4048) : const Color(0xFFD6EDDC);
   // Kaydırma arka planları (sağa = düzenle, sola = sil)
-  Color get editBg => dark ? const Color(0xFF383E47) : const Color(0xFFD6E5F6);
-  Color get delBg => dark ? const Color(0xFF4A4046) : const Color(0xFFF6D5D5);
+  Color get editBg => dark ? const Color(0xFF3F566B) : const Color(0xFFD6E5F6);
+  Color get delBg => dark ? const Color(0xFF6A4448) : const Color(0xFFF6D5D5);
 
   /// Renkli başlık / kutu tonları: koyu temada pastel yerine gri-gümüş
   Color tint(Color c) =>

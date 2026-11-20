@@ -1,12 +1,15 @@
-DAILY ROUTINE v29.11 (1.25.11) - TAM PAKET
+DAILY ROUTINE v29.12 (1.25.12) - TAM PAKET
 
 Bu zipte projenin TAMAMI var: .github, assets, lib, debug.keystore, pubspec.yaml.
 1) Zipi çıkar. GitHub'da "gunluk" reposunun ANA sayfasında: Add file > Upload files.
 2) Çıkan klasörlerin ve dosyaların HEPSİNİ (.github, assets, lib, debug.keystore, pubspec.yaml) sürükle-bırak > Commit changes.
    (YENİ: lib/links.dart. v29.7'den gelen lib/shortcuts.dart ve .github/workflows/build.yml de pakette.)
 3) Actions > yeşil tik > Artifacts > gunluk-apk indir, telefona kur (veriler kalır).
-Derleme hatası olursa Actions'taki kırmızı satırları gönder.v29.11 yenilikleri:
-- Üst barda mikrofon (sesli komut): hatırlatıcı, yapılacak, cüzdan gider/gelir, rutin değeri, radyo/müzik/uygulama açma, haber oku, radyo çal, durdur.
-- Kayıt ekleyen komutlar önce onay penceresi gösterir. Ayarlar > Uygulamalar > Sesli komut ile kapatılabilir.
-- YENİ PAKET: speech_to_text (pubspec.yaml) ve build.yml'de "Android ayarları (sesli komut)" adımı. Hata olursa Actions'taki kırmızı satırları gönder.
-- Ses tanıma için telefonda Google (veya cihazın) ses tanıma servisi gerekir.
+Derleme hatası olursa Actions'taki kırmızı satırları gönder.v29.12 yenilikleri:
+- Ayarlar > Sesli komut: mikrofon düğmesi, Sürekli dinle (uyandırma kelimesi "Günlük"), sesli yanıt, onay isteme.
+- Rutin satırındaki zil kalktı; sağa çekince hatırlatma saati + bağlı yer menüsü.
+- Hava uyarısı gün ve saatiyle yazılır.
+- Rutinler/Yapılacaklar/Günlük/Hatırlatıcı açıkken hava ve namaz satırları gizlenir.
+- Bölüm başlığını sola itince gizlenir; satır sil/düzenle kaydırması düzeltildi.
+- Günlük açıkken de aşağı çekip yenileme çalışır; radyo çubuğunda ✕ medya bildirimini kapatır.
+- v29.11'deki speech_to_text paketi ve build.yml adımı bu pakette de var.

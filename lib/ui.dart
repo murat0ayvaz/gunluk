@@ -658,7 +658,8 @@ class _PullHomeState extends State<PullHome> {
       final route = ctx == null ? null : ModalRoute.of(ctx);
       // pencere / alt panel / yazı yazarken devre dışı
       // yalnız ana ekranda (ilk sayfa) çalışır; diğer sayfalarda çekince bir şey olmaz
-      _active = route is PageRoute && route.isFirst && !_typing() && !store.locked;
+      // Günlük açıkken yazı kutusu odaklı olsa da çalışır; yenilenince klavye kapanır
+      _active = route is PageRoute && route.isFirst && !store.locked;
     } else if (n is OverscrollNotification) {
       if (_active &&
           n.dragDetails != null &&

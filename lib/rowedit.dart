@@ -206,7 +206,7 @@ class _RowEditDialogState extends State<_RowEditDialog> {
 }
 
 /// Satırdaki zil: rutinin günlük hatırlatma saatini ayarlar.
-/// Dönen değer: (saat, dakika); saat -1 ise hatırlatma kaldırıldı; null: değişmedi.
+/// Dönen değer: (saat, dakika); saat -1 ise hatırlatma kaldırıldı; -2 ise "Alt kategoriyi düzenle"; null: değişmedi.
 Future<(int, int)?> showRoutineBell(BuildContext context, SubCat sub) {
   return showDialog<(int, int)>(
     context: context,
@@ -303,6 +303,15 @@ class _BellDialogState extends State<_BellDialog> {
           ],
           Text(tx('Rutinin adına dokununca bağlı yer açılır.'),
               style: TextStyle(fontSize: 12, color: p.soft)),
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => Navigator.pop(context, (-2, 0)),
+              icon: const Icon(Icons.tune_rounded, size: 18),
+              label: Text(tx('Alt kategoriyi düzenle')),
+            ),
+          ),
         ],
       ),
       actions: [

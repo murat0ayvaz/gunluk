@@ -100,6 +100,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     weather.ensure(); // hava durumu açıksa verisini yükle
+    voiceListener.ctx = context; // sürekli dinleme komutları bu ekranın üstünde çalıştırır
+    voiceListener.sync();
     store.rollTodos(); // bitmeyen geçmiş maddeler bugüne taşınır
     _wasAll = store.todayGoals().all;
     store.addListener(_checkGoals);
@@ -123,6 +125,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// Herhangi bir sayfada aşağı çekilince: ana ekran ilk haline döner
   void _onHomeReset() {
     if (!mounted) return;
+    FocusManager.instance.primaryFocus?.unfocus(); // klavye kapanır
     store.setWxBarOpen(false); // yenilenince hava ve namaz yalnız yazı olarak kalır
     weather.ensure(force: true); // hava ve namaz verileri yenilenir
     prayer.ensure(force: true);
@@ -289,9 +292,28 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   // ----- Satır işlemleri -----
 
-  /// Sağa kaydırma: veriyi, rutin günlerini ve hatırlatma saatini düzenler
+  /// Sağa kaydırma. Rutinlerde: yalnız hatırlatma saati ve bağlı yer (veri girişi satırdan yapılır).
+  /// Diğer satırlarda: veriyi düzenle / sil.
   Future<void> _editRow(_RowData r) async {
     final sub = r.sub!;
+    if (sub.routine) {
+      final b = await showRoutineBell(context, sub);
+      if (b == null) return;
+      if (b.$1 == -2) {
+        // "Alt kategoriyi düzenle": günler, hedef vb. oradan ayarlanır
+        if (!mounted) return;
+        await editSubCategory(context, sub);
+        return;
+      }
+      store.setRoutineOptions(sub.id, days: sub.days, rh: b.$1, rm: b.$2);
+      if (b.$1 >= 0) {
+        final messenger = ScaffoldMessenger.of(context);
+        final msg = await permissionMessage();
+        if (msg != null) messenger.showSnackBar(SnackBar(content: Text(msg)));
+      }
+      await Notifier.syncSub(sub);
+      return;
+    }
     final res = await showRowEditDialog(context, sub: sub, entry: r.entry);
     if (res == null) return;
     if (res.openSub) {
@@ -305,24 +327,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       store.setEntry(sub.id, dKey(day), res.value!);
     }
     if (res.goalSet) store.setGoal(sub.id, res.goal);
-    if (sub.routine) {
-      store.setRoutineOptions(sub.id, days: res.days, rh: res.rh, rm: res.rm);
-      if (res.rh >= 0) await permissionMessage();
-      await Notifier.syncSub(sub);
-    }
-  }
-
-  /// Zil: rutinin günlük hatırlatma saati
-  Future<void> _bell(SubCat sub) async {
-    final r = await showRoutineBell(context, sub);
-    if (r == null) return;
-    store.setRoutineOptions(sub.id, days: sub.days, rh: r.$1, rm: r.$2);
-    if (r.$1 >= 0) {
-      final messenger = ScaffoldMessenger.of(context);
-      final msg = await permissionMessage();
-      if (msg != null) messenger.showSnackBar(SnackBar(content: Text(msg)));
-    }
-    await Notifier.syncSub(sub);
   }
 
   /// Sola kaydırma (kısa): rutini sadece bu güne özel gizler.
@@ -540,7 +544,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             date: date,
             onEdit: () => _editRow(r),
             onRemove: (full) => _removeRoutine(r, full: full),
-            onBell: () => _bell(r.sub!),
+            onBell: () {}, // zil kaldırıldı; hatırlatma sağa kaydırınca açılan menüde
           );
         }
 
@@ -795,13 +799,39 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   )
                 : null;
         final Widget? iMic = !store.appHidden('voice')
-            ? IconButton(
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 38, minHeight: 44),
-                tooltip: tx('Sesli komut'),
-                icon: const Icon(Icons.mic_rounded),
-                onPressed: () => voiceCommand(context),
+            ? ListenableBuilder(
+                listenable: voiceListener,
+                builder: (context, _) {
+                  // Sürekli dinleme açıkken mikrofon renkli ve küçük bir nokta görünür
+                  final on = store.voiceListen && voiceListener.listening;
+                  return IconButton(
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints:
+                        const BoxConstraints(minWidth: 38, minHeight: 44),
+                    tooltip: on
+                        ? tx('Dinliyor: "{0}" de', [store.voiceWake])
+                        : tx('Sesli komut'),
+                    icon: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Icon(Icons.mic_rounded, color: on ? p.accent : null),
+                        if (on)
+                          Positioned(
+                            right: -2,
+                            top: -2,
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                  color: p.accent, shape: BoxShape.circle),
+                            ),
+                          ),
+                      ],
+                    ),
+                    onPressed: () => voiceCommand(context),
+                  );
+                },
               )
             : null;
         final fixedBars = store.homeTheme >= 2; // Tema 2 ve 3
@@ -848,7 +878,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             // Hava ve namaz: tek satır yazı. Başlıktaki hava simgesi satırları getirir/götürür;
             // yazıya dokununca altına saatlik hava / tüm vakitler açılır.
             // Ekran yenilenince (ana ekranda aşağı çekince) açılan barlar kapanır, yazılar kalır.
-            final lines = store.linesOn;
+            // Klavyesi olan bölümlerden biri (Rutinler, Yapılacaklar, Günlük, Hatırlatıcı)
+            // açıkken hava ve namaz satırları gizlenir; hepsi kapanınca geri gelir.
+            final kbSection = _openSec.any(
+                (k) => k == 'routine' || k == 'todo' || k == 'note' || k == 'rem');
+            final lines = store.linesOn && !kbSection;
             final wxLine = (lines && store.wxOn && !_hidden.contains('wx'))
                 ? WxLine(
                     key: ValueKey('wxl_$date'),
@@ -977,7 +1011,7 @@ class _HomeSection extends StatelessWidget {
     final tone = p.tint(this.tone);
     final head =
         Color.alphaBlend(tone.withOpacity(p.dark ? 0.20 : 0.13), p.card);
-    final box = Container(
+    return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: p.card,
@@ -987,7 +1021,21 @@ class _HomeSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Material(
+          GestureDetector(
+            // Başlığı sola itince bölüm gizlenir (sağa itince önceki gün).
+            // Yalnız başlıkta: satırların kendi sil/düzenle kaydırması bundan etkilenmez.
+            behavior: HitTestBehavior.translucent,
+            onHorizontalDragEnd: onSwipe == null
+                ? null
+                : (d) {
+                    final v = d.primaryVelocity ?? 0;
+                    if (v < -250) {
+                      onSwipe!(true);
+                    } else if (v > 250) {
+                      onSwipe!(false);
+                    }
+                  },
+            child: Material(
             color: head,
             borderRadius: BorderRadius.vertical(
                 top: const Radius.circular(15),
@@ -1045,6 +1093,7 @@ class _HomeSection extends StatelessWidget {
               ),
             ),
           ),
+          ),
           AnimatedSize(
             duration: const Duration(milliseconds: 200),
             alignment: Alignment.topCenter,
@@ -1054,20 +1103,6 @@ class _HomeSection extends StatelessWidget {
           ),
         ],
       ),
-    );
-    if (onSwipe == null) return box;
-    // Başlığı/boş yeri sola itince bölüm gider; satırların kendi kaydırması (sil/düzenle) öncelikli kalır
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onHorizontalDragEnd: (d) {
-        final v = d.primaryVelocity ?? 0;
-        if (v < -250) {
-          onSwipe!(true);
-        } else if (v > 250) {
-          onSwipe!(false);
-        }
-      },
-      child: box,
     );
   }
 }
@@ -1185,24 +1220,6 @@ class _DayRowState extends State<_DayRow> {
               child: Icon(Icons.drag_handle_rounded, size: 22, color: p.soft),
             ),
           ),
-          // Zil: ≡ tutamacının hemen yanında (sadece rutinlerde)
-          if (sub.routine)
-            IconButton(
-              tooltip: tx('Hatırlatma'),
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-              onPressed: widget.onBell,
-              icon: Icon(
-                hasBell
-                    ? Icons.notifications_active_rounded
-                    : Icons.notifications_none_rounded,
-                size: 22,
-                color: hasBell
-                    ? Theme.of(context).colorScheme.primary
-                    : p.soft,
-              ),
-            ),
           Expanded(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
