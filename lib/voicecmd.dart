@@ -10,6 +10,7 @@ import 'reminders.dart';
 import 'shortcuts.dart';
 import 'strings.dart';
 import 'tools.dart';
+import 'tv.dart';
 import 'ui.dart';
 import 'wallet.dart' show parseMoney, money;
 
@@ -576,7 +577,7 @@ Future<void> runVoiceText(BuildContext context, String heard) async {
   final n = nt.join(' ');
   bool has(String k) => n.contains(k);
   final wantsOpen =
-      RegExp(r'\b(ac\w*|git|goster\w*|baslat\w*|calistir\w*)\b').hasMatch(n);
+      RegExp(r'\b(ac\w*|git|goster\w*|baslat\w*|calistir\w*|izle\w*)\b').hasMatch(n);
 
   // 1) Durdur
   if (RegExp(r'\b(durdur\w*|sustur\w*|dur)\b').hasMatch(n)) {
@@ -633,7 +634,22 @@ Future<void> runVoiceText(BuildContext context, String heard) async {
     await _doTodo(context, heard, raw, nt);
     return;
   }
-  // 7) Aç (kısayol uygulamaları önce)
+  // 7) Aç (TV kanalı, kısayol uygulamaları, sonra uygulama içi yerler)
+  if ((wantsOpen || nt.length <= 3) && !has('radyo')) {
+    final chans = tvSorted()
+      ..sort((a, b) => b.name.length.compareTo(a.name.length));
+    for (final c in chans) {
+      final nm = vNorm(c.name);
+      if (nm.length >= 3 && n.contains(nm)) {
+        if (store.appHidden('media') || store.appHidden('tv')) {
+          _snack(context, tx('Bu bölüm kapalı.'));
+          return;
+        }
+        await openTvChannel(context, c);
+        return;
+      }
+    }
+  }
   if (wantsOpen || nt.length <= 2) {
     for (final s in store.shortcuts) {
       final nm = vNorm(s.name);
@@ -658,6 +674,7 @@ Future<void> runVoiceText(BuildContext context, String heard) async {
 String? _openTarget(String n) {
   bool has(String k) => n.contains(k);
   if (has('radyo')) return 'in:media:radio';
+  if (RegExp(r'\b(tv|televizyon|kanal\w*)\b').hasMatch(n)) return 'in:media:tv';
   if (has('muzik')) return 'in:media:music';
   if (has('podcast')) return 'in:media:podcast';
   if (has('haber')) return 'in:media:news';

@@ -74,18 +74,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   String? _catFilter; // null: tüm kategoriler, aksi halde seçili kategori kimliği
   // Sola itilip geçici gizlenen bölümler/çubuklar (veri silinmez; yenileyince geri gelir)
   final Set<String> _hidden = {};
-  /// Hava / namaz çubuğunu sola itince gizler, sağa itince önceki güne geçer
-  Widget _bar(String id, Widget w) => GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onHorizontalDragEnd: (d) {
-          final v = d.primaryVelocity ?? 0;
-          if (v < -250) {
-            _swipeSec(id, true);
-          } else if (v > 250) {
-            _swipeSec(id, false);
-          }
-        },
-        child: w,
+  /// Hava / namaz çubuğu: sola kayarak gizlenir ("Gizle" zemini), sağa itince önceki gün
+  Widget _bar(String id, Widget w) => _SwipeHide(
+        key: ValueKey('bar_$id'),
+        label: tx('Gizle'),
+        inset: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        radius: 16,
+        onHide: () => _swipeSec(id, true),
+        onRight: () => _swipeSec(id, false),
+        builder: (context, wrap) => wrap(w),
       );
   void _swipeSec(String id, bool left) {
     if (left) {
@@ -596,8 +593,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             : const SizedBox.shrink();
 
         // Rutinler ve Diğer kayıtlar: açılır başlıklar (açılışta kapalı)
-        final children = <Widget>[
-          if (!_hidden.contains('routine')) _HomeSection(
+        final secW = <String, Widget>{
+          if (!_hidden.contains('routine')) 'routine': _HomeSection(
+              key: const ValueKey('sec_routine'),
               onSwipe: (l) => _swipeSec('routine', l),
               onAdd: _openAdd,
               icon: Icons.checklist_rounded,
@@ -619,8 +617,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ],
               ),
             ),
-          if (othersTotal > 0)
-            if (!_hidden.contains('other')) _HomeSection(
+          if (othersTotal > 0 && !_hidden.contains('other')) 'other': _HomeSection(
+              key: const ValueKey('sec_other'),
               onSwipe: (l) => _swipeSec('other', l),
               icon: Icons.more_horiz_rounded,
               title: tx('Diğer kayıtlar'),
@@ -635,38 +633,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 child: section(others),
               ),
             ),
-        ];
-
-        final bodyColumn = Column(
-          children: [
-            if (store.storageError != null)
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                    color: p.delBg, borderRadius: BorderRadius.circular(12)),
-                child: Text(store.storageError!,
-                    style: TextStyle(color: p.ink, fontSize: 13)),
-              ),
-            ...[
-              Expanded(
-                child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
-                  children: [
-                    ...children,
-                    if (children.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
-                        child: Text(
-                          tx('Bu gün için kayıt yok.\nSağ alttaki DR düğmesine dokunarak rutin veya kayıt ekleyebilirsin.'),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: p.soft, height: 1.4),
-                        ),
-                      ),
-                    // ----- Açılır başlıklar: Yapılacaklar / Günlük / Hatırlatıcı -----
-                    if (!store.appHidden('todo') && !_hidden.contains('todo')) _HomeSection(
+                    if (!store.appHidden('todo') && !_hidden.contains('todo')) 'todo': _HomeSection(
+                      key: const ValueKey('sec_todo'),
                       onSwipe: (l) => _swipeSec('todo', l),
                       icon: Icons.task_alt_rounded,
                       title: tx('Yapılacaklar'),
@@ -688,7 +656,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           : _openSec.add('todo')),
                       child: TodosBody(date: date),
                     ),
-                    if (!store.appHidden('diary') && !_hidden.contains('note')) _HomeSection(
+                    if (!store.appHidden('diary') && !_hidden.contains('note')) 'note': _HomeSection(
+                      key: const ValueKey('sec_note'),
                       onSwipe: (l) => _swipeSec('note', l),
                       icon: Icons.menu_book_rounded,
                       title: tx('Günlük'),
@@ -706,7 +675,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             title: _label()),
                       ),
                     ),
-                    if (!store.appHidden('rem') && !_hidden.contains('rem')) _HomeSection(
+                    if (!store.appHidden('rem') && !_hidden.contains('rem')) 'rem': _HomeSection(
+                      key: const ValueKey('sec_rem'),
                       onSwipe: (l) => _swipeSec('rem', l),
                       icon: Icons.notifications_active_outlined,
                       title: tx('Hatırlatıcı'),
@@ -724,6 +694,42 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           : _openSec.add('rem')),
                       child: const RemindersBody(),
                     ),
+        };
+        // Bölüm sırası Ayarlar > Ana ekran > Ana ekran düzeni'nden gelir
+        final children = <Widget>[
+          for (final id in store.homeOrder)
+            if (secW[id] != null) secW[id]!,
+        ];
+        final emptyList = !secW.containsKey('routine') && !secW.containsKey('other');
+
+        final bodyColumn = Column(
+          children: [
+            if (store.storageError != null)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                    color: p.delBg, borderRadius: BorderRadius.circular(12)),
+                child: Text(store.storageError!,
+                    style: TextStyle(color: p.ink, fontSize: 13)),
+              ),
+            ...[
+              Expanded(
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+                  children: [
+                    ...children,
+                    if (emptyList)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
+                        child: Text(
+                          tx('Bu gün için kayıt yok.\nSağ alttaki DR düğmesine dokunarak rutin veya kayıt ekleyebilirsin.'),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: p.soft, height: 1.4),
+                        ),
+                      ),
                   ],
                   ),
               ),
@@ -835,6 +841,21 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               )
             : null;
         final fixedBars = store.homeTheme >= 2; // Tema 2 ve 3
+        // Simgeler kullanıcının sırasıyla; kapatılanlar ve gizli uygulamalar çıkarılır.
+        // Tema 1'de ilk 3 simge solda, kalanı sağda durur.
+        final iconMap = <String, Widget?>{
+          'menu': iMenu,
+          'study': iStudy,
+          'short': iShort,
+          'mic': iMic,
+          'tools': iTools,
+          'media': iMedia,
+        };
+        final icons = <(String, Widget)>[
+          for (final id in store.iconOrder)
+            if (iconMap[id] != null && (id == 'menu' || !store.iconOff.contains(id)))
+              (id, iconMap[id]!),
+        ];
 
         final scaffold = Scaffold(
           key: _scaffoldKey,
@@ -848,31 +869,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             centerTitle: true,
             titleSpacing: 0,
             automaticallyImplyLeading: false,
-            leadingWidth: fixedBars ? 0 : 118,
+            leadingWidth: fixedBars ? 0 : 40.0 * icons.take(3).length,
             leading: fixedBars
                 ? const SizedBox.shrink()
-                : Row(children: [iMenu, if (iStudy != null) iStudy, if (iShort != null) iShort]),
+                : Row(children: icons.take(3).map((e) => e.$2).toList()),
             // Tema 1: tarih seçici üstte. Tema 2/3: simgeler eşit aralıkla.
             title: fixedBars
                 ? Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      iMenu,
-                      if (iStudy != null) iStudy,
-                      if (iShort != null) iShort,
-                      if (iMic != null) iMic,
-                      if (iTools != null) iTools,
-                      if (iMedia != null) iMedia,
+                      ...icons.where((e) => e.$1 != 'tools' || store.homeTheme != 3).map((e) => e.$2),
                     ],
                   )
                 : _dateRow(p, long: false),
             actions: fixedBars
                 ? const []
-                : [
-                    if (iMic != null) iMic,
-                    if (iTools != null) iTools,
-                    if (iMedia != null) iMedia,
-                  ],
+                : icons.skip(3).map((e) => e.$2).toList(),
           ),
           body: Builder(builder: (context) {
             // Hava ve namaz: tek satır yazı. Başlıktaki hava simgesi satırları getirir/götürür;
@@ -905,6 +917,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 (lines && store.prayOn && _prOpen && !_hidden.contains('pr'))
                     ? PrayerBar(day: day)
                     : null;
+            // Hava ve namaz çubukları, düzendeki sıraya göre
+            List<Widget> bars({bool reversed = false}) {
+              final wxFirst =
+                  store.homeOrder.indexOf('wx') < store.homeOrder.indexOf('pr');
+              // Tema 3'te paneller yukarı açıldığı için her grup tersine dizilir
+              final wx = reversed
+                  ? [if (wxPanel != null) wxPanel, if (wxLine != null) _bar('wx', wxLine)]
+                  : [if (wxLine != null) _bar('wx', wxLine), if (wxPanel != null) wxPanel];
+              final pr = reversed
+                  ? [if (prBar != null) prBar, if (prLine != null) _bar('pr', prLine)]
+                  : [if (prLine != null) _bar('pr', prLine), if (prBar != null) prBar];
+              // Tema 3'te varsayılan görünüm eskisi gibi kalsın (namaz üstte, hava altta)
+              final firstWx = reversed ? !wxFirst : wxFirst;
+              final l = firstWx ? [...wx, ...pr] : [...pr, ...wx];
+              return l;
+            }
             if (store.homeTheme == 3) {
               // Tema 3: tarih, hava ve namaz en altta sabit; paneller yukarı doğru açılır.
               // En alttan yukarı: Bugün satırı, hava, namaz.
@@ -916,10 +944,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (prBar != null) prBar,
-                        if (prLine != null) _bar('pr', prLine),
-                        if (wxPanel != null) wxPanel,
-                        if (wxLine != null) _bar('wx', wxLine),
+                        // alttan yukarı: seçilen sıranın tersi (ilk sıradaki en üstte)
+                        ...bars(reversed: true),
                         Padding(
                           padding: const EdgeInsets.only(top: 2, bottom: 2),
                           child: Center(child: _dateRow(p, long: true)),
@@ -938,10 +964,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     padding: const EdgeInsets.only(bottom: 2),
                     child: Center(child: _dateRow(p, long: true)),
                   ),
-                if (wxLine != null) _bar('wx', wxLine),
-                if (wxPanel != null) wxPanel,
-                if (prLine != null) _bar('pr', prLine),
-                if (prBar != null) prBar,
+                ...bars(),
                 Expanded(child: body),
               ],
             );
@@ -994,6 +1017,7 @@ class _HomeSection extends StatelessWidget {
   final void Function(bool left)? onSwipe; // sola/sağa itme (sola: bölüm gizlenir)
   final Widget child;
   const _HomeSection({
+    super.key,
     this.onAdd,
     this.onSwipe,
     required this.icon,
@@ -1011,7 +1035,13 @@ class _HomeSection extends StatelessWidget {
     final tone = p.tint(this.tone);
     final head =
         Color.alphaBlend(tone.withOpacity(p.dark ? 0.20 : 0.13), p.card);
-    return Container(
+    return _SwipeHide(
+      label: tx('Gizle'),
+      inset: const EdgeInsets.only(bottom: 10),
+      radius: 16,
+      onHide: onSwipe == null ? null : () => onSwipe!(true),
+      onRight: onSwipe == null ? null : () => onSwipe!(false),
+      builder: (context, wrap) => Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: p.card,
@@ -1021,21 +1051,8 @@ class _HomeSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          GestureDetector(
-            // Başlığı sola itince bölüm gizlenir (sağa itince önceki gün).
-            // Yalnız başlıkta: satırların kendi sil/düzenle kaydırması bundan etkilenmez.
-            behavior: HitTestBehavior.translucent,
-            onHorizontalDragEnd: onSwipe == null
-                ? null
-                : (d) {
-                    final v = d.primaryVelocity ?? 0;
-                    if (v < -250) {
-                      onSwipe!(true);
-                    } else if (v > 250) {
-                      onSwipe!(false);
-                    }
-                  },
-            child: Material(
+          wrap(
+            Material(
             color: head,
             borderRadius: BorderRadius.vertical(
                 top: const Radius.circular(15),
@@ -1044,7 +1061,9 @@ class _HomeSection extends StatelessWidget {
               borderRadius: BorderRadius.circular(15),
               onTap: onToggle,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+                // + düğmesi olan başlıklarda boşluk azaltılır: tüm başlıklar aynı yükseklikte
+                padding: EdgeInsets.fromLTRB(
+                    14, onAdd != null ? 6 : 12, 10, onAdd != null ? 6 : 12),
                 child: Row(
                   children: [
                     Icon(icon, color: tone),
@@ -1103,7 +1122,133 @@ class _HomeSection extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
+  }
+}
+
+// ---------------------------------------------------------------
+// KAYDIRARAK GİZLE
+//  Çocuk (bölüm ya da çubuk) parmakla birlikte sola kayar, arkasında "Gizle" zemini
+//  görünür. Yeterince kaydırılırsa tamamen çıkar ve [onHide] çağrılır, yoksa yerine döner.
+//  wrap(...) ile sarılan alan kaydırmayı başlatır (bölümlerde yalnız başlık: satırların
+//  kendi sil/düzenle kaydırması karışmasın). Sağa hızlı itme: [onRight] (önceki gün).
+// ---------------------------------------------------------------
+class _SwipeHide extends StatefulWidget {
+  final Widget Function(BuildContext context, Widget Function(Widget) wrap)
+      builder;
+  final VoidCallback? onHide;
+  final VoidCallback? onRight;
+  final String label;
+  final double radius;
+  final EdgeInsets inset; // zeminin çocuktan içeri payı (kenar boşlukları)
+  const _SwipeHide({
+    super.key,
+    required this.builder,
+    required this.label,
+    this.onHide,
+    this.onRight,
+    this.radius = 16,
+    this.inset = EdgeInsets.zero,
+  });
+
+  @override
+  State<_SwipeHide> createState() => _SwipeHideState();
+}
+
+class _SwipeHideState extends State<_SwipeHide>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _a = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 200));
+  double _dx = 0;
+  double _from = 0;
+  double _to = 0;
+  double _w = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _a.addListener(() {
+      setState(() =>
+          _dx = _from + (_to - _from) * Curves.easeOutCubic.transform(_a.value));
+    });
+  }
+
+  @override
+  void dispose() {
+    _a.dispose();
+    super.dispose();
+  }
+
+  void _animate(double to, {VoidCallback? done}) {
+    _from = _dx;
+    _to = to;
+    _a.forward(from: 0).whenComplete(() {
+      if (mounted) done?.call();
+    });
+  }
+
+  Widget _wrap(Widget w) => GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onHorizontalDragUpdate: (d) {
+          if (widget.onHide == null || _w <= 0) return;
+          if (_a.isAnimating) _a.stop();
+          setState(() => _dx = (_dx + d.delta.dx).clamp(-_w, 0.0).toDouble());
+        },
+        onHorizontalDragEnd: (d) {
+          final v = d.primaryVelocity ?? 0;
+          if (widget.onHide != null &&
+              _dx < -8 &&
+              (_dx < -_w * 0.3 || v < -700)) {
+            _animate(-_w, done: widget.onHide);
+          } else {
+            if (v > 250 && _dx > -8) widget.onRight?.call();
+            _animate(0);
+          }
+        },
+        onHorizontalDragCancel: () => _animate(0),
+        child: w,
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palOf(context);
+    return LayoutBuilder(builder: (context, c) {
+      _w = c.maxWidth.isFinite ? c.maxWidth : 0;
+      return Stack(
+        children: [
+          if (_dx < -0.5)
+            Positioned.fill(
+              child: Padding(
+                padding: widget.inset,
+                child: Container(
+                  decoration: BoxDecoration(
+                      color: p.editBg,
+                      borderRadius: BorderRadius.circular(widget.radius)),
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(widget.label,
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: p.ink)),
+                      const SizedBox(width: 8),
+                      Icon(Icons.visibility_off_outlined, color: p.ink),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          Transform.translate(
+            offset: Offset(_dx, 0),
+            child: widget.builder(context, _wrap),
+          ),
+        ],
+      );
+    });
   }
 }
 

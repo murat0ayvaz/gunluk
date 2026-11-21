@@ -11,6 +11,7 @@ import 'net.dart';
 import 'podcast.dart';
 import 'radio.dart';
 import 'strings.dart';
+import 'tv.dart';
 import 'ui.dart';
 
 // ---------------------------------------------------------------
@@ -622,12 +623,12 @@ class MediaGroup extends StatelessWidget {
 // ---------------------------------------------------------------
 /// Açık olan sekmeler (Ayarlar > Uygulamalar'dan kapatılanlar çıkar)
 List<String> mediaTabIds() => [
-      for (final id in const ['music', 'radio', 'podcast', 'news', 'online'])
+      for (final id in const ['music', 'radio', 'tv', 'podcast', 'news', 'online'])
         if (!store.appHidden(id)) id
     ];
 
 class MediaPage extends StatelessWidget {
-  final String? initial; // açılacak sekme: music | radio | podcast | news | online
+  final String? initial; // açılacak sekme: music | radio | tv | podcast | news | online
   const MediaPage({super.key, this.initial});
 
   @override
@@ -650,6 +651,8 @@ class MediaPage extends StatelessWidget {
               return Tab(icon: const Icon(Icons.music_note_rounded), text: tx('Müzik'));
             case 'radio':
               return Tab(icon: const Icon(Icons.radio_rounded), text: tx('Radyo'));
+            case 'tv':
+              return Tab(icon: const Icon(Icons.live_tv_rounded), text: tx('TV'));
             case 'podcast':
               return Tab(icon: const Icon(Icons.podcasts_rounded), text: tx('Podcast'));
             case 'news':
@@ -665,6 +668,8 @@ class MediaPage extends StatelessWidget {
               return const MusicTab();
             case 'radio':
               return const RadioTab();
+            case 'tv':
+              return const TvTab();
             case 'podcast':
               return const PodcastTab();
             case 'news':

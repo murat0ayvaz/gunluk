@@ -10,12 +10,10 @@ import 'version.dart';
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
       tx('Verilerin korundu.'),
-      tx('Ayarlar > Sesli komut: mikrofon düğmesi, Sürekli dinle (uygulama açıkken "Günlük, radyo aç" gibi), uyandırma kelimesi, sesli yanıt ve onay isteme seçenekleri.'),
-      tx('Rutin satırındaki zil kalktı. Satırı sağa çekince hatırlatma saati ve bağlı yer (uygulama/araç) menüsü açılır; veri girişi satırdan yapılır.'),
-      tx('Hava satırındaki uyarı artık gün ve saatiyle yazılır (örn. "Uyarı: yarın 14:00-16:00 gök gürültülü fırtına bekleniyor.").'),
-      tx('Rutinler, Yapılacaklar, Günlük veya Hatırlatıcı açıkken hava ve namaz satırları gizlenir (klavye sıkışmasın).'),
-      tx('Bölüm başlığını sola itince bölüm gizlenir; satırların sil/düzenle kaydırması düzeltildi.'),
-      tx('Günlük açıkken de aşağı çekip yenileme çalışır. Radyo çubuğundaki ✕ telefondaki medya bildirimini de kapatır.'),
+      tx('Müzik ve Radyo içinde yeni TV sekmesi: canlı kanal listesi, favori, kendi yayın adresini ekleme, hazır kanallar, yatay izleme. "TV aç" ya da kanal adıyla sesli de açılır.'),
+      tx('Ayarlar > Ana ekran > Ana ekran düzeni: bölümleri ve üst bar simgelerini sürükleyip sırala, simgeleri aç/kapat.'),
+      tx('Bölümleri, hava ve namaz çubuğunu sola çekince "Gizle" zemini görünür; ekranı yenileyince geri gelir.'),
+      tx('Tüm bölüm başlıkları aynı yükseklikte. Tema 3\'te üst bardaki Araçlar simgesi kalktı (sağdaki ≡ ile açılır).'),
     ];
 
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {

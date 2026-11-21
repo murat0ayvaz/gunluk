@@ -2464,12 +2464,19 @@ class AppStore extends ChangeNotifier {
     wxBarOpen = (j['wxbar'] as bool?) ?? false;
     linesOn = (j['lines'] as bool?) ?? true;
     lastRadioId = (j['lrad'] ?? '').toString();
+    tvChans = [
+      for (final x in ((j['tvch'] as List?) ?? []))
+        TvChan.fromJson(Map<String, dynamic>.from(x as Map))
+    ];
     voiceListen = (j['vlisten'] as bool?) ?? false;
     voiceWake = ((j['vwake'] ?? 'Günlük').toString().trim().isEmpty)
         ? 'Günlük'
         : (j['vwake'] ?? 'Günlük').toString().trim();
     voiceSpeak = (j['vspeak'] as bool?) ?? true;
     voiceConfirm = (j['vconf'] as bool?) ?? true;
+    homeOrder = _fixOrder(j['horder'], kHomeOrder);
+    iconOrder = _fixOrder(j['iorder'], kIconOrder);
+    iconOff = ((j['ioff'] as List?) ?? const []).map((e) => e.toString()).toSet();
     homeTheme = (((j['htheme'] as num?)?.toInt() ?? 1).clamp(1, 3)).toInt();
     hiddenApps = {for (final x in ((j['apphid'] as List?) ?? [])) x.toString()};
     evtCat = (j['evtcat'] as bool?) ?? false;
@@ -2720,11 +2727,15 @@ class AppStore extends ChangeNotifier {
         'wxbar': wxBarOpen,
         'lines': linesOn,
         'lrad': lastRadioId,
+        'tvch': tvChans.map((t) => t.toJson()).toList(),
         'vlisten': voiceListen,
         'vwake': voiceWake,
         'vspeak': voiceSpeak,
         'vconf': voiceConfirm,
         'htheme': homeTheme,
+        'horder': homeOrder,
+        'iorder': iconOrder,
+        'ioff': iconOff.toList(),
         'apphid': hiddenApps.toList(),
         'evtcat': evtCat,
         'pralert': prayAlert,
@@ -3167,6 +3178,48 @@ class AppStore extends ChangeNotifier {
     _commit();
   }
 
+  // Canlı TV kanalları
+  List<TvChan> tvChans = [];
+  TvChan addTvChan(String name, String url) {
+    final c = TvChan(newId(), name.trim(), url.trim());
+    tvChans.add(c);
+    _commit();
+    return c;
+  }
+
+  void updateTvChan(TvChan c, String name, String url) {
+    c.name = name.trim();
+    c.url = url.trim();
+    _commit();
+  }
+
+  void toggleTvFav(TvChan c) {
+    c.fav = !c.fav;
+    _commit();
+  }
+
+  void removeTvChan(TvChan c) {
+    tvChans.remove(c);
+    _commit();
+  }
+
+  void restoreTvChan(TvChan c, int index) {
+    tvChans.insert(index.clamp(0, tvChans.length).toInt(), c);
+    _commit();
+  }
+
+  /// Hazır listeden ekler; aynı adresi olanı atlar. Eklenen sayısını döndürür.
+  int addTvPresets(List<(String, String)> list) {
+    var n = 0;
+    for (final p in list) {
+      if (tvChans.any((t) => t.url == p.$2)) continue;
+      tvChans.add(TvChan(newId(), p.$1, p.$2));
+      n++;
+    }
+    if (n > 0) _commit();
+    return n;
+  }
+
   // Sesli komut ayarları
   bool voiceListen = false; // uygulama açıkken uyandırma kelimesini sürekli dinle
   String voiceWake = 'Günlük'; // uyandırma kelimesi
@@ -3203,6 +3256,49 @@ class AppStore extends ChangeNotifier {
   bool linesOn = true; // hava ve namaz yazı satırları görünsün mü (başlıktaki simgeyle)
   void setLinesOn(bool v) {
     linesOn = v;
+    _commit();
+  }
+
+  // ---- Ana ekran düzeni: bölüm sırası ve üst bar simgeleri ----
+  static const kHomeOrder = ['wx', 'pr', 'routine', 'todo', 'note', 'rem', 'other'];
+  static const kIconOrder = ['menu', 'study', 'short', 'mic', 'tools', 'media'];
+  List<String> homeOrder = List.of(kHomeOrder);
+  List<String> iconOrder = List.of(kIconOrder);
+  Set<String> iconOff = {};
+  // Kayıtlı sıradaki bilinmeyenleri atar, eksik olanları sona ekler
+  static List<String> _fixOrder(dynamic raw, List<String> all) {
+    final out = <String>[];
+    if (raw is List) {
+      for (final e in raw) {
+        final k = e.toString();
+        if (all.contains(k) && !out.contains(k)) out.add(k);
+      }
+    }
+    for (final k in all) {
+      if (!out.contains(k)) out.add(k);
+    }
+    return out;
+  }
+
+  void setHomeOrder(List<String> v) {
+    homeOrder = _fixOrder(v, kHomeOrder);
+    _commit();
+  }
+
+  void setIconOrder(List<String> v) {
+    iconOrder = _fixOrder(v, kIconOrder);
+    _commit();
+  }
+
+  void setIconOn(String id, bool on) {
+    on ? iconOff.remove(id) : iconOff.add(id);
+    _commit();
+  }
+
+  void resetHomeLayout() {
+    homeOrder = List.of(kHomeOrder);
+    iconOrder = List.of(kIconOrder);
+    iconOff = {};
     _commit();
   }
 
@@ -3710,6 +3806,19 @@ class AppStore extends ChangeNotifier {
 // ---------------------------------------------------------------
 // CÜZDAN modelleri (tutarlar kuruş cinsinden tam sayı tutulur)
 // ---------------------------------------------------------------
+/// Canlı TV kanalı (Müzik ve Radyo > TV sekmesi)
+class TvChan {
+  final String id;
+  String name;
+  String url;
+  bool fav;
+  TvChan(this.id, this.name, this.url, {this.fav = false});
+  Map<String, dynamic> toJson() => {'id': id, 'n': name, 'u': url, 'f': fav};
+  factory TvChan.fromJson(Map<String, dynamic> j) => TvChan(
+      j['id'].toString(), (j['n'] ?? '').toString(), (j['u'] ?? '').toString(),
+      fav: (j['f'] as bool?) ?? false);
+}
+
 class Wallet {
   final String id;
   String name;

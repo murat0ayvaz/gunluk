@@ -9,6 +9,8 @@ import 'notify.dart';
 import 'reminders.dart';
 import 'prayer.dart';
 import 'tools.dart' show toolList;
+import 'layoutpage.dart';
+import 'media.dart' show slideFromRight;
 import 'strings.dart';
 import 'theme.dart';
 import 'ui.dart';
@@ -157,6 +159,15 @@ class SettingsPage extends StatelessWidget {
                       tx('Tema 2: üst barda yalnız programlar, altında "Bugün 18.11.2026 Perşembe" tarih satırı; iki bar sabit durur. Tema 3: üstte programlar, en altta sabit namaz, hava ve tarih satırı; paneller yukarı açılır.'),
                       style: TextStyle(color: p.soft, fontSize: 12.5, height: 1.35)),
                 ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.swap_vert_rounded),
+                  title: Text(tx('Ana ekran düzeni')),
+                  subtitle: Text(tx('Bölümlerin ve üst bar simgelerinin sırasını değiştir.')),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.of(context)
+                      .push(slideFromRight(const HomeLayoutPage())),
+                ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   secondary: const Icon(Icons.wb_sunny_outlined),
@@ -201,6 +212,7 @@ class SettingsPage extends StatelessWidget {
                   ('media', 'Müzik ve Radyo', Icons.headphones_rounded),
                   ('music', 'Müzik', Icons.music_note_rounded),
                   ('radio', 'Radyo', Icons.radio_rounded),
+                  ('tv', 'TV', Icons.live_tv_rounded),
                   ('podcast', 'Podcast', Icons.podcasts_rounded),
                   ('news', 'Haber', Icons.newspaper_rounded),
                   ('online', 'Online', Icons.cloud_queue_rounded),

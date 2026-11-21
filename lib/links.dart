@@ -38,6 +38,8 @@ List<LinkTarget> inAppTargets() => [
           Icons.music_note_rounded),
       LinkTarget('in:media:radio', '${tx('Müzik ve Radyo')}: ${tx('Radyo')}',
           Icons.radio_rounded),
+      LinkTarget('in:media:tv', '${tx('Müzik ve Radyo')}: ${tx('TV')}',
+          Icons.live_tv_rounded),
       LinkTarget('in:media:podcast', '${tx('Müzik ve Radyo')}: ${tx('Podcast')}',
           Icons.podcasts_rounded),
       LinkTarget('in:media:news', '${tx('Müzik ve Radyo')}: ${tx('Haber')}',
