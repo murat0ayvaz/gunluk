@@ -697,7 +697,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         };
         // Bölüm sırası Ayarlar > Ana ekran > Ana ekran düzeni'nden gelir
         final children = <Widget>[
-          for (final id in store.homeOrder)
+          for (final id in store.secOrder)
             if (secW[id] != null) secW[id]!,
         ];
         final emptyList = !secW.containsKey('routine') && !secW.containsKey('other');
@@ -920,7 +920,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             // Hava ve namaz çubukları, düzendeki sıraya göre
             List<Widget> bars({bool reversed = false}) {
               final wxFirst =
-                  store.homeOrder.indexOf('wx') < store.homeOrder.indexOf('pr');
+                  store.secOrder.indexOf('wx') < store.secOrder.indexOf('pr');
               // Tema 3'te paneller yukarı açıldığı için her grup tersine dizilir
               final wx = reversed
                   ? [if (wxPanel != null) wxPanel, if (wxLine != null) _bar('wx', wxLine)]

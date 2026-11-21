@@ -2474,7 +2474,7 @@ class AppStore extends ChangeNotifier {
         : (j['vwake'] ?? 'Günlük').toString().trim();
     voiceSpeak = (j['vspeak'] as bool?) ?? true;
     voiceConfirm = (j['vconf'] as bool?) ?? true;
-    homeOrder = _fixOrder(j['horder'], kHomeOrder);
+    secOrder = _fixOrder(j['horder'], kHomeOrder);
     iconOrder = _fixOrder(j['iorder'], kIconOrder);
     iconOff = ((j['ioff'] as List?) ?? const []).map((e) => e.toString()).toSet();
     homeTheme = (((j['htheme'] as num?)?.toInt() ?? 1).clamp(1, 3)).toInt();
@@ -2733,7 +2733,7 @@ class AppStore extends ChangeNotifier {
         'vspeak': voiceSpeak,
         'vconf': voiceConfirm,
         'htheme': homeTheme,
-        'horder': homeOrder,
+        'horder': secOrder,
         'iorder': iconOrder,
         'ioff': iconOff.toList(),
         'apphid': hiddenApps.toList(),
@@ -3262,7 +3262,7 @@ class AppStore extends ChangeNotifier {
   // ---- Ana ekran düzeni: bölüm sırası ve üst bar simgeleri ----
   static const kHomeOrder = ['wx', 'pr', 'routine', 'todo', 'note', 'rem', 'other'];
   static const kIconOrder = ['menu', 'study', 'short', 'mic', 'tools', 'media'];
-  List<String> homeOrder = List.of(kHomeOrder);
+  List<String> secOrder = List.of(kHomeOrder);
   List<String> iconOrder = List.of(kIconOrder);
   Set<String> iconOff = {};
   // Kayıtlı sıradaki bilinmeyenleri atar, eksik olanları sona ekler
@@ -3280,8 +3280,8 @@ class AppStore extends ChangeNotifier {
     return out;
   }
 
-  void setHomeOrder(List<String> v) {
-    homeOrder = _fixOrder(v, kHomeOrder);
+  void setSecOrder(List<String> v) {
+    secOrder = _fixOrder(v, kHomeOrder);
     _commit();
   }
 
@@ -3296,7 +3296,7 @@ class AppStore extends ChangeNotifier {
   }
 
   void resetHomeLayout() {
-    homeOrder = List.of(kHomeOrder);
+    secOrder = List.of(kHomeOrder);
     iconOrder = List.of(kIconOrder);
     iconOff = {};
     _commit();

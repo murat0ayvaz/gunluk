@@ -94,13 +94,13 @@ class HomeLayoutPage extends StatelessWidget {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               onReorder: (o, n) {
-                final l = List<String>.of(store.homeOrder);
+                final l = List<String>.of(store.secOrder);
                 if (n > o) n -= 1;
                 l.insert(n, l.removeAt(o));
-                store.setHomeOrder(l);
+                store.setSecOrder(l);
               },
               children: [
-                for (final id in store.homeOrder)
+                for (final id in store.secOrder)
                   Card(
                     key: ValueKey('sc_$id'),
                     margin: const EdgeInsets.only(bottom: 6),
