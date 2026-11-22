@@ -10,6 +10,7 @@ import 'reminders.dart';
 import 'prayer.dart';
 import 'tools.dart' show toolList;
 import 'layoutpage.dart';
+import 'profile.dart' show ProfilePage;
 import 'media.dart' show slideFromRight;
 import 'strings.dart';
 import 'theme.dart';
@@ -133,7 +134,26 @@ class SettingsPage extends StatelessWidget {
           body: ListView(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
             children: [
+              sec(tx('Profil ve hatırlatma'), [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.person_outline_rounded),
+                  title: Text(tx('Beni tanı')),
+                  subtitle: Text(tx('Uyku, mesai, boy, kilo, spor: hatırlatmalar ve öneriler buna göre şekillenir.')),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.of(context)
+                      .push(slideFromRight(const ProfilePage())),
+                ),
+              ]),
               sec(tx('Ana ekran'), [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: const Icon(Icons.gradient_rounded),
+                  title: Text(tx('Ambiyans arka plan')),
+                  subtitle: Text(tx('Ana ekranın arkasında tema renginin tonlarından yumuşak geçiş.')),
+                  value: store.pBool('amb', true),
+                  onChanged: (v) => store.setProf('amb', v),
+                ),
                 Text(tx('Ana sayfa teması'), style: TextStyle(color: p.soft)),
                 const SizedBox(height: 6),
                 Wrap(spacing: 8, children: [

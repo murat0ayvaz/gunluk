@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import 'profile.dart' show entryRemSync;
 import 'quotes.dart';
 import 'strings.dart';
 import 'theme.dart';
@@ -2474,6 +2475,8 @@ class AppStore extends ChangeNotifier {
         : (j['vwake'] ?? 'Günlük').toString().trim();
     voiceSpeak = (j['vspeak'] as bool?) ?? true;
     voiceConfirm = (j['vconf'] as bool?) ?? true;
+    prof = Map<String, dynamic>.from((j['prof'] as Map?) ?? {});
+    lastEntryMs = (j['lastent'] as num?)?.toInt() ?? 0;
     secOrder = _fixOrder(j['horder'], kHomeOrder);
     iconOrder = _fixOrder(j['iorder'], kIconOrder);
     iconOff = ((j['ioff'] as List?) ?? const []).map((e) => e.toString()).toSet();
@@ -2733,6 +2736,8 @@ class AppStore extends ChangeNotifier {
         'vspeak': voiceSpeak,
         'vconf': voiceConfirm,
         'htheme': homeTheme,
+        'prof': prof,
+        'lastent': lastEntryMs,
         'horder': secOrder,
         'iorder': iconOrder,
         'ioff': iconOff.toList(),
@@ -3031,7 +3036,9 @@ class AppStore extends ChangeNotifier {
     } else {
       entries.add(Entry(id: newId(), date: date, sub: subId, value: v));
     }
+    lastEntryMs = DateTime.now().millisecondsSinceEpoch; // giriş hatırlatması sıfırlanır
     _commit();
+    Future.microtask(entryRemSync);
   }
 
   void deleteEntry(String id) {
@@ -3256,6 +3263,28 @@ class AppStore extends ChangeNotifier {
   bool linesOn = true; // hava ve namaz yazı satırları görünsün mü (başlıktaki simgeyle)
   void setLinesOn(bool v) {
     linesOn = v;
+    _commit();
+  }
+
+  // ---- Kişisel profil ve giriş hatırlatması ----
+  // prof: tek bir harita (cinsiyet, boy, kilo, uyanma/uyku, mesai, spor, hatırlatma ayarları ...)
+  Map<String, dynamic> prof = {};
+  int lastEntryMs = 0; // son veri girişinin zamanı (giriş hatırlatması için)
+  int pInt(String k, int d) => (prof[k] as num?)?.toInt() ?? d;
+  double? pNum(String k) => (prof[k] as num?)?.toDouble();
+  String pStr(String k, [String d = '']) => (prof[k] ?? d).toString();
+  bool pBool(String k, bool d) => prof[k] is bool ? prof[k] as bool : d;
+  void setProf(String k, dynamic v) {
+    if (v == null) {
+      prof.remove(k);
+    } else {
+      prof[k] = v;
+    }
+    _commit();
+  }
+
+  void markEntryNow() {
+    lastEntryMs = DateTime.now().millisecondsSinceEpoch;
     _commit();
   }
 

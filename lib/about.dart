@@ -10,10 +10,10 @@ import 'version.dart';
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
       tx('Verilerin korundu.'),
-      tx('Müzik ve Radyo içinde yeni TV sekmesi: canlı kanal listesi, favori, kendi yayın adresini ekleme, hazır kanallar, yatay izleme. "TV aç" ya da kanal adıyla sesli de açılır.'),
-      tx('Ayarlar > Ana ekran > Ana ekran düzeni: bölümleri ve üst bar simgelerini sürükleyip sırala, simgeleri aç/kapat.'),
-      tx('Bölümleri, hava ve namaz çubuğunu sola çekince "Gizle" zemini görünür; ekranı yenileyince geri gelir.'),
-      tx('Tüm bölüm başlıkları aynı yükseklikte. Tema 3\'te üst bardaki Araçlar simgesi kalktı (sağdaki ≡ ile açılır).'),
+      tx('Ayarlar > Profil ve hatırlatma > Beni tanı: uyku, mesai, boy, kilo ve spor bilgilerini gir; hatırlatmalar ve rutin önerileri buna göre şekillenir.'),
+      tx('Belirlenen süre rutin girişi yapılmazsa ana ekranda uyarı satırı ve telefon bildirimi çıkar (uyanık saatlerde).'),
+      tx('Haftalık spor hedefi tutmayacak gibiyse akşam hatırlatması.'),
+      tx('Ana ekranın arkasında ambiyans arka plan (Ayarlar > Ana ekran\'dan kapatılır).'),
     ];
 
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {

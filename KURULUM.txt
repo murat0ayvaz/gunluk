@@ -1,13 +1,12 @@
-DAILY ROUTINE v1.25.14 - TAM PAKET
+DAILY ROUTINE v1.25.15 - TAM PAKET
 
 Bu zipte projenin TAMAMI var: .github, assets, lib, debug.keystore, pubspec.yaml.
 1) Zipi çıkar. GitHub'da "gunluk" reposunun ANA sayfasında: Add file > Upload files.
 2) Çıkan klasörlerin ve dosyaların HEPSİNİ (.github, assets, lib, debug.keystore, pubspec.yaml) sürükle-bırak > Commit changes.
    (YENİ: lib/tv.dart, lib/layoutpage.dart. pubspec.yaml'a video_player ve wakelock_plus eklendi.)
 3) Actions > yeşil tik > Artifacts > gunluk-apk indir, telefona kur (veriler kalır).
-Derleme hatası olursa Actions'taki kırmızı satırları gönder.v1.25.14 yenilikleri:
-- Müzik ve Radyo > TV sekmesi: canlı kanallar, favori, kendi adresini ekle, hazır kanallar (adresler yayıncıya aittir, çalışmayan olursa düzenle).
-- Ayarlar > Ana ekran > Ana ekran düzeni: bölüm ve üst bar simgelerini sürükleyerek sırala.
-- Bölümleri, hava ve namaz çubuğunu sola çekince "Gizle" efekti.
-- Başlık yükseklikleri eşitlendi; Tema 3'te Araçlar simgesi kalktı.
-- Önceki paketlerdeki speech_to_text ve build.yml adımı bu pakette de var.
+Derleme hatası olursa Actions'taki kırmızı satırları gönder.v1.25.15 yenilikleri:
+- Ayarlar > Profil ve hatırlatma > Beni tanı: uyku, mesai, boy, kilo, spor; rutin önerileri (Su, Spor, Uyku, Kilo).
+- Rutin girişi belirlenen süre yapılmazsa ana ekranda uyarı satırı + telefon bildirimi; spor hedefi hatırlatması.
+- Ana ekran arkasında ambiyans arka plan (Ayarlar > Ana ekran'dan kapatılır).
+- Yeni dosyalar: lib/profile.dart, lib/ambient.dart.

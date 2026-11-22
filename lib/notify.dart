@@ -6,6 +6,7 @@ import 'package:timezone/timezone.dart' as tz;
 import 'data.dart';
 import 'strings.dart';
 import 'prayer.dart' show prayerTimesNow;
+import 'profile.dart' show entryRemSync;
 
 // ---------------------------------------------------------------
 // BİLDİRİMLER: hatırlatıcılar ve yapılacak maddesi hatırlatmaları.
@@ -333,6 +334,7 @@ class Notifier {
         if (d.remind && !d.done) await syncDebt(d);
       }
       await syncPrayer(prayerTimesNow());
+      await entryRemSync(); // rutin giriş ve spor hatırlatmaları
     } catch (_) {}
   }
 
@@ -394,7 +396,8 @@ class Notifier {
   }
 
   /// Tek seferlik bildirim (sayaç / pomodoro bitişi için)
-  static Future<void> scheduleOnce(int id, String body, DateTime when) async {
+  static Future<void> scheduleOnce(int id, String body, DateTime when,
+      {String title = 'Daily Routine'}) async {
     try {
       await init();
       final a = _android;
@@ -402,7 +405,7 @@ class Notifier {
           a == null ? true : (await a.canScheduleExactNotifications() ?? false);
       await _p.zonedSchedule(
         id,
-        'Daily Routine',
+        title,
         body,
         tz.TZDateTime.fromMillisecondsSinceEpoch(
             tz.UTC, when.millisecondsSinceEpoch),

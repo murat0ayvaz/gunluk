@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'about.dart';
 import 'add_sheet.dart';
+import 'ambient.dart';
 import 'data.dart';
+import 'profile.dart' show EntryLine;
 import 'fireworks.dart';
 import 'tools.dart';
 import 'manage.dart' show editSubCategory;
@@ -857,13 +859,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               (id, iconMap[id]!),
         ];
 
-        final scaffold = Scaffold(
+        final amb = ambienceOn();
+        final scaffold0 = Scaffold(
           key: _scaffoldKey,
+          backgroundColor: amb ? Colors.transparent : null,
           drawer: const AppDrawer(),
           endDrawer: const ToolsDrawer(),
           endDrawerEnableOpenDragGesture: false, // günler arası kaydırmayla karışmasın
           appBar: AppBar(
-            backgroundColor: p.bg,
+            backgroundColor: amb ? Colors.transparent : p.bg,
             elevation: 0,
             scrolledUnderElevation: 0,
             centerTitle: true,
@@ -918,6 +922,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     ? PrayerBar(day: day)
                     : null;
             // Hava ve namaz çubukları, düzendeki sıraya göre
+            final erLine = (!kbSection &&
+                    !_hidden.contains('er') &&
+                    store.pBool('erOn', true) &&
+                    date == dKey(DateTime.now()))
+                ? EntryLine(onTap: () => setState(() => _openSec.add('routine')))
+                : null;
             List<Widget> bars({bool reversed = false}) {
               final wxFirst =
                   store.secOrder.indexOf('wx') < store.secOrder.indexOf('pr');
@@ -930,7 +940,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   : [if (prLine != null) _bar('pr', prLine), if (prBar != null) prBar];
               // Tema 3'te varsayılan görünüm eskisi gibi kalsın (namaz üstte, hava altta)
               final firstWx = reversed ? !wxFirst : wxFirst;
-              final l = firstWx ? [...wx, ...pr] : [...pr, ...wx];
+              final l = [
+                if (erLine != null) _bar('er', erLine),
+                ...(firstWx ? [...wx, ...pr] : [...pr, ...wx]),
+              ];
               return l;
             }
             if (store.homeTheme == 3) {
@@ -970,6 +983,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             );
           }),
         );
+
+        final scaffold = amb
+            ? Stack(fit: StackFit.expand, children: [const Positioned.fill(child: AmbientBg()), scaffold0])
+            : scaffold0;
 
         // Geri tuşu: önce menü, sonra çıkış onayı
         return PopScope(
