@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'data.dart';
+import 'fx.dart';
 import 'reminders.dart';
 import 'strings.dart';
 import 'theme.dart';
@@ -519,7 +520,7 @@ class _FreeRowDialogState extends State<_FreeRowDialog> {
 // ORTAK KAYDIRMA SATIRI: sağa kaydır = düzenle, sola kaydır = sil.
 // İkisi de eylemi çağırır; satır yerinde kalır (silme/onay çağıranın işidir).
 // ---------------------------------------------------------------
-class SwipeRow extends StatelessWidget {
+class SwipeRow extends StatefulWidget {
   final String tag; // benzersiz kimlik (Dismissible anahtarı için)
   final Widget child;
   final VoidCallback onEdit;
@@ -536,34 +537,58 @@ class SwipeRow extends StatelessWidget {
     this.radius = 0,
   });
 
-  Widget _bg(Color c, IconData i, Alignment a) => Container(
-        color: c,
-        alignment: a,
-        padding: const EdgeInsets.symmetric(horizontal: 22),
-        child: Icon(i),
-      );
+  @override
+  State<SwipeRow> createState() => _SwipeRowState();
+}
+
+class _SwipeRowState extends State<SwipeRow> {
+  final _pn = ValueNotifier<double>(0); // silme dolumu
+  final _pe = ValueNotifier<double>(0); // düzenleme dolumu
+
+  @override
+  void dispose() {
+    _pn.dispose();
+    _pe.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = palOf(context);
     return Padding(
-      padding: padding,
+      padding: widget.padding,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
+        borderRadius: BorderRadius.circular(widget.radius),
         child: Dismissible(
-          key: ValueKey('swp_$tag'),
-          background: _bg(p.editBg, Icons.edit_rounded, Alignment.centerLeft),
-          secondaryBackground:
-              _bg(p.delBg, Icons.delete_outline_rounded, Alignment.centerRight),
+          key: ValueKey('swp_${widget.tag}'),
+          onUpdate: (d) =>
+              (d.direction == DismissDirection.endToStart ? _pn : _pe).value =
+                  d.progress,
+          background: FxFillBg(
+              prog: _pe,
+              base: p.editBg,
+              strong: const Color(0xFF4F8EF7),
+              icon: Icons.edit_rounded,
+              align: Alignment.centerLeft,
+              hot: 0.4),
+          secondaryBackground: FxFillBg(
+              prog: _pn,
+              base: p.delBg,
+              strong: const Color(0xFFD9534F),
+              icon: Icons.delete_outline_rounded,
+              align: Alignment.centerRight,
+              hot: 0.4),
           confirmDismiss: (dir) async {
+            _pe.value = 0;
+            _pn.value = 0;
             if (dir == DismissDirection.startToEnd) {
-              onEdit();
+              widget.onEdit();
             } else {
-              onDelete();
+              widget.onDelete();
             }
             return false;
           },
-          child: child,
+          child: FxShine(radius: widget.radius, child: widget.child),
         ),
       ),
     );

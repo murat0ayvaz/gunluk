@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'ambient.dart';
 import 'data.dart';
 import 'notify.dart';
 import 'strings.dart';
@@ -129,9 +130,9 @@ class _ManagePageState extends State<ManagePage> {
       builder: (context, _) {
         final p = palOf(context);
         final cats = store.cats;
-        return Scaffold(
+        return AmbScaffold(kind: 'misc', 
           appBar: AppBar(
-            backgroundColor: p.bg,
+            backgroundColor: ambBg(p),
             elevation: 0,
             scrolledUnderElevation: 0,
             title: Text(tx('Kategorileri düzenle')),

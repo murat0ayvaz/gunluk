@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'ambient.dart';
 import 'data.dart';
 import 'notify.dart';
 import 'reminders.dart' show permissionMessage;
@@ -834,10 +835,10 @@ class _WalletPageState extends State<WalletPage> {
       listenable: store,
       builder: (context, _) {
         final empty = store.wallets.isEmpty;
-        return Scaffold(
-          backgroundColor: p.bg,
+        return AmbScaffold(kind: 'wallet', 
+          backgroundColor: ambBg(p),
           appBar: AppBar(
-            backgroundColor: p.bg,
+            backgroundColor: ambBg(p),
             elevation: 0,
             scrolledUnderElevation: 0,
             title: Text(widget.stats ? tx('Cüzdan özeti') : tx('Cüzdan')),

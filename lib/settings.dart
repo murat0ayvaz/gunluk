@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'ambient.dart';
 import 'data.dart';
 import 'about.dart';
 import 'intro.dart';
@@ -15,7 +16,7 @@ import 'media.dart' show slideFromRight;
 import 'strings.dart';
 import 'theme.dart';
 import 'ui.dart';
-import 'voicecmd.dart' show voiceListener;
+import 'voicecmd.dart' show voiceListener, VoiceCommandsPage;
 import 'version.dart';
 import 'weather.dart';
 
@@ -124,9 +125,9 @@ class SettingsPage extends StatelessWidget {
               ),
             );
 
-        return Scaffold(
+        return AmbScaffold(kind: 'settings', 
           appBar: AppBar(
-            backgroundColor: p.bg,
+            backgroundColor: ambBg(p),
             elevation: 0,
             scrolledUnderElevation: 0,
             title: Text(tx('Ayarlar')),
@@ -153,6 +154,28 @@ class SettingsPage extends StatelessWidget {
                   subtitle: Text(tx('Ana ekranın arkasında tema renginin tonlarından yumuşak geçiş.')),
                   value: store.pBool('amb', true),
                   onChanged: (v) => store.setProf('amb', v),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, bottom: 2),
+                  child: Text(tx('Satır efektleri'), style: TextStyle(color: p.soft)),
+                ),
+                Wrap(spacing: 8, children: [
+                  for (final e in [
+                    [0, tx('Kapalı')],
+                    [1, tx('Hafif')],
+                    [2, tx('Göz alıcı')],
+                  ])
+                    ChoiceChip(
+                      label: Text(e[1] as String),
+                      selected: store.pInt('fx', 1) == e[0],
+                      onSelected: (_) => store.setProf('fx', e[0]),
+                    ),
+                ]),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, bottom: 6),
+                  child: Text(
+                      tx('Satırlarda ışık süzülmesi, hedef parlaması, dokunma dalgası ve kaydırırken dolan renk. Göz alıcı daha çok pil harcar.'),
+                      style: TextStyle(color: p.soft, fontSize: 12.5, height: 1.35)),
                 ),
                 Text(tx('Ana sayfa teması'), style: TextStyle(color: p.soft)),
                 const SizedBox(height: 6),
@@ -246,6 +269,15 @@ class SettingsPage extends StatelessWidget {
                   ),
               ]),
               sec(tx('Sesli komut'), [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.list_alt_rounded),
+                  title: Text(tx('Komut listesi')),
+                  subtitle: Text(tx('Neler söyleyebileceğini örneklerle gör.')),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.of(context)
+                      .push(slideFromRight(const VoiceCommandsPage())),
+                ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   secondary: const Icon(Icons.mic_rounded),
@@ -270,7 +302,7 @@ class SettingsPage extends StatelessWidget {
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.record_voice_over_rounded),
                     title: Text(tx('Uyandırma kelimesi')),
-                    subtitle: Text(store.voiceWake),
+                    subtitle: Text('${store.voiceWake}\n${tx('Tek heceli ya da çok yaygın kelimeler yanlışlıkla tetiklenebilir.')}'),
                     trailing: const Icon(Icons.edit_rounded, size: 18),
                     onTap: () async {
                       final w = await askText(context, tx('Uyandırma kelimesi'),
@@ -603,9 +635,9 @@ class _CustomQuotesPageState extends State<CustomQuotesPage> {
       listenable: store,
       builder: (context, _) {
         final p = palOf(context);
-        return Scaffold(
+        return AmbScaffold(kind: 'settings', 
           appBar: AppBar(
-            backgroundColor: p.bg,
+            backgroundColor: ambBg(p),
             elevation: 0,
             scrolledUnderElevation: 0,
             title: Text(tx('Kendi sözlerim')),

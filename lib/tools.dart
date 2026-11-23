@@ -3,6 +3,7 @@ import 'dart:math' show cos, pi;
 import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'ambient.dart';
 import 'data.dart';
 import 'notify.dart';
 import 'prayer.dart';
@@ -2231,8 +2232,8 @@ class _EpPickPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = palOf(context);
-    return Scaffold(
-      backgroundColor: p.bg,
+    return AmbScaffold(kind: 'tools', 
+      backgroundColor: ambBg(p),
       appBar: AppBar(title: Text(pd.title, maxLines: 1)),
       body: SingleChildScrollView(
         child: Column(
@@ -2473,8 +2474,8 @@ class _MeditatePageState extends State<MeditatePage>
 
   Future<void> _pickOnline() async {
     final p = palOf(context);
-    await Navigator.of(context).push(_route(Scaffold(
-      backgroundColor: p.bg,
+    await Navigator.of(context).push(_route(AmbScaffold(kind: 'tools', 
+      backgroundColor: ambBg(p),
       appBar: AppBar(title: Text(tx('Online müzik'))),
       body: const OnlineTab(),
     )));

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'ambient.dart';
 import 'data.dart';
 import 'media.dart';
 import 'net.dart';
@@ -614,8 +615,8 @@ class _RadioBrowserPageState extends State<RadioBrowserPage> {
   Widget build(BuildContext context) {
     final p = palOf(context);
     if (_countryName.isEmpty) _countryName = tx('Türkiye');
-    return Scaffold(
-      backgroundColor: p.bg,
+    return AmbScaffold(kind: 'media', 
+      backgroundColor: ambBg(p),
       appBar: AppBar(
         title: Text(tx('Radyo ekle')),
         actions: [

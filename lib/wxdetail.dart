@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'ambient.dart';
 import 'data.dart';
 import 'net.dart';
 import 'strings.dart';
@@ -1130,8 +1131,8 @@ class _WxDetailPageState extends State<WxDetailPage> {
       builder: (context, _) {
         final p = palOf(context);
         final has = _all != null && !_loading;
-        return Scaffold(
-          backgroundColor: p.bg,
+        return AmbScaffold(kind: 'weather', 
+          backgroundColor: ambBg(p),
           endDrawer: const ToolsDrawer(replace: true),
           appBar: AppBar(
             title: Text(tx('Hava durumu')),

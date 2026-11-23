@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
+import 'ambient.dart';
 import 'data.dart';
 import 'music.dart';
 import 'news.dart';
@@ -33,7 +34,9 @@ Future<void> initAudio() async {
       androidNotificationChannelId: 'com.example.gunluk.audio',
       androidNotificationChannelName: 'Daily Routine müzik',
       androidNotificationOngoing: false,
-      androidStopForegroundOnPause: false, // duraklatınca medya oturumu açık kalır (direksiyon tuşları için)
+      // true: çalar durdurulunca / ✕ ile kapatılınca servis ve telefon bildirimi tamamen kalkar
+      // (false iken boşta durumunda bile bildirim ekranda kalıyordu). Duraklatılmış bildirim kaydırılıp kapatılabilir.
+      androidStopForegroundOnPause: true,
     ).timeout(const Duration(seconds: 5));
   } catch (_) {
     // başlatılamazsa çalar yine çalışır, sadece bildirim kontrolü olmaz
@@ -639,8 +642,8 @@ class MediaPage extends StatelessWidget {
       builder: (context, _) {
         final ids = mediaTabIds();
         if (ids.isEmpty) {
-          return Scaffold(
-            backgroundColor: p.bg,
+          return AmbScaffold(kind: 'media', 
+            backgroundColor: ambBg(p),
             appBar: AppBar(title: Text(tx('Müzik ve Radyo'))),
             body: Center(child: Text(tx('Tüm sekmeler Ayarlar > Uygulamalar bölümünden kapatılmış.'))),
           );
@@ -683,8 +686,8 @@ class MediaPage extends StatelessWidget {
           key: ValueKey(ids.join(',')),
           length: ids.length,
           initialIndex: (initial != null && ids.contains(initial)) ? ids.indexOf(initial!) : 0,
-          child: Scaffold(
-            backgroundColor: p.bg,
+          child: AmbScaffold(kind: 'media', 
+            backgroundColor: ambBg(p),
             appBar: AppBar(
               title: Text(tx('Müzik ve Radyo')),
               bottom: TabBar(tabs: [for (final id in ids) tab(id)]),

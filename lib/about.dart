@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'ambient.dart';
 import 'strings.dart';
 import 'ui.dart';
 import 'version.dart';
@@ -10,10 +11,8 @@ import 'version.dart';
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
       tx('Verilerin korundu.'),
-      tx('Ayarlar > Profil ve hatırlatma > Beni tanı: uyku, mesai, boy, kilo ve spor bilgilerini gir; hatırlatmalar ve rutin önerileri buna göre şekillenir.'),
-      tx('Belirlenen süre rutin girişi yapılmazsa ana ekranda uyarı satırı ve telefon bildirimi çıkar (uyanık saatlerde).'),
-      tx('Haftalık spor hedefi tutmayacak gibiyse akşam hatırlatması.'),
-      tx('Ana ekranın arkasında ambiyans arka plan (Ayarlar > Ana ekran\'dan kapatılır).'),
+      tx('Veri girilmiş satırda değere dokununca yeniden giriş yapabilirsin: mevcut değer seçili gelir, yazınca üzerine geçer.'),
+      tx('Radyo, müzik ve diğer çalarlarda ✕ ile kapatınca telefondaki medya bildirimi de kalkar; duraklatılmış bildirim kaydırılıp kapatılabilir.'),
     ];
 
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {
@@ -165,10 +164,10 @@ class FeaturesPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = palOf(context);
-    return Scaffold(
-      backgroundColor: p.bg,
+    return AmbScaffold(kind: 'settings', 
+      backgroundColor: ambBg(p),
       appBar: AppBar(
-        backgroundColor: p.bg,
+        backgroundColor: ambBg(p),
         elevation: 0,
         scrolledUnderElevation: 0,
         title: Text(tx('Neler yapabilir?')),

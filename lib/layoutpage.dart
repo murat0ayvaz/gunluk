@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'ambient.dart';
 import 'data.dart';
 import 'strings.dart';
 import 'theme.dart';
@@ -44,10 +45,10 @@ class HomeLayoutPage extends StatelessWidget {
     final p = palOf(context);
     return ListenableBuilder(
       listenable: store,
-      builder: (context, _) => Scaffold(
-        backgroundColor: p.bg,
+      builder: (context, _) => AmbScaffold(kind: 'settings', 
+        backgroundColor: ambBg(p),
         appBar: AppBar(
-          backgroundColor: p.bg,
+          backgroundColor: ambBg(p),
           elevation: 0,
           scrolledUnderElevation: 0,
           title: Text(tx('Ana ekran düzeni')),

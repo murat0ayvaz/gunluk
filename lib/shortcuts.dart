@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'ambient.dart';
 import 'data.dart';
 import 'notify.dart';
 import 'strings.dart';
@@ -73,8 +74,8 @@ class ShortcutsPage extends StatelessWidget {
       listenable: store,
       builder: (context, _) {
         final list = store.shortcuts;
-        return Scaffold(
-          backgroundColor: p.bg,
+        return AmbScaffold(kind: 'short', 
+          backgroundColor: ambBg(p),
           appBar: AppBar(title: Text(tx('Kısayollar'))),
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () => _pick(context),

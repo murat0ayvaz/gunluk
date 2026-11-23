@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart';
+import 'ambient.dart';
 import 'data.dart';
 import 'links.dart';
 import 'media.dart';
@@ -382,6 +385,7 @@ class _ListenDialogState extends State<_ListenDialog> {
   String? _err;
   bool _done = false;
   bool _on = false;
+  Timer? _auto; // konuşma durunca (1,5 sn) komut kendiliğinden çalışır
 
   @override
   void initState() {
@@ -391,6 +395,7 @@ class _ListenDialogState extends State<_ListenDialog> {
 
   @override
   void dispose() {
+    _auto?.cancel();
     try {
       _stt.cancel();
     } catch (_) {}
@@ -437,8 +442,14 @@ class _ListenDialogState extends State<_ListenDialog> {
         onResult: (r) {
           if (!mounted || _done) return;
           setState(() => _text = r.recognizedWords);
+          _auto?.cancel();
           if (r.finalResult && r.recognizedWords.trim().isNotEmpty) {
             _finish(r.recognizedWords);
+          } else if (r.recognizedWords.trim().isNotEmpty) {
+            // yeni kelime gelmezse 1,5 sn sonra bitir ("Bitti"ye basmaya gerek kalmaz)
+            _auto = Timer(const Duration(milliseconds: 1500), () {
+              if (mounted && !_done) _finish(_text);
+            });
           }
         },
         localeId: 'tr_TR',
@@ -458,6 +469,7 @@ class _ListenDialogState extends State<_ListenDialog> {
   void _finish(String t) {
     if (_done) return;
     _done = true;
+    _auto?.cancel();
     try {
       _stt.stop();
     } catch (_) {}
@@ -501,6 +513,15 @@ class _ListenDialogState extends State<_ListenDialog> {
         ],
       ),
       actions: [
+        IconButton(
+            tooltip: tx('Komut listesi'),
+            icon: const Icon(Icons.help_outline_rounded),
+            onPressed: () {
+              _done = true;
+              final nav = Navigator.of(context);
+              nav.pop();
+              nav.push(slideFromRight(const VoiceCommandsPage()));
+            }),
         TextButton(
             onPressed: () {
               _done = true;
@@ -579,6 +600,15 @@ Future<void> runVoiceText(BuildContext context, String heard) async {
   final wantsOpen =
       RegExp(r'\b(ac\w*|git|goster\w*|baslat\w*|calistir\w*|izle\w*)\b').hasMatch(n);
 
+  // 0) Komut listesi
+  if ((has('komut') && (has('liste') || n.trim() == 'komutlar' || n.trim() == 'komut')) ||
+      has('neler yapabilirsin') ||
+      n.trim() == 'komutlar') {
+    if (context.mounted) {
+      await Navigator.of(context).push(slideFromRight(const VoiceCommandsPage()));
+    }
+    return;
+  }
   // 1) Durdur
   if (RegExp(r'\b(durdur\w*|sustur\w*|dur)\b').hasMatch(n)) {
     if (newsReader.reading) await newsReader.stop();
@@ -599,8 +629,10 @@ Future<void> runVoiceText(BuildContext context, String heard) async {
     return;
   }
   // 3) Radyo çal
-  if (has('radyo') && RegExp(r'\bcal(sin|sana|ar|abilir|si)?\b').hasMatch(n)) {
-    await _playRadio(context, n);
+  if (has('radyo') &&
+      RegExp(r'\b(cal(sin|sana|ar|abilir|si)?|ac\w*|baslat\w*|dinle\w*)\b').hasMatch(n) &&
+      !RegExp(r'\b(sayfa\w*|ekran\w*|menu\w*|liste\w*)\b').hasMatch(n)) {
+    await _playRadio(context, n); // "radyo aç": son çalan istasyon doğrudan çalar
     return;
   }
   // 4) Cüzdan
@@ -708,7 +740,7 @@ Future<void> _playRadio(BuildContext context, String n) async {
   }
   // "radyo çal TRT FM": ad geçiyorsa onu bul
   var q = n
-      .replaceAll(RegExp(r'\b(radyo\w*|cal\w*|ac\w*|lutfen|bir|bana)\b'), ' ')
+      .replaceAll(RegExp(r'\b(radyo\w*|cal\w*|ac\w*|baslat\w*|dinle\w*|lutfen|bir|bana)\b'), ' ')
       .replaceAll(RegExp(r'\s+'), ' ')
       .trim();
   Station? pick;
@@ -1230,6 +1262,7 @@ class VoiceListener extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> _halt() async {
     _gen++;
+    _wakeTimer?.cancel();
     try {
       await _stt.cancel();
     } catch (_) {}
@@ -1263,7 +1296,11 @@ class VoiceListener extends ChangeNotifier with WidgetsBindingObserver {
       await _stt.listen(
         onResult: (r) {
           if (g != _gen) return;
-          if (r.finalResult) _onFinal(r.recognizedWords);
+          if (r.finalResult) {
+            _onFinal(r.recognizedWords);
+          } else {
+            _onPartial(r.recognizedWords); // ara sonuçlardan da uyandır
+          }
         },
         localeId: 'tr_TR',
         listenFor: const Duration(seconds: 55),
@@ -1288,22 +1325,19 @@ class VoiceListener extends ChangeNotifier with WidgetsBindingObserver {
     });
   }
 
-  Future<void> _onFinal(String text) async {
-    final raw = text
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((e) => e.isNotEmpty)
-        .toList();
-    if (raw.isEmpty) return;
-    final nt = [for (final r in raw) vNorm(r).replaceAll(RegExp(r'[.,!?;]+$'), '')];
+  // ---- Uyandırma kelimesi ----
+  Timer? _wakeTimer; // ara sonuçta kelime duyulunca kısa bekleme (cümle bitsin)
+  bool _firing = false;
+
+  /// Kelimeler arasında uyandırma kelimesini arar: (başlangıç, kullanılan kelime sayısı)
+  (int, int)? _wakeAt(List<String> nt) {
     final wake = vNorm(store.voiceWake)
         .trim()
         .split(RegExp(r'\s+'))
         .where((e) => e.isNotEmpty)
         .toList();
-    if (wake.isEmpty) return;
-    var at = -1;
-    for (var i = 0; i + wake.length <= nt.length; i++) {
+    if (wake.isEmpty) return null;
+    for (var i = 0; i + wake.length <= nt.length && i <= 1; i++) {
       var ok = true;
       for (var j = 0; j < wake.length; j++) {
         final a = nt[i + j];
@@ -1313,16 +1347,61 @@ class VoiceListener extends ChangeNotifier with WidgetsBindingObserver {
           break;
         }
       }
-      if (ok) {
-        at = i;
-        break;
+      if (ok) return (i, wake.length);
+    }
+    // Tek kelimelik uyandırma "gün lük" gibi bölünerek duyulabilir
+    if (wake.length == 1) {
+      for (var i = 0; i + 1 < nt.length && i <= 1; i++) {
+        if (nt[i].length >= 2 && (nt[i] + nt[i + 1]).startsWith(wake[0])) {
+          return (i, 2);
+        }
       }
     }
-    if (at < 0 || at > 1) return; // cümle uyandırma kelimesiyle başlamıyor
-    final cmd = raw.sublist(at + wake.length).join(' ').trim();
+    return null;
+  }
+
+  List<String> _split(String text) => text
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((e) => e.isNotEmpty)
+      .toList();
+
+  /// Konuşma sürerken gelen ara sonuç: kelime duyulur duyulmaz komut ekranı açılır
+  void _onPartial(String text) {
+    final raw = _split(text);
+    if (raw.isEmpty || _firing) return;
+    final nt = [for (final r in raw) vNorm(r).replaceAll(RegExp(r'[.,!?;]+$'), '')];
+    final w = _wakeAt(nt);
+    if (w == null) {
+      _wakeTimer?.cancel();
+      return;
+    }
+    final cmd = raw.sublist(w.$1 + w.$2).join(' ').trim();
+    _wakeTimer?.cancel();
+    // yalnız kelime: kısa bekle ve komut ekranını aç; komut da varsa cümle durana kadar bekle
+    _wakeTimer = Timer(Duration(milliseconds: cmd.isEmpty ? 800 : 1600), () {
+      _fire(cmd);
+    });
+  }
+
+  Future<void> _onFinal(String text) async {
+    final raw = _split(text);
+    if (raw.isEmpty || _firing) return;
+    final nt = [for (final r in raw) vNorm(r).replaceAll(RegExp(r'[.,!?;]+$'), '')];
+    final w = _wakeAt(nt);
+    if (w == null) return; // cümle uyandırma kelimesiyle başlamıyor
+    _wakeTimer?.cancel();
+    await _fire(raw.sublist(w.$1 + w.$2).join(' ').trim());
+  }
+
+  Future<void> _fire(String cmd) async {
+    if (_firing) return;
     final c = ctx;
     if (c == null || !c.mounted) return;
+    _firing = true;
+    _wakeTimer?.cancel();
     _busy = true;
+    HapticFeedback.mediumImpact(); // kelimeyi algıladım
     await _halt();
     try {
       if (cmd.isEmpty) {
@@ -1332,6 +1411,7 @@ class VoiceListener extends ChangeNotifier with WidgetsBindingObserver {
       }
     } catch (_) {}
     _busy = false;
+    _firing = false;
     if (_want && store.voiceListen) {
       await Future<void>.delayed(const Duration(milliseconds: 600));
       _loop();
@@ -1340,3 +1420,127 @@ class VoiceListener extends ChangeNotifier with WidgetsBindingObserver {
 }
 
 final voiceListener = VoiceListener();
+
+
+// ---------------------------------------------------------------
+// KOMUT LİSTESİ
+//  "Günlük, komut listesini aç" / Ayarlar > Sesli komut / komut penceresindeki ? düğmesi.
+//  Kapattığın bölümlerin komutları görünmez. Dokununca denenebilenler (açma, radyo, haber,
+//  durdurma) çalışır; veri ekleyenlerde yalnız örnek gösterilir.
+// ---------------------------------------------------------------
+class _CmdGroup {
+  final String title;
+  final IconData icon;
+  final List<(String, bool)> items; // (örnek cümle, dokununca denenebilir mi)
+  _CmdGroup(this.title, this.icon, this.items);
+}
+
+List<_CmdGroup> _cmdGroups() {
+  final mediaOff = store.appHidden('media');
+  return [
+    if (!store.appHidden('rem'))
+      _CmdGroup(tx('Hatırlatıcı'), Icons.notifications_active_outlined, [
+        (tx('Yarın saat 9\'a toplantı hatırlat'), false),
+        (tx('Cuma günü 14:30\'da doktor hatırlat'), false),
+      ]),
+    if (!store.appHidden('todo'))
+      _CmdGroup(tx('Yapılacak'), Icons.task_alt_rounded, [
+        (tx('Yapılacaklara market alışverişi ekle'), false),
+      ]),
+    if (!store.appHidden('wallet'))
+      _CmdGroup(tx('Cüzdan'), Icons.account_balance_wallet_rounded, [
+        (tx('Cüzdana binikiyüz lira market harcaması ekle'), false),
+      ]),
+    _CmdGroup(tx('Rutin değeri'), Icons.checklist_rounded, [
+      (tx('Su 2 litre'), false),
+      (tx('Kilo 82'), false),
+    ]),
+    _CmdGroup(tx('Açma'), Icons.open_in_new_rounded, [
+      (tx('Cüzdanı aç'), true),
+      if (!mediaOff && !store.appHidden('tv')) (tx('TV aç'), true),
+      if (!mediaOff && !store.appHidden('tv')) (tx('Kanal adıyla: TRT Haber aç'), false),
+      (tx('Kısayol uygulaması adıyla aç'), false),
+    ]),
+    if (!mediaOff && !store.appHidden('radio'))
+      _CmdGroup(tx('Radyo'), Icons.radio_rounded, [
+        (tx('Radyo aç (son çalan istasyon)'), false),
+        (tx('İstasyon adıyla: TRT FM çal'), false),
+        (tx('Radyo sayfasını aç'), true),
+      ]),
+    if (!mediaOff && !store.appHidden('news'))
+      _CmdGroup(tx('Haber ve durdurma'), Icons.newspaper_rounded, [
+        (tx('Haber oku'), true),
+        (tx('Durdur'), true),
+      ]),
+    _CmdGroup(tx('Yardım'), Icons.help_outline_rounded, [
+      (tx('Komut listesini aç'), false),
+    ]),
+  ];
+}
+
+class VoiceCommandsPage extends StatelessWidget {
+  const VoiceCommandsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palOf(context);
+    final groups = _cmdGroups();
+    return AmbScaffold(
+      kind: 'settings',
+      appBar: AppBar(
+        backgroundColor: ambBg(p),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        title: Text(tx('Komut listesi')),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 6),
+            child: Text(
+                tx('Uyandırma kelimesini ("{0}") söyleyip komutu ekle: "{0}, radyo aç". Yalnız kelimeyi söylersen komut ekranı açılır. Yanında ▶ olan örneklere dokununca denenir.',
+                    [store.voiceWake]),
+                style: TextStyle(color: p.soft, fontSize: 12.5, height: 1.35)),
+          ),
+          for (final g in groups)
+            Container(
+              margin: const EdgeInsets.only(top: 10),
+              decoration: BoxDecoration(
+                color: p.card,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: p.line),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+                    child: Row(children: [
+                      Icon(g.icon, size: 20, color: p.accent),
+                      const SizedBox(width: 8),
+                      Text(g.title,
+                          style: const TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w700)),
+                    ]),
+                  ),
+                  for (final e in g.items)
+                    ListTile(
+                      dense: true,
+                      title: Text('“${e.$1}”'),
+                      trailing: e.$2
+                          ? Icon(Icons.play_arrow_rounded, color: p.accent)
+                          : null,
+                      onTap: e.$2
+                          ? () => runVoiceText(context, e.$1)
+                          : null,
+                    ),
+                  const SizedBox(height: 4),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}

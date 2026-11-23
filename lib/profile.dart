@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'ambient.dart';
 import 'data.dart';
 import 'notify.dart';
 import 'strings.dart';
 import 'theme.dart';
 import 'ui.dart';
+import 'ambient.dart';
+import 'onboarding.dart' show ProfileWizard;
 
 // ---------------------------------------------------------------
 // KİŞİSEL PROFİL, GİRİŞ HATIRLATMASI, SPOR HATIRLATMASI
@@ -74,7 +77,7 @@ int sportDoneThisWeek([DateTime? now]) {
   final ids = <String>{
     for (final c in store.cats)
       for (final s in c.subs)
-        if (_isSport(s.name)) s.id
+        if (_isSport(s.name) || const {'run', 'bike', 'swim', 'weights'}.contains(s.key)) s.id
   };
   final days = <String>{
     for (final e in store.entries)
@@ -205,28 +208,14 @@ class _EntryLineState extends State<EntryLine> {
 }
 
 // ---------------------------------------------------------------
-// PROFİL SAYFASI
+// PROFİL FORMU (hem "Beni tanı" sayfasında hem kurulum sihirbazında kullanılır)
+//  parts: 1 = kişisel bilgiler, 2 = günlük düzen + spor, 3 = rutin giriş hatırlatması
 // ---------------------------------------------------------------
 String _hm(int m) =>
     '${(m ~/ 60).toString().padLeft(2, '0')}:${(m % 60).toString().padLeft(2, '0')}';
 
-class _Sug {
-  final String name, unit;
-  final double? goal;
-  final bool isMax, summable;
-  final Set<int> days;
-  final int rh, rm;
-  final String why;
-  _Sug(this.name, this.unit, this.goal, this.why,
-      {this.isMax = false,
-      this.summable = true,
-      Set<int>? days,
-      this.rh = -1,
-      this.rm = 0})
-      : days = days ?? {1, 2, 3, 4, 5, 6, 7};
-}
-
-const _sportDays = <int, Set<int>>{
+/// Haftada n gün spor için gün dağılımı
+const sportDaySets = <int, Set<int>>{
   1: {3},
   2: {2, 5},
   3: {1, 3, 5},
@@ -236,41 +225,15 @@ const _sportDays = <int, Set<int>>{
   7: {1, 2, 3, 4, 5, 6, 7},
 };
 
-List<_Sug> _suggestions() {
-  final out = <_Sug>[];
-  final w = store.pNum('weight');
-  final water = w == null ? 2.0 : ((w * 0.033) * 10).round() / 10;
-  out.add(_Sug(tx('Su'), 'L', water, tx('Kilona göre günlük su hedefi.')));
-  final sport = store.pInt('sport', 0);
-  if (sport > 0) {
-    var at = store.pBool('wkOn', false) ? store.pInt('wkE', 1020) + 30 : _sleepAt() - 180;
-    at = at.clamp(0, 23 * 60 + 30).toInt();
-    out.add(_Sug(tx('Spor'), tx('dk'), 30, tx('Haftada {0} gün: seçilen günlere yayıldı.', [sport]),
-        days: _sportDays[sport], rh: at ~/ 60, rm: at % 60));
-  }
-  final dur = ((_wake() + 1440 - _sleepAt()) % 1440) / 60;
-  out.add(_Sug(tx('Uyku'), tx('saat'), (dur * 2).round() / 2,
-      tx('Uyku ve uyanma saatine göre hedef.'),
-      rh: ((_sleepAt() - 30) % 1440) ~/ 60, rm: ((_sleepAt() - 30) % 1440) % 60));
-  if (w != null) {
-    final g = store.pNum('goalW');
-    out.add(_Sug(tx('Kilo'), 'kg', g, tx('Haftada bir tartıl. Hedef kilon varsa hedef olarak girilir.'),
-        isMax: g != null && g < w, summable: false, days: {1}));
-  }
-  return out;
-}
-
-bool _hasSub(String name) => store.cats.any((c) => c.subs
-    .any((s) => s.name.toLowerCase() == name.toLowerCase()));
-
-class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
+class ProfileForm extends StatefulWidget {
+  final Set<int> parts;
+  const ProfileForm({super.key, required this.parts});
 
   @override
-  State<ProfilePage> createState() => _ProfilePageState();
+  State<ProfileForm> createState() => _ProfileFormState();
 }
 
-class _ProfilePageState extends State<ProfilePage> {
+class _ProfileFormState extends State<ProfileForm> {
   void _set(String k, dynamic v) {
     store.setProf(k, v);
     entryRemSync();
@@ -302,7 +265,9 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _num(String key, String title, {String? suffix, bool year = false}) async {
     final cur = store.pNum(key);
-    final r = await _ask(title, cur == null ? '' : (cur == cur.roundToDouble() ? cur.toInt().toString() : cur.toString()),
+    final r = await _ask(
+        title,
+        cur == null ? '' : (cur == cur.roundToDouble() ? cur.toInt().toString() : cur.toString()),
         suffix: suffix);
     if (r == null) return;
     final v = double.tryParse(r.replaceAll(',', '.'));
@@ -345,27 +310,6 @@ class _ProfilePageState extends State<ProfilePage> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: kids),
       );
 
-  void _add(_Sug s) {
-    final c = store.addCategory(tx('Sağlık'));
-    final sub = store.addSub(
-        c.id,
-        SubDraft(
-            name: s.name,
-            unit: s.unit,
-            routine: true,
-            goal: s.goal,
-            isMax: s.isMax,
-            summable: s.summable,
-            days: s.days));
-    if (s.rh >= 0) {
-      store.setRoutineOptions(sub.id, days: s.days, rh: s.rh, rm: s.rm);
-      Notifier.syncSub(sub);
-    }
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(tx('"{0}" rutini eklendi.', [s.name]))));
-  }
-
   @override
   Widget build(BuildContext context) {
     final p = palOf(context);
@@ -392,23 +336,10 @@ class _ProfilePageState extends State<ProfilePage> {
         final names = ['', tx('Pzt'), tx('Sal'), tx('Çar'), tx('Per'), tx('Cum'), tx('Cmt'), tx('Paz')];
         String numStr(double? v) =>
             v == null ? '—' : (v == v.roundToDouble() ? '${v.toInt()}' : '$v');
-        return Scaffold(
-          backgroundColor: p.bg,
-          appBar: AppBar(
-            backgroundColor: p.bg,
-            elevation: 0,
-            scrolledUnderElevation: 0,
-            title: Text(tx('Beni tanı')),
-          ),
-          body: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                    tx('Bu bilgiler yalnız telefonunda durur, hiçbir yere gönderilmez. Hepsi isteğe bağlıdır; hatırlatmalar ve öneriler buna göre şekillenir.'),
-                    style: TextStyle(color: p.soft, fontSize: 12.5, height: 1.35)),
-              ),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (widget.parts.contains(1)) ...[
               _head(p, tx('Kişisel bilgiler')),
               _card(p, [
                 const SizedBox(height: 6),
@@ -441,6 +372,8 @@ class _ProfilePageState extends State<ProfilePage> {
                         style: TextStyle(color: p.soft, fontSize: 12.5)),
                   ),
               ]),
+            ],
+            if (widget.parts.contains(2)) ...[
               _head(p, tx('Günlük düzen')),
               _card(p, [
                 _row(p, Icons.wb_twilight_rounded, tx('Uyanma saati'), _hm(_wake()),
@@ -491,11 +424,13 @@ class _ProfilePageState extends State<ProfilePage> {
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text(tx('Hedef tutmayacaksa akşam hatırlat')),
-                  subtitle: Text(tx('"Spor" adlı rutine girdiğin günler sayılır.')),
+                  subtitle: Text(tx('Spor rutinlerine (koşu, bisiklet, yüzme, ağırlık...) girdiğin günler sayılır.')),
                   value: store.pBool('spOn', true),
                   onChanged: store.pInt('sport', 0) == 0 ? null : (v) => _set('spOn', v),
                 ),
               ]),
+            ],
+            if (widget.parts.contains(3)) ...[
               _head(p, tx('Rutin giriş hatırlatması')),
               _card(p, [
                 SwitchListTile(
@@ -520,26 +455,49 @@ class _ProfilePageState extends State<ProfilePage> {
                     ]),
                   ),
               ]),
-              _head(p, tx('Önerilen rutinler')),
-              for (final s in _suggestions())
-                Card(
-                  margin: const EdgeInsets.only(bottom: 6),
-                  color: p.card,
-                  child: ListTile(
-                    title: Text(
-                        '${s.name}${s.goal == null ? '' : ' · ${numStr(s.goal)} ${s.unit}'}',
-                        style: const TextStyle(fontWeight: FontWeight.w600)),
-                    subtitle: Text(s.why),
-                    trailing: _hasSub(s.name)
-                        ? Text(tx('Ekli'), style: TextStyle(color: p.soft))
-                        : FilledButton.tonal(
-                            onPressed: () => _add(s), child: Text(tx('Ekle'))),
-                  ),
-                ),
             ],
-          ),
+          ],
         );
       },
+    );
+  }
+}
+
+/// Ayarlar > Profil ve hatırlatma > Beni tanı
+class ProfilePage extends StatelessWidget {
+  const ProfilePage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palOf(context);
+    return AmbScaffold(
+      kind: 'settings',
+      appBar: AppBar(
+        backgroundColor: ambBg(p),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        title: Text(tx('Beni tanı')),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+                tx('Bu bilgiler yalnız telefonunda durur, hiçbir yere gönderilmez. Hepsi isteğe bağlıdır; hatırlatmalar ve öneriler buna göre şekillenir.'),
+                style: TextStyle(color: p.soft, fontSize: 12.5, height: 1.35)),
+          ),
+          const ProfileForm(parts: {1, 2, 3}),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.replay_rounded),
+            label: Text(tx('Kurulum sorularını baştan sor')),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (ctx) => ProfileWizard(
+                    fresh: false, onDone: () => Navigator.of(ctx).maybePop()))),
+          ),
+        ],
+      ),
     );
   }
 }

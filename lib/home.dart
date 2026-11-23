@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'about.dart';
 import 'add_sheet.dart';
 import 'ambient.dart';
+import 'fx.dart';
 import 'data.dart';
 import 'profile.dart' show EntryLine;
 import 'fireworks.dart';
@@ -1302,14 +1303,50 @@ class _DayRow extends StatefulWidget {
   State<_DayRow> createState() => _DayRowState();
 }
 
-class _DayRowState extends State<_DayRow> {
+class _DayRowState extends State<_DayRow> with SingleTickerProviderStateMixin {
   final _ctrl = TextEditingController();
+  final _pn = ValueNotifier<double>(0); // sola kaydırma dolumu (silme)
+  final _pe = ValueNotifier<double>(0); // sağa kaydırma dolumu (düzenle)
+  late final AnimationController _out = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 230)); // silinirken küçülüp solar
   double _prog = 0; // sola kaydırma ilerlemesi (0..1), parmak basılıyken ölçülür
   bool _down = false; // parmak şu an ekranda mı
+  bool _editing = false; // değere dokunuldu: mevcut veri yeniden girilebilir
+  final _fn = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    // Kutunun dışına dokunulursa düzenleme kapanır (değer değişmez)
+    _fn.addListener(() {
+      if (!_fn.hasFocus && _editing) {
+        Future<void>.delayed(const Duration(milliseconds: 200), () {
+          if (mounted && _editing && !_fn.hasFocus) setState(() => _editing = false);
+        });
+      }
+    });
+  }
+
+  // Değere dokununca: mevcut değer kutuya yazılır ve hepsi seçilir (yazınca üzerine geçer)
+  void _startEdit(double v) {
+    final t = v == v.roundToDouble() ? v.toInt().toString() : v.toString().replaceAll('.', ',');
+    setState(() {
+      _editing = true;
+      _ctrl.text = t;
+      _ctrl.selection = TextSelection(baseOffset: 0, extentOffset: t.length);
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _fn.requestFocus();
+    });
+  }
 
   @override
   void dispose() {
+    _fn.dispose();
     _ctrl.dispose();
+    _pn.dispose();
+    _pe.dispose();
+    _out.dispose();
     super.dispose();
   }
 
@@ -1326,7 +1363,9 @@ class _DayRowState extends State<_DayRow> {
     }
     store.setEntry(widget.sub.id, widget.date, v);
     _ctrl.clear();
+    _editing = false;
     FocusScope.of(context).unfocus();
+    if (mounted) setState(() {});
   }
 
   @override
@@ -1415,10 +1454,13 @@ class _DayRowState extends State<_DayRow> {
             ),
             ),
           ),
-          if (e != null)
-            // Veri varsa: değer + kalan bilgisi
-            Padding(
-              padding: const EdgeInsets.all(2),
+          if (e != null && !_editing)
+            // Veri varsa: değer + kalan bilgisi. Dokununca yeniden girilebilir.
+            InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => _startEdit(e.value),
+              child: Padding(
+              padding: const EdgeInsets.all(6),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -1431,6 +1473,7 @@ class _DayRowState extends State<_DayRow> {
                     Text(remain, style: TextStyle(fontSize: 11.5, color: p.soft)),
                 ],
               ),
+            ),
             )
           else ...[
             // Veri yoksa: satırın yanında giriş kutusu
@@ -1438,6 +1481,7 @@ class _DayRowState extends State<_DayRow> {
               width: 70,
               child: TextField(
                 controller: _ctrl,
+                focusNode: _fn,
                 keyboardType: numberKeyboard,
                 inputFormatters: numberFormatters,
                 textAlign: TextAlign.center,
@@ -1463,27 +1507,26 @@ class _DayRowState extends State<_DayRow> {
       ),
     );
 
-    // Sola kaydırırken arka plan yazısı: kısa = bu gün, uzun = tüm günler
-    final full = _prog >= 0.6;
-    final delBg = Container(
-      color: p.delBg,
-      alignment: Alignment.centerRight,
-      padding: const EdgeInsets.symmetric(horizontal: 18),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(full ? tx('Tüm günlerden') : tx('Sadece bu gün'),
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: p.ink)),
-          const SizedBox(width: 8),
-          Icon(full ? Icons.delete_forever_rounded : Icons.delete_outline_rounded),
-        ],
-      ),
+    // Sola kaydırırken arka plan dolar: kısa = bu gün, uzun = tüm günler
+    final delBg = FxFillBg(
+      prog: _pn,
+      base: p.delBg,
+      strong: const Color(0xFFD9534F),
+      icon: Icons.delete_outline_rounded,
+      hotIcon: Icons.delete_forever_rounded,
+      align: Alignment.centerRight,
+      label: (v) => v >= 0.6 ? tx('Tüm günlerden') : tx('Sadece bu gün'),
+    );
+    final editBg = FxFillBg(
+      prog: _pe,
+      base: p.editBg,
+      strong: const Color(0xFF4F8EF7),
+      icon: Icons.edit_rounded,
+      align: Alignment.centerLeft,
+      hot: 0.3,
     );
 
-    return Padding(
+    final shown = Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
@@ -1491,6 +1534,8 @@ class _DayRowState extends State<_DayRow> {
           onPointerDown: (_) {
             _down = true;
             _prog = 0;
+            _pn.value = 0;
+            _pe.value = 0;
           },
           onPointerUp: (_) => _down = false,
           onPointerCancel: (_) => _down = false,
@@ -1504,29 +1549,57 @@ class _DayRowState extends State<_DayRow> {
           // kalkınca Flutter satırı sonuna kadar kaydırır (progress hep 1 olur);
           // o yüzden bırakıldıktan sonraki değerler yok sayılır.
           onUpdate: (d) {
+            if (_down) {
+              (d.direction == DismissDirection.endToStart ? _pn : _pe).value =
+                  d.progress;
+            }
             if (d.direction == DismissDirection.endToStart && _down) {
               final f = d.progress >= 0.6;
               if (f != (_prog >= 0.6)) setState(() => _prog = d.progress);
               _prog = d.progress;
             }
           },
-          background:
-              _swipeBg(p.editBg, Icons.edit_rounded, Alignment.centerLeft),
+          background: editBg,
           secondaryBackground: delBg,
           // Satır ağaçtan kalkmaz: işlem yapılır, satır yerine döner
           confirmDismiss: (dir) async {
             if (dir == DismissDirection.startToEnd) {
+              _pe.value = 0;
               widget.onEdit(); // sağa kaydır: düzenle
             } else {
               final f = _prog >= 0.6;
               _prog = 0;
-              widget.onRemove(f); // sola kaydır: kısa = bu gün, uzun = tamamen
+              _pn.value = 0;
+              if (fxLevel() > 0 && !f) {
+                // kısa kaydırma: satır küçülüp solar, sonra o güne özel kaldırılır
+                await _out.forward();
+                widget.onRemove(false);
+                Future<void>.delayed(const Duration(milliseconds: 500), () {
+                  if (mounted) _out.reverse(); // satır hâlâ duruyorsa geri gelir
+                });
+              } else {
+                widget.onRemove(f); // sola kaydır: kısa = bu gün, uzun = tamamen
+              }
             }
             return false;
           },
-          child: content,
+          child: FxShine(
+            radius: 14,
+            phase: widget.index,
+            met: widget.entry != null && goalMet(widget.sub, widget.entry!.value),
+            flashKey: widget.entry?.value,
+            child: content,
+          ),
           ),
         ),
+      ),
+    );
+    return FadeTransition(
+      opacity: ReverseAnimation(_out),
+      child: SizeTransition(
+        sizeFactor: ReverseAnimation(_out),
+        axisAlignment: -1,
+        child: shown,
       ),
     );
   }
@@ -1614,7 +1687,7 @@ class _FreeRowTile extends StatelessWidget {
             }
             return false;
           },
-          child: content,
+          child: FxShine(radius: 14, phase: index, child: content),
         ),
       ),
     );

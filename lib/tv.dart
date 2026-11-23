@@ -4,7 +4,10 @@ import 'package:video_player/video_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'data.dart';
 import 'media.dart';
+import 'net.dart';
+import 'ambient.dart';
 import 'strings.dart';
+import 'theme.dart';
 import 'ui.dart';
 
 // ---------------------------------------------------------------
@@ -112,6 +115,38 @@ class TvTab extends StatelessWidget {
     }
   }
 
+  // "+" : dizinde ara (iptv-org) ya da elle ekle
+  void _addMenu(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.travel_explore_rounded),
+              title: Text(tx('Dizinde ara')),
+              subtitle: Text(tx('Ülkeye ve ada göre herkese açık kanalları bul.')),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.of(context).push(slideFromRight(const TvBrowserPage()));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: Text(tx('Elle ekle')),
+              subtitle: Text(tx('Kanal adı ve yayın adresini kendin yaz.')),
+              onTap: () {
+                Navigator.pop(ctx);
+                _edit(context, null);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _remove(BuildContext context, TvChan c) {
     final i = store.tvChans.indexOf(c);
     store.removeTvChan(c);
@@ -210,7 +245,7 @@ class TvTab extends StatelessWidget {
               bottom: 16,
               child: FloatingActionButton.extended(
                 heroTag: null,
-                onPressed: () => _edit(context, null),
+                onPressed: () => _addMenu(context),
                 icon: const Icon(Icons.add_rounded),
                 label: Text(tx('Kanal ekle')),
               ),
@@ -370,6 +405,308 @@ class _TvPlayerPageState extends State<TvPlayerPage> {
                   ),
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+// ---------------------------------------------------------------
+// TV DİZİNİ (iptv-org): ülke listesinden kanal bul, dene, ekle
+//  Adres: https://iptv-org.github.io/iptv/countries/<ülke kodu>.m3u
+//  Topluluk listesidir; bazı yayınlar çalışmayabilir ya da bölge kısıtlı olabilir.
+// ---------------------------------------------------------------
+class TvFound {
+  final String name, url, group;
+  TvFound(this.name, this.url, this.group);
+}
+
+final Map<String, List<TvFound>> _tvDirCache = {};
+
+Future<List<TvFound>> tvDirectory(String cc) async {
+  final key = cc.toLowerCase();
+  final c = _tvDirCache[key];
+  if (c != null) return c;
+  final txt = await httpGetText(
+      Uri.parse('https://iptv-org.github.io/iptv/countries/$key.m3u'),
+      seconds: 20,
+      maxBytes: 8000000);
+  final out = <TvFound>[];
+  String? name;
+  var group = '';
+  for (var l in txt.split(RegExp(r'\r?\n'))) {
+    l = l.trim();
+    if (l.startsWith('#EXTINF')) {
+      final i = l.lastIndexOf(',');
+      name = i >= 0 ? l.substring(i + 1).trim() : '';
+      group = RegExp(r'group-title="([^"]*)"').firstMatch(l)?.group(1) ?? '';
+    } else if (l.isNotEmpty && !l.startsWith('#')) {
+      if (name != null &&
+          name.isNotEmpty &&
+          l.startsWith('http') &&
+          !group.toUpperCase().contains('XXX')) {
+        out.add(TvFound(name, l, group));
+      }
+      name = null;
+    }
+  }
+  _tvDirCache[key] = out;
+  return out;
+}
+
+class TvBrowserPage extends StatefulWidget {
+  const TvBrowserPage({super.key});
+
+  @override
+  State<TvBrowserPage> createState() => _TvBrowserPageState();
+}
+
+class _TvBrowserPageState extends State<TvBrowserPage> {
+  final _q = TextEditingController();
+  String _cc = 'TR';
+  String _ccName = '';
+  List<TvFound> _all = [];
+  bool _loading = false;
+  String? _err;
+
+  @override
+  void initState() {
+    super.initState();
+    _ccName = tx('Türkiye');
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _q.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _err = null;
+    });
+    try {
+      final r = await tvDirectory(_cc);
+      if (!mounted) return;
+      setState(() {
+        _all = r;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _all = [];
+        _err = tx('TV rehberine bağlanılamadı ya da bu ülke için liste yok. İnternetini kontrol et.');
+      });
+    }
+  }
+
+  Future<void> _pickCountry() async {
+    final c = await showModalBottomSheet<RbCountry>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => const _TvCountrySheet(),
+    );
+    if (c == null) return;
+    setState(() {
+      _cc = c.code;
+      _ccName = c.code == 'TR' ? tx('Türkiye') : c.name;
+    });
+    _load();
+  }
+
+  void _add(TvFound f) {
+    store.addTvChan(f.name, f.url);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(tx('"{0}" eklendi.', [f.name]))));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palOf(context);
+    return ListenableBuilder(
+      listenable: store,
+      builder: (context, _) {
+        final q = _q.text.trim().toLowerCase();
+        final list = [
+          for (final f in _all)
+            if (q.isEmpty ||
+                f.name.toLowerCase().contains(q) ||
+                f.group.toLowerCase().contains(q))
+              f
+        ];
+        final have = {for (final c in store.tvChans) c.url};
+        return AmbScaffold(
+          kind: 'media',
+          appBar: AppBar(
+            backgroundColor: ambBg(p),
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            title: Text(tx('TV rehberi')),
+            actions: [
+              TextButton.icon(
+                onPressed: _pickCountry,
+                icon: const Icon(Icons.public_rounded, size: 18),
+                label: Text(_ccName),
+              ),
+            ],
+          ),
+          body: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+                child: TextField(
+                  controller: _q,
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                      hintText: tx('Kanal ya da tür ara'),
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      isDense: true),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+                child: Text(
+                    tx('Herkese açık topluluk listesi (iptv-org). Bazı yayınlar çalışmayabilir; eklemeden önce oynatıp deneyebilirsin.'),
+                    style: TextStyle(color: p.soft, fontSize: 12, height: 1.3)),
+              ),
+              Expanded(
+                child: _loading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _err != null
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(_err!,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(color: p.soft)),
+                                  const SizedBox(height: 12),
+                                  OutlinedButton(
+                                      onPressed: _load, child: Text(tx('Yeniden dene'))),
+                                ],
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+                            itemCount: list.length,
+                            itemBuilder: (context, i) {
+                              final f = list[i];
+                              final added = have.contains(f.url);
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 6),
+                                color: p.card,
+                                child: ListTile(
+                                  leading: IconButton(
+                                    tooltip: tx('Dene'),
+                                    icon: Icon(Icons.play_circle_outline_rounded,
+                                        color: p.accent),
+                                    onPressed: () => openTvChannel(
+                                        context, TvChan('', f.name, f.url)),
+                                  ),
+                                  title: Text(f.name,
+                                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                                  subtitle: f.group.isEmpty ? null : Text(f.group),
+                                  trailing: added
+                                      ? Text(tx('Ekli'), style: TextStyle(color: p.soft))
+                                      : IconButton(
+                                          tooltip: tx('Ekle'),
+                                          icon: const Icon(Icons.add_circle_outline_rounded),
+                                          onPressed: () => _add(f),
+                                        ),
+                                ),
+                              );
+                            },
+                          ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _TvCountrySheet extends StatefulWidget {
+  const _TvCountrySheet();
+
+  @override
+  State<_TvCountrySheet> createState() => _TvCountrySheetState();
+}
+
+class _TvCountrySheetState extends State<_TvCountrySheet> {
+  late Future<List<RbCountry>> _f = rbCountries();
+  final _q = TextEditingController();
+
+  @override
+  void dispose() {
+    _q.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palOf(context);
+    return SafeArea(
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.8,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: TextField(
+                controller: _q,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                    hintText: tx('Ülke ara'),
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    isDense: true),
+              ),
+            ),
+            Expanded(
+              child: FutureBuilder<List<RbCountry>>(
+                future: _f,
+                builder: (context, snap) {
+                  if (snap.connectionState != ConnectionState.done) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snap.hasError || snap.data == null) {
+                    return Center(
+                        child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(tx('Ülke listesi alınamadı. İnternetini kontrol et.'),
+                          textAlign: TextAlign.center, style: TextStyle(color: p.soft)),
+                    ));
+                  }
+                  final q = _q.text.trim().toLowerCase();
+                  final all = snap.data!
+                      .where((c) => q.isEmpty || c.name.toLowerCase().contains(q))
+                      .toList();
+                  final tr = all.where((c) => c.code == 'TR').toList();
+                  final rest = all.where((c) => c.code != 'TR').toList();
+                  final list = [...tr, ...rest];
+                  return ListView.builder(
+                    itemCount: list.length,
+                    itemBuilder: (context, i) {
+                      final c = list[i];
+                      return ListTile(
+                        title: Text(c.code == 'TR' ? tx('Türkiye') : c.name),
+                        onTap: () => Navigator.pop(context, c),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
           ],
         ),
       ),

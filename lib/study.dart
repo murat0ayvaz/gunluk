@@ -1,5 +1,6 @@
 import 'dart:math' show Random;
 import 'package:flutter/material.dart';
+import 'ambient.dart';
 import 'data.dart';
 import 'media.dart' show slideFromRight;
 import 'notify.dart';
@@ -271,8 +272,8 @@ class _StudyPageState extends State<StudyPage> {
         final p = palOf(context);
         final tabs = _tabs;
         if (tabs.isEmpty) {
-          return Scaffold(
-            backgroundColor: p.bg,
+          return AmbScaffold(kind: 'study', 
+            backgroundColor: ambBg(p),
             appBar: AppBar(title: Text(tx('Ders çalışma'))),
             body: Center(
               child: Padding(
@@ -289,8 +290,8 @@ class _StudyPageState extends State<StudyPage> {
         final all = studySubjects.where((s) => s.group == tab).toList();
         final list = all.where((s) => store.studyPk.contains(s.id)).toList();
         final missing = all.where((s) => !store.studyPk.contains(s.id)).toList();
-        return Scaffold(
-          backgroundColor: p.bg,
+        return AmbScaffold(kind: 'study', 
+          backgroundColor: ambBg(p),
           appBar: AppBar(
             title: Text(tx('Ders çalışma')),
             actions: [
@@ -502,8 +503,8 @@ class _SubjectPage extends StatelessWidget {
         final topics = _topicsOf(s).length;
         final rev = _revOf(s);
         final due = _dueCount(rev);
-        return Scaffold(
-          backgroundColor: p.bg,
+        return AmbScaffold(kind: 'study', 
+          backgroundColor: ambBg(p),
           appBar: AppBar(title: Text(s.name, maxLines: 1)),
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -605,8 +606,8 @@ class _TopicListPage extends StatelessWidget {
       builder: (context, _) {
         final p = palOf(context);
         final topics = _topicsOf(s);
-        return Scaffold(
-          backgroundColor: p.bg,
+        return AmbScaffold(kind: 'study', 
+          backgroundColor: ambBg(p),
           appBar: AppBar(title: Text(tx('Ders çalış'), maxLines: 1)),
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () async {
@@ -769,8 +770,8 @@ class _TopicPage extends StatelessWidget {
             .any((h) => hidIds.any((t) => h.startsWith('$t#')));
         final notInRev =
             items.where((i) => i.builtin && !store.studyInRev(i.id)).toList();
-        return Scaffold(
-          backgroundColor: p.bg,
+        return AmbScaffold(kind: 'study', 
+          backgroundColor: ambBg(p),
           appBar: AppBar(
             title: Text(name, maxLines: 1),
             actions: [
@@ -1048,8 +1049,8 @@ class _RevPage extends StatelessWidget {
         final p = palOf(context);
         final items = _revOf(s);
         final due = _dueCount(items);
-        return Scaffold(
-          backgroundColor: p.bg,
+        return AmbScaffold(kind: 'study', 
+          backgroundColor: ambBg(p),
           appBar: AppBar(title: Text(tx('Tekrar et'), maxLines: 1)),
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -1162,8 +1163,8 @@ class _PlanPage extends StatelessWidget {
       listenable: store,
       builder: (context, _) {
         final p = palOf(context);
-        return Scaffold(
-          backgroundColor: p.bg,
+        return AmbScaffold(kind: 'study', 
+          backgroundColor: ambBg(p),
           appBar: AppBar(title: Text(tx('Haftalık çalışma programı'))),
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () => _edit(context, null),
@@ -1504,8 +1505,8 @@ class _ReviewPageState extends State<_ReviewPage> {
   Widget build(BuildContext context) {
     final p = palOf(context);
     final done = _q.isEmpty;
-    return Scaffold(
-      backgroundColor: p.bg,
+    return AmbScaffold(kind: 'study', 
+      backgroundColor: ambBg(p),
       appBar: AppBar(title: Text(widget.title, maxLines: 1)),
       body: SafeArea(
         child: Padding(
@@ -1740,8 +1741,8 @@ class _PatternPage extends StatelessWidget {
     final p = palOf(context);
     final s = _subj(sid);
     final list = studyPatterns[sid] ?? const <List<String>>[];
-    return Scaffold(
-      backgroundColor: p.bg,
+    return AmbScaffold(kind: 'study', 
+      backgroundColor: ambBg(p),
       appBar: AppBar(
           title: Text('${s?.name ?? ''} • ${tx('Soru kalıpları')}', maxLines: 1)),
       body: ListView(

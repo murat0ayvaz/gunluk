@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'data.dart';
 import 'home.dart';
 import 'intro.dart';
+import 'onboarding.dart';
 import 'lock.dart';
 import 'media.dart';
 import 'notify.dart';
@@ -186,9 +187,13 @@ class _GateState extends State<Gate> with WidgetsBindingObserver {
       return IntroPage(
         onDone: () {
           store.markIntroSeen();
+          store.setProf('wiz', 'pending'); // tanıtımdan sonra "Seni tanıyalım" adımları
           setState(() {});
         },
       );
+    }
+    if (store.pStr('wiz') == 'pending') {
+      return ProfileWizard(fresh: true, onDone: () => setState(() {}));
     }
     return const HomePage();
   }

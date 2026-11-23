@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import 'fx.dart' show fxMarkAdded;
 import 'profile.dart' show entryRemSync;
 import 'quotes.dart';
 import 'strings.dart';
@@ -2946,6 +2947,7 @@ class AppStore extends ChangeNotifier {
       days: Set<int>.from(d.days),
     );
     c.subs.add(ns);
+    fxMarkAdded(); // yeni satır girişte süzülür
     _commit();
     return ns;
   }
@@ -3508,6 +3510,7 @@ class AppStore extends ChangeNotifier {
         remindMs: remindMs,
         nid: remindMs > 0 ? newNid() : 0);
     freeRows.add(f);
+    fxMarkAdded();
     _commit();
     return f;
   }

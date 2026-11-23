@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'ambient.dart';
 import 'data.dart';
 import 'strings.dart';
 import 'theme.dart';
@@ -86,7 +87,7 @@ class _StatsPageState extends State<StatsPage> {
         final sub = store.subById(widget.subId);
         final cat = store.catOfSub(widget.subId);
         if (sub == null || cat == null) {
-          return Scaffold(
+          return AmbScaffold(kind: 'stats', 
             appBar: AppBar(),
             body: Center(child: Text(tx('Bu alt kategori bulunamadı'))),
           );
@@ -280,9 +281,9 @@ class _StatsPageState extends State<StatsPage> {
 
         final periodLabels = [tx('Gün'), tx('Hafta'), tx('Ay')];
 
-        return Scaffold(
+        return AmbScaffold(kind: 'stats', 
           appBar: AppBar(
-            backgroundColor: p.bg,
+            backgroundColor: ambBg(p),
             elevation: 0,
             scrolledUnderElevation: 0,
             title: Text('${cat.name} › ${sub.name}'),

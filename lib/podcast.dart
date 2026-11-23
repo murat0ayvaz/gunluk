@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'ambient.dart';
 import 'data.dart';
 import 'media.dart';
 import 'net.dart';
@@ -655,8 +656,8 @@ class _PodcastSearchPageState extends State<PodcastSearchPage> {
   @override
   Widget build(BuildContext context) {
     final p = palOf(context);
-    return Scaffold(
-      backgroundColor: p.bg,
+    return AmbScaffold(kind: 'media', 
+      backgroundColor: ambBg(p),
       appBar: AppBar(title: Text(tx('Podcast ara'))),
       body: Column(
         children: [

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'ambient.dart';
 import 'data.dart';
 import 'strings.dart';
 import 'ui.dart';
@@ -164,9 +165,9 @@ class NoteEditPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = palOf(context);
-    return Scaffold(
+    return AmbScaffold(kind: 'diary', 
       appBar: AppBar(
-        backgroundColor: p.bg,
+        backgroundColor: ambBg(p),
         elevation: 0,
         scrolledUnderElevation: 0,
         title: Text(tx('Günlük')),

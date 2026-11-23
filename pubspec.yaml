@@ -1,7 +1,7 @@
 name: gunluk
 description: Daily Routine - günlük rutin, hedef, yapılacaklar ve günlük (not) uygulaması
 publish_to: 'none'
-version: 1.25.15+48
+version: 1.25.17+50
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -23,7 +23,7 @@ dependencies:
   geolocator: '>=11.0.0 <15.0.0'   # telefonun konumu (hava durumu)
   audioplayers: ^6.1.0     # meditasyonda nefes sesleri ve gong (müzikle üst üste çalar)
   just_audio: '>=0.9.36 <0.11.0'   # müzik / radyo çalar
-  just_audio_background: ^0.0.1-beta.11   # arka planda çalma + bildirim kontrolü
+  just_audio_background: ^0.0.1-beta.17   # arka planda çalma + bildirim kontrolü (beta.17: stop'ta bildirim kapanır)
   file_picker: '>=8.0.0 <11.0.0'   # telefondan şarkı seçmek için
   crypto: ^3.0.3           # şifre özeti (SHA-256) için; saf Dart paketi, eklenti değil
 

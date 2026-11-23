@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'data.dart';
+import 'fx.dart';
 import 'notify.dart';
 import 'strings.dart';
 import 'ui.dart';
@@ -190,7 +191,9 @@ class _RemindersBodyState extends State<RemindersBody> {
                               return true;
                             },
                             onDismissed: (_) => _delete(r),
-                            child: Material(
+                            child: FxShine(
+                              radius: 12,
+                              child: Material(
                               color: p.card,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -215,7 +218,7 @@ class _RemindersBodyState extends State<RemindersBody> {
                                   },
                                 ),
                               ),
-                            ),
+                            )),
                           ),
                         ),
                       ),

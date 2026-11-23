@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'data.dart';
+import 'fx.dart';
 import 'notify.dart';
 import 'reminders.dart';
 import 'strings.dart';
@@ -227,7 +228,11 @@ class _TodosBodyState extends State<TodosBody> {
                       onPointerCancel: (_) => _released = true,
                       child: Padding(
                         padding: const EdgeInsets.only(bottom: 8),
-                        child: Material(
+                        child: FxShine(
+                          radius: 12,
+                          phase: i,
+                          flashKey: t.done,
+                          child: Material(
                           color: t.done ? p.bg : p.card,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -304,6 +309,7 @@ class _TodosBodyState extends State<TodosBody> {
                               ),
                             ],
                           ),
+                        ),
                         ),
                       ),
                     ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'ambient.dart';
 import 'data.dart';
 import 'notes.dart';
 import 'strings.dart';
@@ -122,9 +123,9 @@ class _DiaryCalendarPageState extends State<DiaryCalendarPage> {
             ),
         ];
 
-        return Scaffold(
+        return AmbScaffold(kind: 'diary', 
           appBar: AppBar(
-            backgroundColor: p.bg,
+            backgroundColor: ambBg(p),
             elevation: 0,
             scrolledUnderElevation: 0,
             title: Text(tx('Günlük')),

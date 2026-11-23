@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'ambient.dart';
 import 'data.dart';
 import 'media.dart';
 import 'net.dart' show fetchEpisodes;
@@ -116,8 +117,8 @@ final sleepTimer = SleepTimerCtl();
 Widget _toolScaffold(BuildContext context, String title, Widget body,
     {Widget? fab}) {
   final p = palOf(context);
-  return Scaffold(
-    backgroundColor: p.bg,
+  return AmbScaffold(kind: 'tools', 
+    backgroundColor: ambBg(p),
     appBar: AppBar(title: Text(title), actions: const [ToolsButton()]),
     endDrawer: const ToolsDrawer(replace: true),
     floatingActionButton: fab,
