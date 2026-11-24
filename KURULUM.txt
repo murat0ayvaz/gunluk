@@ -1,12 +1,15 @@
-DAILY ROUTINE v1.25.20 - TAM PAKET
+DAILY ROUTINE v1.25.21 - TAM PAKET
 
 Bu zipte projenin TAMAMI var: .github, assets, lib, debug.keystore, pubspec.yaml.
 1) Zipi çıkar. GitHub'da "gunluk" reposunun ANA sayfasında: Add file > Upload files.
 2) Çıkan klasörlerin ve dosyaların HEPSİNİ (.github, assets, lib, debug.keystore, pubspec.yaml) sürükle-bırak > Commit changes.
-   (YENİ: lib/nowsong.dart.)
+   (YENİ: lib/backup.dart, lib/nowradio.dart, lib/nowsong.dart. pubspec.yaml'a archive eklendi.)
 3) Actions > yeşil tik > Artifacts > gunluk-apk indir, telefona kur (veriler kalır).
-Derleme hatası olursa Actions'taki kırmızı satırları gönder.v1.25.20 yenilikleri:
-- Radyo: yayinin gonderdigi sarki adi (varsa) calma cubugunda ve ana ekrandaki radyo satirinda; istasyon kapagi (dizinden eklenenlerde logo).
-- Isteklerim listesi: sarkinin yanindaki kalple ekle; Cal, YouTube, Spotify, Amazon Music dugmeleri. Yedege dahil.
-- Shazam telefonda kuruluysa radyo ve muzik calarda Shazam dugmesi.
-- GitHub'da degisiklik yok: build.yml ve .github ayni.
+Derleme hatası olursa Actions'taki kırmızı satırları gönder.v1.25.21 yenilikleri:
+- Yedek: ses kayitlariyla tek .zip dosyasi olarak kaydet / dosyadan geri yukle. Otomatik yedek (Kapali/Haftalik/Gunluk) Indirilenler/GunlukYedek klasorune yazar. 7 gun yedek almazsan ana ekranda ve bildirimde uyarir.
+- Ana ekranda calan radyo satiri; radyo ve TV oynaticida onceki/sonraki tuslari, yukari kaydirinca sonraki, asagi kaydirinca onceki.
+- Sesli komut sirasinda radyo duraklar, sonra devam eder. Komut listesinde dinleme durumu paneli.
+- Radyo: yayinin gonderdigi sarki adi (varsa) calma cubugunda ve ana ekrandaki radyo satirinda; istasyon kapagi.
+- Isteklerim listesi (kalp ile ekle; Cal, YouTube, Spotify, Amazon Music) ve Shazam dugmesi (telefonda kuruluysa).
+- Vosk (cevrimdisi dinleme) cikarildi: eklentisi bildirim paketiyle uyusmuyordu.
+- GitHub'da DEGISIKLIK VAR: .github/workflows/build.yml guncellendi (Indirilenler'e yazma kodu). .github klasorunu mutlaka yukle.

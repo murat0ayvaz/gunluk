@@ -12,7 +12,6 @@ import 'notify.dart';
 import 'reminders.dart';
 import 'shortcuts.dart';
 import 'strings.dart';
-import 'wake.dart';
 import 'tools.dart';
 import 'tv.dart';
 import 'ui.dart';
@@ -1237,13 +1236,6 @@ class VoiceListener extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  /// Çevrimdışı motor hazır olunca dinlemeyi o motorla yeniden başlatır
-  Future<void> engineChanged() async {
-    if (!_want || !store.voiceListen) return;
-    await _halt();
-    _loop();
-  }
-
   /// Başka bir mikrofon kullanımı (ses kaydı gibi) için geçici durdurma
   Future<void> pause() async {
     _busy = true;
@@ -1272,7 +1264,6 @@ class VoiceListener extends ChangeNotifier with WidgetsBindingObserver {
     _gen++;
     _wakeTimer?.cancel();
     try {
-      await wakeEngine.stop();
       await _stt.cancel();
     } catch (_) {}
     if (listening) {
@@ -1284,22 +1275,6 @@ class VoiceListener extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> _loop() async {
     if (!_want || _busy || !_fg || listening) return;
     final g = ++_gen;
-    // Çevrimdışı motor hazırsa o dinler (bip yok, kesinti yok); değilse eski yöntem
-    if (wakeEngine.ready && wakeEngine.enabled) {
-      final ok = await wakeEngine.start(
-        (t) {
-          if (g == _gen) _onPartial(t);
-        },
-        (t) {
-          if (g == _gen) _onFinal(t);
-        },
-      );
-      if (ok) {
-        listening = true;
-        notifyListeners();
-        return;
-      }
-    }
     if (!_inited) {
       try {
         _inited = await _stt.initialize(
@@ -1586,7 +1561,7 @@ class VoiceCommandsPage extends StatelessWidget {
 
 
 // ---------------------------------------------------------------
-// DURUM PANELİ: hangi motor dinliyor, model indirildi mi, son hata ne
+// DURUM PANELİ: şu an dinliyor mu
 // ---------------------------------------------------------------
 class _VoiceStatus extends StatelessWidget {
   const _VoiceStatus();
@@ -1595,13 +1570,9 @@ class _VoiceStatus extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = palOf(context);
     return ListenableBuilder(
-      listenable: Listenable.merge([voiceListener, wakeEngine, store]),
+      listenable: Listenable.merge([voiceListener, store]),
       builder: (context, _) {
-        final w = wakeEngine;
         final on = store.voiceListen;
-        final engine = w.ready && w.enabled
-            ? tx('Çevrimdışı motor (bipsiz)')
-            : tx('Telefonun konuşma servisi (zaman zaman bip verir)');
         return Container(
           margin: const EdgeInsets.only(top: 10),
           padding: const EdgeInsets.all(14),
@@ -1610,60 +1581,34 @@ class _VoiceStatus extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: p.line),
           ),
-          child: Column(
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(children: [
-                Icon(voiceListener.listening ? Icons.hearing_rounded : Icons.hearing_disabled_rounded,
-                    size: 20, color: p.accent),
-                const SizedBox(width: 8),
-                Text(tx('Dinleme durumu'),
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-              ]),
-              const SizedBox(height: 8),
-              Text(
-                  !on
-                      ? tx('Sürekli dinleme kapalı (Ayarlar > Sesli komut).')
-                      : voiceListener.listening
-                          ? tx('Dinliyor. Uyandırma kelimesi: "{0}"', [store.voiceWake])
-                          : tx('Şu an dinlemiyor (arka planda, komut sırasında ya da yeniden başlıyor).'),
-                  style: TextStyle(color: p.ink, fontSize: 13)),
-              const SizedBox(height: 4),
-              Text(tx('Motor: {0}', [engine]), style: TextStyle(color: p.soft, fontSize: 12.5)),
-              if (w.status.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(w.status, style: TextStyle(color: p.soft, fontSize: 12.5)),
+              Icon(
+                  voiceListener.listening
+                      ? Icons.hearing_rounded
+                      : Icons.hearing_disabled_rounded,
+                  size: 20,
+                  color: p.accent),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(tx('Dinleme durumu'),
+                        style: const TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 6),
+                    Text(
+                        !on
+                            ? tx('Sürekli dinleme kapalı (Ayarlar > Sesli komut).')
+                            : voiceListener.listening
+                                ? tx('Dinliyor. Uyandırma kelimesi: "{0}"', [store.voiceWake])
+                                : tx('Şu an dinlemiyor (arka planda, komut sırasında ya da yeniden başlıyor).'),
+                        style: TextStyle(color: p.ink, fontSize: 13)),
+                  ],
                 ),
-              if (w.error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(tx('Hata: {0}', [w.error!]),
-                      style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
-                ),
-              const SizedBox(height: 8),
-              if (w.downloading)
-                const LinearProgressIndicator()
-              else if (!w.ready)
-                FilledButton.icon(
-                  onPressed: () async {
-                    await w.download();
-                    voiceListener.engineChanged();
-                  },
-                  icon: const Icon(Icons.download_rounded),
-                  label: Text(tx('Çevrimdışı modeli indir (~40 MB)')),
-                )
-              else
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                  title: Text(tx('Çevrimdışı motoru kullan')),
-                  value: w.enabled,
-                  onChanged: (v) {
-                    store.setProf('vosk', v);
-                    voiceListener.engineChanged();
-                  },
-                ),
+              ),
             ],
           ),
         );

@@ -4,7 +4,6 @@ import 'about.dart';
 import 'add_sheet.dart';
 import 'ambient.dart';
 import 'backup.dart';
-import 'wake.dart';
 import 'fx.dart';
 import 'data.dart';
 import 'profile.dart' show EntryLine;
@@ -105,9 +104,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     weather.ensure(); // hava durumu açıksa verisini yükle
     voiceListener.ctx = context; // sürekli dinleme komutları bu ekranın üstünde çalıştırır
     voiceListener.sync();
-    wakeEngine.tryLoad().then((_) {
-      if (wakeEngine.ready) voiceListener.engineChanged();
-    });
     store.rollTodos(); // bitmeyen geçmiş maddeler bugüne taşınır
     _wasAll = store.todayGoals().all;
     store.addListener(_checkGoals);

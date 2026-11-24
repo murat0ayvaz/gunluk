@@ -2115,4 +2115,5 @@ const _en = <String, String>{
   'İsteklerime eklendi.': 'Added to My Requests.',
   'Şarkı bilgisi yok': 'No song info',
   'Şarkının yanındaki kalple "İsteklerim" listesine ekle (Müzik ve Radyo sayfasının sağ üstü). Listede Çal, YouTube, Spotify ve Amazon Music düğmeleri var.': 'Add songs to the "My Requests" list with the heart next to them (top right of the Music and Radio page). The list has Play, YouTube, Spotify and Amazon Music buttons.',
+  'Sesli komut sırasında çalan radyo duraklar, sonra kendiliğinden devam eder. Komut listesinde dinleme durumu paneli var.': 'The radio pauses during a voice command and resumes by itself afterwards. The command list has a listening status panel.',
 };
