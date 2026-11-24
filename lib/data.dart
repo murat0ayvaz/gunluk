@@ -2470,6 +2470,11 @@ class AppStore extends ChangeNotifier {
       for (final x in ((j['tvch'] as List?) ?? []))
         TvChan.fromJson(Map<String, dynamic>.from(x as Map))
     ];
+    tvCats = [
+      for (final x in ((j['tvcats'] as List?) ?? []))
+        TvCat.fromJson(Map<String, dynamic>.from(x as Map))
+    ];
+    _tvEnsure();
     voiceListen = (j['vlisten'] as bool?) ?? false;
     voiceWake = ((j['vwake'] ?? 'Günlük').toString().trim().isEmpty)
         ? 'Günlük'
@@ -2732,6 +2737,7 @@ class AppStore extends ChangeNotifier {
         'lines': linesOn,
         'lrad': lastRadioId,
         'tvch': tvChans.map((t) => t.toJson()).toList(),
+        'tvcats': tvCats.map((t) => t.toJson()).toList(),
         'vlisten': voiceListen,
         'vwake': voiceWake,
         'vspeak': voiceSpeak,
@@ -3187,18 +3193,111 @@ class AppStore extends ChangeNotifier {
     _commit();
   }
 
-  // Canlı TV kanalları
+  // Canlı TV kanalları ve kategorileri
   List<TvChan> tvChans = [];
-  TvChan addTvChan(String name, String url) {
-    final c = TvChan(newId(), name.trim(), url.trim());
+  List<TvCat> tvCats = [];
+
+  /// Ekran açılırken: en az bir kategori olsun
+  void tvReady() => _tvEnsure();
+
+  /// En az bir kategori olsun; kategorisiz kanallar ilk kategoriye geçsin
+  void _tvEnsure() {
+    if (tvCats.isEmpty) {
+      tvCats.add(TvCat(id: 'tvgen', name: tx('Genel')));
+    }
+    final ids = {for (final c in tvCats) c.id};
+    for (final c in tvChans) {
+      if (!ids.contains(c.cat)) c.cat = tvCats.first.id;
+    }
+  }
+
+  TvCat? tvCatById(String id) {
+    for (final c in tvCats) {
+      if (c.id == id) return c;
+    }
+    return null;
+  }
+
+  /// Kategorideki kanallar (listedeki sırayla)
+  List<TvChan> tvIn(String catId) =>
+      [for (final c in tvChans) if (c.cat == catId) c];
+
+  /// Ada göre kategori bulur (büyük/küçük harf fark etmez); yoksa oluşturur
+  String tvCatByName(String name) {
+    final n = name.trim().toLowerCase();
+    for (final c in tvCats) {
+      if (c.name.trim().toLowerCase() == n) return c.id;
+    }
+    final c = TvCat(id: newId(), name: name.trim());
+    tvCats.add(c);
+    return c.id;
+  }
+
+  void addTvCat(String name) {
+    tvCats.add(TvCat(id: newId(), name: name.trim()));
+    _commit();
+  }
+
+  void renameTvCat(String id, String name) {
+    tvCatById(id)?.name = name.trim();
+    _commit();
+  }
+
+  /// Kategoriyi siler; içindeki kanallar ilk kalan kategoriye geçer
+  bool removeTvCat(String id) {
+    if (tvCats.length < 2) return false;
+    final c = tvCatById(id);
+    if (c == null) return false;
+    tvCats.removeWhere((x) => x.id == id);
+    for (final ch in tvChans) {
+      if (ch.cat == id) ch.cat = tvCats.first.id;
+    }
+    _commit();
+    return true;
+  }
+
+  void toggleTvCat(String id) {
+    final c = tvCatById(id);
+    if (c == null) return;
+    c.open = !c.open;
+    _commit();
+  }
+
+  void moveTvCat(int from, int to) {
+    if (from < 0 || from >= tvCats.length) return;
+    final x = tvCats.removeAt(from);
+    tvCats.insert(to.clamp(0, tvCats.length).toInt(), x);
+    _commit();
+  }
+
+  /// Kategori içinde kanal sırasını değiştirir
+  void moveTvChan(String catId, int from, int to) {
+    final items = tvIn(catId);
+    if (from < 0 || from >= items.length) return;
+    final x = items.removeAt(from);
+    items.insert(to.clamp(0, items.length).toInt(), x);
+    tvChans = [
+      for (final c in tvCats)
+        ...(c.id == catId ? items : tvIn(c.id)),
+    ];
+    _commit();
+  }
+
+  TvChan addTvChan(String name, String url, {String? catId}) {
+    _tvEnsure();
+    final cid = (catId != null && tvCatById(catId) != null)
+        ? catId
+        : tvCats.first.id;
+    final c = TvChan(newId(), name.trim(), url.trim(), cat: cid);
     tvChans.add(c);
     _commit();
     return c;
   }
 
-  void updateTvChan(TvChan c, String name, String url) {
+  void updateTvChan(TvChan c, String name, String url, {String? catId}) {
     c.name = name.trim();
     c.url = url.trim();
+    if (catId != null && tvCatById(catId) != null) c.cat = catId;
     _commit();
   }
 
@@ -3212,17 +3311,27 @@ class AppStore extends ChangeNotifier {
     _commit();
   }
 
+  /// Aynı adresli kanalı kaldırır (dizinden "Kaldır")
+  void removeTvChanByUrl(String url) {
+    tvChans.removeWhere((c) => c.url == url);
+    _commit();
+  }
+
   void restoreTvChan(TvChan c, int index) {
+    _tvEnsure();
+    if (tvCatById(c.cat) == null) c.cat = tvCats.first.id;
     tvChans.insert(index.clamp(0, tvChans.length).toInt(), c);
     _commit();
   }
 
-  /// Hazır listeden ekler; aynı adresi olanı atlar. Eklenen sayısını döndürür.
-  int addTvPresets(List<(String, String)> list) {
+  /// Hazır listeden ekler (ad, adres, kategori adı); aynı adresi olanı atlar.
+  /// Eklenen sayısını döndürür.
+  int addTvPresets(List<(String, String, String)> list) {
     var n = 0;
     for (final p in list) {
       if (tvChans.any((t) => t.url == p.$2)) continue;
-      tvChans.add(TvChan(newId(), p.$1, p.$2));
+      final cid = tvCatByName(p.$3);
+      tvChans.add(TvChan(newId(), p.$1, p.$2, cat: cid));
       n++;
     }
     if (n > 0) _commit();
@@ -3844,11 +3953,26 @@ class TvChan {
   String name;
   String url;
   bool fav;
-  TvChan(this.id, this.name, this.url, {this.fav = false});
-  Map<String, dynamic> toJson() => {'id': id, 'n': name, 'u': url, 'f': fav};
+  String cat; // kategori kimliği
+  TvChan(this.id, this.name, this.url, {this.fav = false, this.cat = ''});
+  Map<String, dynamic> toJson() =>
+      {'id': id, 'n': name, 'u': url, 'f': fav, 'c': cat};
   factory TvChan.fromJson(Map<String, dynamic> j) => TvChan(
       j['id'].toString(), (j['n'] ?? '').toString(), (j['u'] ?? '').toString(),
-      fav: (j['f'] as bool?) ?? false);
+      fav: (j['f'] as bool?) ?? false, cat: (j['c'] ?? '').toString());
+}
+
+/// TV kategorisi (ör. Genel, Haber, Spor)
+class TvCat {
+  final String id;
+  String name;
+  bool open;
+  TvCat({required this.id, required this.name, this.open = true});
+  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'open': open};
+  factory TvCat.fromJson(Map<String, dynamic> j) => TvCat(
+      id: j['id'].toString(),
+      name: (j['name'] ?? '').toString(),
+      open: (j['open'] as bool?) ?? true);
 }
 
 class Wallet {

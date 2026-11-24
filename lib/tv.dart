@@ -30,12 +30,39 @@ const List<(String, String)> kTvPresets = [
   ('TBMM TV', 'https://meclistv-stream.ercdn.net/meclistv/meclistv.m3u8'),
 ];
 
-/// Favoriler üstte, sonra eklenme sırası
+/// Favoriler üstte, sonra eklenme sırası (sesli komut aramasında kullanılır)
 List<TvChan> tvSorted() {
   final l = List<TvChan>.of(store.tvChans);
   final fav = [for (final c in l) if (c.fav) c];
   final rest = [for (final c in l) if (!c.fav) c];
   return [...fav, ...rest];
+}
+
+/// Hazır kanalın kategorisi (adından)
+String _presetCat(String name) {
+  final n = name.toLowerCase();
+  if (n.contains('haber')) return tx('Haber');
+  if (n.contains('spor')) return tx('Spor');
+  if (n.contains('çocuk')) return tx('Çocuk');
+  if (n.contains('belgesel')) return tx('Belgesel');
+  if (n.contains('müzik')) return tx('Müzik');
+  return tx('Genel');
+}
+
+/// Dizindeki grup / kanal adından kategori önerisi
+String tvSuggestCat(String group, String name) {
+  final n = '$group $name'.toLowerCase();
+  bool has(List<String> k) => k.any((x) => n.contains(x));
+  if (has(['news', 'haber'])) return tx('Haber');
+  if (has(['sport', 'spor'])) return tx('Spor');
+  if (has(['kids', 'child', 'çocuk', 'cocuk', 'animation', 'cartoon'])) {
+    return tx('Çocuk');
+  }
+  if (has(['documentary', 'belgesel', 'science', 'nature'])) {
+    return tx('Belgesel');
+  }
+  if (has(['music', 'müzik', 'muzik'])) return tx('Müzik');
+  return tx('Genel');
 }
 
 /// Kanalı tam ekran oynatıcıda açar
@@ -48,37 +75,138 @@ Future<void> openTvChannel(BuildContext context, TvChan c) {
       .push(MaterialPageRoute<void>(builder: (_) => TvPlayerPage(chan: c)));
 }
 
+/// TV sekmesi: false = hepsi (kategoriler), true = sadece favoriler
+final ValueNotifier<bool> tvFavOnly = ValueNotifier<bool>(false);
+
+/// Dizinden eklerken kategori seçtirir. [suggest] önerilen kategori adıdır;
+/// listede yoksa "yeni kategori" olarak sunulur. Seçilen kategori kimliğini döndürür.
+Future<String?> pickTvCat(BuildContext context, String suggest) async {
+  final cats = store.tvCats;
+  final sugg = suggest.trim().toLowerCase();
+  final existing = [
+    for (final c in cats)
+      if (c.name.trim().toLowerCase() == sugg) c
+  ];
+  final res = await showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    builder: (ctx) => SafeArea(
+      child: ConstrainedBox(
+        constraints:
+            BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.7),
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 6),
+              child: Text(tx('Hangi kategoriye eklensin?'),
+                  style: const TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.w700)),
+            ),
+            if (existing.isEmpty && suggest.trim().isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.create_new_folder_outlined),
+                title: Text(tx('Yeni kategori: {0}', [suggest.trim()])),
+                subtitle: Text(tx('Önerilen')),
+                onTap: () => Navigator.pop(ctx, '__new__'),
+              ),
+            for (final c in cats)
+              ListTile(
+                leading: Icon(
+                    existing.contains(c)
+                        ? Icons.star_rounded
+                        : Icons.folder_outlined,
+                    color: existing.contains(c) ? const Color(0xFFE9A23B) : null),
+                title: Text(c.name),
+                subtitle: existing.contains(c) ? Text(tx('Önerilen')) : null,
+                onTap: () => Navigator.pop(ctx, c.id),
+              ),
+          ],
+        ),
+      ),
+    ),
+  );
+  if (res == null) return null;
+  if (res == '__new__') return store.tvCatByName(suggest);
+  return res;
+}
+
 class TvTab extends StatelessWidget {
   const TvTab({super.key});
 
-  Future<void> _edit(BuildContext context, TvChan? c) async {
+  Future<void> _addCat(BuildContext context) async {
+    final n = await askText(context, tx('Kategori adı'));
+    if (n == null || n.trim().isEmpty) return;
+    store.addTvCat(n.trim());
+  }
+
+  Future<void> _renameCat(BuildContext context, TvCat c) async {
+    final n = await askText(context, tx('Kategori adı'), initial: c.name);
+    if (n == null || n.trim().isEmpty) return;
+    store.renameTvCat(c.id, n.trim());
+  }
+
+  Future<void> _removeCat(BuildContext context, TvCat c) async {
+    final messenger = ScaffoldMessenger.of(context);
+    if (store.tvCats.length < 2) {
+      messenger.showSnackBar(
+          SnackBar(content: Text(tx('En az bir kategori kalmalı.'))));
+      return;
+    }
+    final ok = await confirmDialog(
+      context,
+      tx('Kategori silinsin mi?'),
+      tx('"{0}" silinir; içindeki kanallar ilk kategoriye geçer.', [c.name]),
+      okLabel: tx('Sil'),
+    );
+    if (!ok) return;
+    store.removeTvCat(c.id);
+  }
+
+  Future<void> _edit(BuildContext context, TvChan? c, {String? catId}) async {
     final name = TextEditingController(text: c?.name ?? '');
     final url = TextEditingController(text: c?.url ?? '');
     String? err;
+    var cid = c?.cat ?? catId ?? store.tvCats.first.id;
+    if (store.tvCatById(cid) == null) cid = store.tvCats.first.id;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, set) => AlertDialog(
           title: Text(c == null ? tx('Kanal ekle') : tx('Kanalı düzenle')),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: name,
-                autofocus: true,
-                textCapitalization: TextCapitalization.words,
-                decoration: InputDecoration(labelText: tx('Kanal adı')),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: url,
-                keyboardType: TextInputType.url,
-                decoration: InputDecoration(
-                    labelText: tx('Yayın adresi (.m3u8)'),
-                    hintText: 'https://…',
-                    errorText: err),
-              ),
-            ],
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: name,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: InputDecoration(labelText: tx('Kanal adı')),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: url,
+                  keyboardType: TextInputType.url,
+                  decoration: InputDecoration(
+                      labelText: tx('Yayın adresi (.m3u8)'),
+                      hintText: 'https://…',
+                      errorText: err),
+                ),
+                const SizedBox(height: 8),
+                DropdownButton<String>(
+                  isExpanded: true,
+                  value: cid,
+                  items: [
+                    for (final k in store.tvCats)
+                      DropdownMenuItem<String>(value: k.id, child: Text(k.name)),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) set(() => cid = v);
+                  },
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -109,14 +237,14 @@ class TvTab extends StatelessWidget {
     url.dispose();
     if (ok != true) return;
     if (c == null) {
-      store.addTvChan(n, u);
+      store.addTvChan(n, u, catId: cid);
     } else {
-      store.updateTvChan(c, n, u);
+      store.updateTvChan(c, n, u, catId: cid);
     }
   }
 
-  // "+" : dizinde ara (iptv-org) ya da elle ekle
-  void _addMenu(BuildContext context) {
+  // "Kanal ekle": dizinde ara (iptv-org) ya da elle ekle
+  void _addMenu(BuildContext context, String? catId) {
     showModalBottomSheet<void>(
       context: context,
       builder: (ctx) => SafeArea(
@@ -129,7 +257,8 @@ class TvTab extends StatelessWidget {
               subtitle: Text(tx('Ülkeye ve ada göre herkese açık kanalları bul.')),
               onTap: () {
                 Navigator.pop(ctx);
-                Navigator.of(context).push(slideFromRight(const TvBrowserPage()));
+                Navigator.of(context)
+                    .push(slideFromRight(TvBrowserPage(catId: catId)));
               },
             ),
             ListTile(
@@ -138,7 +267,7 @@ class TvTab extends StatelessWidget {
               subtitle: Text(tx('Kanal adı ve yayın adresini kendin yaz.')),
               onTap: () {
                 Navigator.pop(ctx);
-                _edit(context, null);
+                _edit(context, null, catId: catId);
               },
             ),
           ],
@@ -147,6 +276,7 @@ class TvTab extends StatelessWidget {
     );
   }
 
+  /// Kanalı sormadan kaldırır; altta "Geri al" çıkar
   void _remove(BuildContext context, TvChan c) {
     final i = store.tvChans.indexOf(c);
     store.removeTvChan(c);
@@ -155,7 +285,9 @@ class TvTab extends StatelessWidget {
   }
 
   void _presets(BuildContext context) {
-    final n = store.addTvPresets(kTvPresets);
+    final n = store.addTvPresets([
+      for (final p in kTvPresets) (p.$1, p.$2, _presetCat(p.$1)),
+    ]);
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(
@@ -164,92 +296,242 @@ class TvTab extends StatelessWidget {
               : tx('Hazır kanalların hepsi zaten listede.'))));
   }
 
+  Widget _chans(BuildContext context, TvCat cat) {
+    final p = palOf(context);
+    final items = store.tvIn(cat.id);
+    if (items.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(tx('Bu kategoride kanal yok.'),
+              style: TextStyle(color: p.soft, fontSize: 13)),
+        ),
+      );
+    }
+    return ReorderableListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      buildDefaultDragHandles: false,
+      itemCount: items.length,
+      onReorder: (a, b) {
+        var to = b;
+        if (to > a) to -= 1;
+        store.moveTvChan(cat.id, a, to);
+      },
+      itemBuilder: (context, i) {
+        final c = items[i];
+        return SwipeRow(
+          key: ValueKey(c.id),
+          tag: 'tv_${c.id}',
+          onEdit: () => _edit(context, c),
+          onDelete: () => _remove(context, c),
+          child: ColoredBox(
+            color: p.card,
+            child: ListTile(
+              dense: true,
+              contentPadding: const EdgeInsets.only(left: 8, right: 0),
+              leading: ReorderableDragStartListener(
+                index: i,
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Icon(Icons.drag_handle_rounded, color: p.soft),
+                ),
+              ),
+              title: Text(c.name,
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+              subtitle: Text(Uri.tryParse(c.url)?.host ?? c.url,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: p.soft, fontSize: 12)),
+              onTap: () => openTvChannel(context, c),
+              trailing: IconButton(
+                tooltip: tx('Favori'),
+                visualDensity: VisualDensity.compact,
+                onPressed: () => store.toggleTvFav(c),
+                icon: Icon(
+                    c.fav ? Icons.star_rounded : Icons.star_outline_rounded,
+                    color: c.fav ? const Color(0xFFE9A23B) : p.soft),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Favoriler görünümü: tüm kategorilerdeki yıldızlı kanallar tek listede
+  Widget _favList(BuildContext context) {
+    final p = palOf(context);
+    final items = [for (final c in store.tvChans) if (c.fav) c];
+    if (items.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Text(tx('Henüz favori kanal yok. Kanalın yanındaki yıldıza dokun.'),
+              textAlign: TextAlign.center,
+              style: TextStyle(color: p.soft, height: 1.4)),
+        ),
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+      children: [
+        for (final c in items)
+          Container(
+            margin: const EdgeInsets.only(bottom: 6),
+            decoration: BoxDecoration(
+              color: p.card,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: tagTone(c.cat).withOpacity(0.5)),
+            ),
+            child: ListTile(
+              dense: true,
+              title: Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+              subtitle: Text(store.tvCatById(c.cat)?.name ?? '',
+                  style: TextStyle(color: p.soft, fontSize: 12)),
+              onTap: () => openTvChannel(context, c),
+              trailing: IconButton(
+                tooltip: tx('Favori'),
+                onPressed: () => store.toggleTvFav(c),
+                icon: const Icon(Icons.star_rounded, color: Color(0xFFE9A23B)),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = palOf(context);
     return ListenableBuilder(
-      listenable: store,
+      listenable: Listenable.merge([store, tvFavOnly]),
       builder: (context, _) {
-        final list = tvSorted();
-        return Stack(
+        store.tvReady();
+        final cats = store.tvCats;
+        final favOnly = tvFavOnly.value;
+        return Column(
           children: [
-            ListView(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
-              children: [
-                if (list.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 24, 8, 12),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _addCat(context),
+                      icon: const Icon(Icons.create_new_folder_outlined),
+                      label: Text(tx('Kategori ekle')),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => _addMenu(context, null),
+                      icon: const Icon(Icons.add_rounded),
+                      label: Text(tx('Kanal ekle')),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 2, 16, 2),
+              child: Row(
+                children: [
+                  ChoiceChip(
+                    label: Text(tx('Hepsi')),
+                    selected: !favOnly,
+                    onSelected: (_) => tvFavOnly.value = false,
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    avatar: const Icon(Icons.star_rounded,
+                        size: 16, color: Color(0xFFE9A23B)),
+                    label: Text(tx('Favoriler')),
+                    selected: favOnly,
+                    onSelected: (_) => tvFavOnly.value = true,
+                  ),
+                ],
+              ),
+            ),
+            if (favOnly)
+              Expanded(child: _favList(context))
+            else
+              Expanded(
+                child: ReorderableListView.builder(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  buildDefaultDragHandles: false,
+                  itemCount: cats.length,
+                  onReorder: (o, n) {
+                    if (n > o) n -= 1;
+                    store.moveTvCat(o, n);
+                  },
+                  footer: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.live_tv_rounded, size: 48, color: p.soft),
-                        const SizedBox(height: 12),
-                        Text(tx('Henüz kanal yok.'),
-                            style: TextStyle(fontSize: 16, color: p.ink)),
-                        const SizedBox(height: 6),
+                        OutlinedButton.icon(
+                          onPressed: () => _presets(context),
+                          icon: const Icon(Icons.playlist_add_rounded),
+                          label: Text(tx('Hazır kanalları ekle')),
+                        ),
+                        const SizedBox(height: 10),
                         Text(
-                            tx('Hazır kanalları ekleyebilir ya da kendi yayın adresini girebilirsin.'),
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: p.soft)),
+                          tx('Yayın adresleri zamanla değişebilir; çalışmayan kanalın adresini kaydırarak düzenle.'),
+                          style: TextStyle(
+                              color: p.soft, fontSize: 12.5, height: 1.4),
+                        ),
                       ],
                     ),
                   ),
-                for (final c in list)
-                  Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    color: p.card,
-                    child: ListTile(
-                      leading: Icon(Icons.live_tv_rounded, color: p.accent),
-                      title: Text(c.name,
-                          style: const TextStyle(fontWeight: FontWeight.w600)),
-                      subtitle: Text(Uri.tryParse(c.url)?.host ?? c.url,
-                          maxLines: 1, overflow: TextOverflow.ellipsis),
-                      onTap: () => openTvChannel(context, c),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            tooltip: tx('Favori'),
-                            onPressed: () => store.toggleTvFav(c),
-                            icon: Icon(
-                                c.fav
-                                    ? Icons.star_rounded
-                                    : Icons.star_border_rounded,
-                                color: c.fav ? p.accent : p.soft),
+                  itemBuilder: (context, i) {
+                    final c = cats[i];
+                    return SwipeRow(
+                      key: ValueKey(c.id),
+                      tag: 'tc_${c.id}',
+                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+                      radius: 14,
+                      onEdit: () => _renameCat(context, c),
+                      onDelete: () => _removeCat(context, c),
+                      child: MediaGroup(
+                        colorSeed: c.id,
+                        title: c.name,
+                        info: '${store.tvIn(c.id).length}',
+                        open: c.open,
+                        margin: EdgeInsets.zero,
+                        handle: ReorderableDragStartListener(
+                          index: i,
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child:
+                                Icon(Icons.drag_handle_rounded, color: p.soft),
                           ),
-                          PopupMenuButton<String>(
-                            onSelected: (v) {
-                              if (v == 'edit') _edit(context, c);
-                              if (v == 'del') _remove(context, c);
-                            },
-                            itemBuilder: (_) => [
-                              PopupMenuItem(
-                                  value: 'edit', child: Text(tx('Düzenle'))),
-                              PopupMenuItem(
-                                  value: 'del', child: Text(tx('Sil'))),
-                            ],
-                          ),
-                        ],
+                        ),
+                        onToggle: () => store.toggleTvCat(c.id),
+                        menu: PopupMenuButton<String>(
+                          onSelected: (v) {
+                            if (v == 'add') _addMenu(context, c.id);
+                            if (v == 'rename') _renameCat(context, c);
+                            if (v == 'delete') _removeCat(context, c);
+                          },
+                          itemBuilder: (_) => [
+                            PopupMenuItem(
+                                value: 'add', child: Text(tx('Kanal ekle'))),
+                            PopupMenuItem(
+                                value: 'rename',
+                                child: Text(tx('Adı değiştir'))),
+                            PopupMenuItem(
+                                value: 'delete', child: Text(tx('Sil'))),
+                          ],
+                        ),
+                        child: _chans(context, c),
                       ),
-                    ),
-                  ),
-                const SizedBox(height: 4),
-                OutlinedButton.icon(
-                  onPressed: () => _presets(context),
-                  icon: const Icon(Icons.playlist_add_rounded),
-                  label: Text(tx('Hazır kanalları ekle')),
+                    );
+                  },
                 ),
-              ],
-            ),
-            Positioned(
-              right: 16,
-              bottom: 16,
-              child: FloatingActionButton.extended(
-                heroTag: null,
-                onPressed: () => _addMenu(context),
-                icon: const Icon(Icons.add_rounded),
-                label: Text(tx('Kanal ekle')),
               ),
-            ),
           ],
         );
       },
@@ -457,7 +739,8 @@ Future<List<TvFound>> tvDirectory(String cc) async {
 }
 
 class TvBrowserPage extends StatefulWidget {
-  const TvBrowserPage({super.key});
+  final String? catId; // doluysa kanallar doğrudan bu kategoriye eklenir
+  const TvBrowserPage({super.key, this.catId});
 
   @override
   State<TvBrowserPage> createState() => _TvBrowserPageState();
@@ -520,8 +803,12 @@ class _TvBrowserPageState extends State<TvBrowserPage> {
     _load();
   }
 
-  void _add(TvFound f) {
-    store.addTvChan(f.name, f.url);
+  Future<void> _add(TvFound f) async {
+    // kategori seçtir; önerilen, dizindeki gruba göre
+    final cid = widget.catId ??
+        await pickTvCat(context, tvSuggestCat(f.group, f.name));
+    if (cid == null || !mounted) return;
+    store.addTvChan(f.name, f.url, catId: cid);
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(tx('"{0}" eklendi.', [f.name]))));
@@ -617,11 +904,14 @@ class _TvBrowserPageState extends State<TvBrowserPage> {
                                       maxLines: 1, overflow: TextOverflow.ellipsis),
                                   subtitle: f.group.isEmpty ? null : Text(f.group),
                                   trailing: added
-                                      ? Text(tx('Ekli'), style: TextStyle(color: p.soft))
-                                      : IconButton(
-                                          tooltip: tx('Ekle'),
-                                          icon: const Icon(Icons.add_circle_outline_rounded),
+                                      ? TextButton(
+                                          onPressed: () =>
+                                              store.removeTvChanByUrl(f.url),
+                                          child: Text(tx('Kaldır')),
+                                        )
+                                      : FilledButton.tonal(
                                           onPressed: () => _add(f),
+                                          child: Text(tx('Ekle')),
                                         ),
                                 ),
                               );

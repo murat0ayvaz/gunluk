@@ -1124,6 +1124,17 @@ class _WxDetailPageState extends State<WxDetailPage> {
     );
   }
 
+  /// Arka plan için güncel hava kodu ve gece/gündüz bilgisi
+  (int, bool)? _bgWx() {
+    final byAll = _all?.by.values;
+    final n = _sel?.now ??
+        ((byAll == null || byAll.isEmpty) ? null : byAll.first.now);
+    final c = n?.code;
+    if (c == null) return null;
+    final hr = DateTime.now().hour;
+    return (c, hr < 6 || hr >= 20);
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -1132,6 +1143,7 @@ class _WxDetailPageState extends State<WxDetailPage> {
         final p = palOf(context);
         final has = _all != null && !_loading;
         return AmbScaffold(kind: 'weather', 
+          wx: _bgWx(),
           backgroundColor: ambBg(p),
           endDrawer: const ToolsDrawer(replace: true),
           appBar: AppBar(

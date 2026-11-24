@@ -32,27 +32,7 @@ class AppDrawer extends StatelessWidget {
           child: SafeArea(
             child: Column(
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                            color: p.accent, shape: BoxShape.circle),
-                        child: Icon(Icons.auto_stories_rounded,
-                            color: p.onAccent),
-                      ),
-                      const SizedBox(width: 12),
-                      Text('Your Book',
-                          style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w700,
-                              color: p.ink)),
-                    ],
-                  ),
-                ),
+                const SizedBox(height: 12),
                 Expanded(
                   child: ListView(
                     padding: EdgeInsets.zero,

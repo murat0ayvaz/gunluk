@@ -164,7 +164,7 @@ class RadioTab extends StatelessWidget {
                 },
                 itemBuilder: (_) => [
                   PopupMenuItem(value: 'edit', child: Text(tx('Düzenle'))),
-                  PopupMenuItem(value: 'delete', child: Text(tx('Sil'))),
+                  PopupMenuItem(value: 'delete', child: Text(tx('Kaldır'))),
                 ],
               ),
             ],
@@ -769,18 +769,18 @@ class _RadioBrowserPageState extends State<RadioBrowserPage> {
                                 ? Icons.pause_circle_outline_rounded
                                 : Icons.play_circle_outline_rounded),
                           ),
-                          IconButton(
-                            tooltip: have ? tx('Kaldır') : tx('Ekle'),
-                            onPressed: have
-                                ? () {
+                          have
+                              ? TextButton(
+                                  onPressed: () {
                                     store.removeStationByUrl(r.url, _cat);
                                     setState(() {});
-                                  }
-                                : () => _add(r),
-                            icon: Icon(have
-                                ? Icons.check_circle_rounded
-                                : Icons.add_circle_outline_rounded),
-                          ),
+                                  },
+                                  child: Text(tx('Kaldır')),
+                                )
+                              : FilledButton.tonal(
+                                  onPressed: () => _add(r),
+                                  child: Text(tx('Ekle')),
+                                ),
                         ],
                       ),
                     );

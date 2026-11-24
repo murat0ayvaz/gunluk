@@ -80,7 +80,7 @@ class _FxShineState extends State<FxShine> with TickerProviderStateMixin {
     _loop = null;
     if (lv > 0) {
       _loop = AnimationController(
-          vsync: this, duration: Duration(milliseconds: lv == 2 ? 3800 : 7600))
+          vsync: this, duration: Duration(milliseconds: lv == 2 ? 8000 : 15000))
         ..value = ((widget.phase * 0.19) % 1.0)
         ..repeat();
     }
@@ -206,7 +206,7 @@ class _FxPainter extends CustomPainter {
     }
     // 2) Hedef tamam: yeşil kenar parlaması
     if (met) {
-      final a = level == 2 ? 0.40 + 0.35 * math.sin(phase * 2 * math.pi) : 0.50;
+      final a = level == 2 ? 0.40 + 0.35 * math.sin(phase * 4 * math.pi) : 0.50;
       canvas.drawRRect(
           RRect.fromRectAndRadius(
               (Offset.zero & size).deflate(1), Radius.circular(radius)),
@@ -223,9 +223,9 @@ class _FxPainter extends CustomPainter {
     }
     // 4) Dokunma dalgası
     if (ripple >= 0) {
-      final r = size.width * 0.55 * Curves.easeOut.transform(ripple);
+      final r = 36.0 * Curves.easeOut.transform(ripple);
       canvas.drawCircle(tap, r,
-          Paint()..color = accent.withOpacity((level == 2 ? 0.26 : 0.16) * (1 - ripple)));
+          Paint()..color = accent.withOpacity((level == 2 ? 0.20 : 0.12) * (1 - ripple)));
     }
   }
 

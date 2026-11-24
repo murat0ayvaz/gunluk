@@ -196,54 +196,64 @@ class _AddSheetState extends State<AddSheet> {
                         color: p.ink)),
                 const SizedBox(height: 16),
 
-                // ----- Serbest satır: kategorisiz, başlığı ve verisi serbest -----
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: _addFree,
-                    icon: const Icon(Icons.edit_note_rounded),
-                    label: Text(tx('Serbest satır')),
+                // ----- Kategori + Serbest satır: tek çerçevede, birlikte -----
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: p.line, width: 1.5),
                   ),
-                ),
-                const SizedBox(height: 16),
-
-                // ----- Kategori -----
-                _head(p, Icons.folder_outlined, tx('Kategori')),
-                const SizedBox(height: 10),
-                _dropBox(
-                  p,
-                  child: DropdownButton<String>(
-                    isExpanded: true,
-                    underline: const SizedBox.shrink(),
-                    hint: Text(tx('Kategori seç')),
-                    value: cat?.id,
-                    items: [
-                      for (final c in store.cats)
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _head(p, Icons.folder_outlined, tx('Kategori')),
+                      const SizedBox(height: 10),
+                  _dropBox(
+                    p,
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      underline: const SizedBox.shrink(),
+                      hint: Text(tx('Kategori seç')),
+                      value: cat?.id,
+                      items: [
+                        for (final c in store.cats)
+                          DropdownMenuItem<String>(
+                              value: c.id, child: Text(c.name)),
                         DropdownMenuItem<String>(
-                            value: c.id, child: Text(c.name)),
-                      DropdownMenuItem<String>(
-                          value: '__new__',
-                          child: Row(children: [
-                            const Icon(Icons.add, size: 18),
-                            const SizedBox(width: 6),
-                            Text(tx('Kategori ekle')),
-                          ])),
-                    ],
-                    onChanged: (v) {
-                      if (v == null) return;
-                      if (v == '__new__') {
-                        _newCat();
-                        return;
-                      }
-                      setState(() {
-                        if (catId != v) {
-                          subId = null;
-                          routine = false;
-                          _goal.clear();
+                            value: '__new__',
+                            child: Row(children: [
+                              const Icon(Icons.add, size: 18),
+                              const SizedBox(width: 6),
+                              Text(tx('Kategori ekle')),
+                            ])),
+                      ],
+                      onChanged: (v) {
+                        if (v == null) return;
+                        if (v == '__new__') {
+                          _newCat();
+                          return;
                         }
-                        catId = v;
-                      });
-                    },
+                        setState(() {
+                          if (catId != v) {
+                            subId = null;
+                            routine = false;
+                            _goal.clear();
+                          }
+                          catId = v;
+                        });
+                      },
+                    ),
+                  ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _addFree,
+                          icon: const Icon(Icons.edit_note_rounded),
+                          label: Text(tx('Serbest satır')),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
 

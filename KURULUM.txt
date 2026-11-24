@@ -1,11 +1,15 @@
-DAILY ROUTINE v1.25.17 - TAM PAKET
+DAILY ROUTINE v1.25.18 - TAM PAKET
 
 Bu zipte projenin TAMAMI var: .github, assets, lib, debug.keystore, pubspec.yaml.
 1) Zipi çıkar. GitHub'da "gunluk" reposunun ANA sayfasında: Add file > Upload files.
 2) Çıkan klasörlerin ve dosyaların HEPSİNİ (.github, assets, lib, debug.keystore, pubspec.yaml) sürükle-bırak > Commit changes.
    (YENİ: lib/tv.dart, lib/layoutpage.dart. pubspec.yaml'a video_player ve wakelock_plus eklendi.)
 3) Actions > yeşil tik > Artifacts > gunluk-apk indir, telefona kur (veriler kalır).
-Derleme hatası olursa Actions'taki kırmızı satırları gönder.v1.25.17 yenilikleri:
-- Veri girilmiş satırda değere dokununca yeniden veri girişi (düzeltme).
-- Radyo/müzik çalar ✕ ile kapatılınca telefondaki medya bildirimi de kalkar (androidStopForegroundOnPause: true).
-- pubspec.yaml: just_audio_background beta.17'ye yükseltildi. Paket çakışması olursa Actions hata satırını gönder.
+Derleme hatası olursa Actions'taki kırmızı satırları gönder.v1.25.18 yenilikleri:
+- Ana ekran arka planı: R, D (iki farklı dalga konumu), çapraz kalp; her açılışta rastgele. D'nin içinde köşelerden farklı tonlar.
+- Hava durumu sayfası arka planı güncel havaya göre (güneş, bulut, yağmur, kar, sis, fırtına, gece), 40 sn'lik yavaş hareketle.
+- TV sekmesi: kategoriler, favoriler, sürükleyerek sıralama, kaydırarak düzenle/kaldır (radyo gibi). Eski kanallar "Genel" kategorisine geçer.
+- Radyo ve TV dizinlerinde yazılı Ekle / Kaldır düğmeleri; TV dizininden eklerken kategori seçilir.
+- Satır efektleri seyrekleşti (Hafif ~15 sn, Göz alıcı ~8 sn), dokunma halkası en çok 36 px.
+- Soldaki menüden ve kilit ekranından "Your Book" yazısı/simgesi kaldırıldı. Ekle penceresinde Serbest satır Kategori çerçevesine alındı.
+- GitHub'da değişiklik yok: build.yml ve .github aynı.

@@ -98,12 +98,6 @@ class _LockScreenState extends State<LockScreen> {
                     child: Icon(Icons.lock_rounded, size: 34, color: p.onAccent),
                   ),
                   const SizedBox(height: 16),
-                  Text('Your Book',
-                      style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w700,
-                          color: p.ink)),
-                  const SizedBox(height: 4),
                   Text(tx('Uygulama kilitli'),
                       style: TextStyle(color: p.soft)),
                   const SizedBox(height: 28),
