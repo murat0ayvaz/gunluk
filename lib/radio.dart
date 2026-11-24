@@ -603,6 +603,7 @@ class _RadioBrowserPageState extends State<RadioBrowserPage> {
 
   void _add(RbStation r) {
     store.saveStation(_cat, null, r.name, r.url);
+    store.setStationArt(r.url, r.icon);
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(SnackBar(

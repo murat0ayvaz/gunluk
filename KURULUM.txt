@@ -1,15 +1,12 @@
-DAILY ROUTINE v1.25.18 - TAM PAKET
+DAILY ROUTINE v1.25.20 - TAM PAKET
 
 Bu zipte projenin TAMAMI var: .github, assets, lib, debug.keystore, pubspec.yaml.
 1) Zipi çıkar. GitHub'da "gunluk" reposunun ANA sayfasında: Add file > Upload files.
 2) Çıkan klasörlerin ve dosyaların HEPSİNİ (.github, assets, lib, debug.keystore, pubspec.yaml) sürükle-bırak > Commit changes.
-   (YENİ: lib/tv.dart, lib/layoutpage.dart. pubspec.yaml'a video_player ve wakelock_plus eklendi.)
+   (YENİ: lib/nowsong.dart.)
 3) Actions > yeşil tik > Artifacts > gunluk-apk indir, telefona kur (veriler kalır).
-Derleme hatası olursa Actions'taki kırmızı satırları gönder.v1.25.18 yenilikleri:
-- Ana ekran arka planı: R, D (iki farklı dalga konumu), çapraz kalp; her açılışta rastgele. D'nin içinde köşelerden farklı tonlar.
-- Hava durumu sayfası arka planı güncel havaya göre (güneş, bulut, yağmur, kar, sis, fırtına, gece), 40 sn'lik yavaş hareketle.
-- TV sekmesi: kategoriler, favoriler, sürükleyerek sıralama, kaydırarak düzenle/kaldır (radyo gibi). Eski kanallar "Genel" kategorisine geçer.
-- Radyo ve TV dizinlerinde yazılı Ekle / Kaldır düğmeleri; TV dizininden eklerken kategori seçilir.
-- Satır efektleri seyrekleşti (Hafif ~15 sn, Göz alıcı ~8 sn), dokunma halkası en çok 36 px.
-- Soldaki menüden ve kilit ekranından "Your Book" yazısı/simgesi kaldırıldı. Ekle penceresinde Serbest satır Kategori çerçevesine alındı.
-- GitHub'da değişiklik yok: build.yml ve .github aynı.
+Derleme hatası olursa Actions'taki kırmızı satırları gönder.v1.25.20 yenilikleri:
+- Radyo: yayinin gonderdigi sarki adi (varsa) calma cubugunda ve ana ekrandaki radyo satirinda; istasyon kapagi (dizinden eklenenlerde logo).
+- Isteklerim listesi: sarkinin yanindaki kalple ekle; Cal, YouTube, Spotify, Amazon Music dugmeleri. Yedege dahil.
+- Shazam telefonda kuruluysa radyo ve muzik calarda Shazam dugmesi.
+- GitHub'da degisiklik yok: build.yml ve .github ayni.

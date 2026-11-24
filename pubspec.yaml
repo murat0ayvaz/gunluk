@@ -1,7 +1,7 @@
 name: gunluk
 description: Daily Routine - günlük rutin, hedef, yapılacaklar ve günlük (not) uygulaması
 publish_to: 'none'
-version: 1.25.18+51
+version: 1.25.20+53
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -17,6 +17,7 @@ dependencies:
   video_player: '>=2.8.0 <3.0.0'   # canlı TV (HLS yayınları)
   wakelock_plus: '>=1.2.0 <2.0.0'   # TV izlerken ekranın açık kalması
   record: '>=5.1.0 <7.0.0'   # ses kaydı (günlük, yapılacaklar)
+  vosk_flutter: '>=0.3.48 <0.4.0'   # çevrimdışı uyandırma kelimesi (Türkçe küçük model)
   speech_to_text: '>=6.6.0 <8.0.0'   # sesli komut (konuşmayı yazıya çevirir)
   flutter_tts: '>=4.0.0 <5.0.0'   # haberleri sesli okuma
   url_launcher: '>=6.2.0 <7.0.0'   # haberi tarayıcıda aç
@@ -25,6 +26,7 @@ dependencies:
   just_audio: '>=0.9.36 <0.11.0'   # müzik / radyo çalar
   just_audio_background: ^0.0.1-beta.17   # arka planda çalma + bildirim kontrolü (beta.17: stop'ta bildirim kapanır)
   file_picker: '>=8.0.0 <11.0.0'   # telefondan şarkı seçmek için
+  archive: '>=3.4.0 <4.0.0'   # yedek dosyası (zip): veriler + ses kayıtları; saf Dart paketi
   crypto: ^3.0.3           # şifre özeti (SHA-256) için; saf Dart paketi, eklenti değil
 
 dev_dependencies:

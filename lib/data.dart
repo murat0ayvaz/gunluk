@@ -520,16 +520,28 @@ class Station {
   String name;
   String url;
   bool fav; // favori (yıldız)
-  Station({required this.id, required this.name, required this.url, this.fav = false});
+  String art; // istasyon kapağı / logosu (adres); yoksa ''
+  Station(
+      {required this.id,
+      required this.name,
+      required this.url,
+      this.fav = false,
+      this.art = ''});
 
-  Map<String, dynamic> toJson() =>
-      {'id': id, 'name': name, 'url': url, 'fav': fav};
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'url': url,
+        'fav': fav,
+        if (art.isNotEmpty) 'art': art
+      };
 
   factory Station.fromJson(Map<String, dynamic> j) => Station(
         id: j['id'] as String,
         name: (j['name'] ?? '') as String,
         url: (j['url'] ?? '') as String,
         fav: (j['fav'] ?? false) as bool,
+        art: (j['art'] ?? '').toString(),
       );
 }
 
@@ -2470,6 +2482,10 @@ class AppStore extends ChangeNotifier {
       for (final x in ((j['tvch'] as List?) ?? []))
         TvChan.fromJson(Map<String, dynamic>.from(x as Map))
     ];
+    wishes = [
+      for (final x in ((j['wishes'] as List?) ?? []))
+        Wish.fromJson(Map<String, dynamic>.from(x as Map))
+    ];
     tvCats = [
       for (final x in ((j['tvcats'] as List?) ?? []))
         TvCat.fromJson(Map<String, dynamic>.from(x as Map))
@@ -2738,6 +2754,7 @@ class AppStore extends ChangeNotifier {
         'lrad': lastRadioId,
         'tvch': tvChans.map((t) => t.toJson()).toList(),
         'tvcats': tvCats.map((t) => t.toJson()).toList(),
+        'wishes': wishes.map((w) => w.toJson()).toList(),
         'vlisten': voiceListen,
         'vwake': voiceWake,
         'vspeak': voiceSpeak,
@@ -3196,6 +3213,50 @@ class AppStore extends ChangeNotifier {
   // Canlı TV kanalları ve kategorileri
   List<TvChan> tvChans = [];
   List<TvCat> tvCats = [];
+
+  // ---- İsteklerim (radyoda / çalarda duyulan şarkılar) ----
+  List<Wish> wishes = [];
+
+  bool hasWish(String title, String artist) => wishes.any((w) =>
+      w.title.toLowerCase() == title.toLowerCase() &&
+      w.artist.toLowerCase() == artist.toLowerCase());
+
+  /// Eklendiyse true; aynısı zaten varsa false
+  bool addWish(String title, String artist, String from) {
+    final t = title.trim();
+    if (t.isEmpty || hasWish(t, artist.trim())) return false;
+    wishes.insert(
+        0,
+        Wish(newId(), t, artist.trim(), from,
+            DateTime.now().millisecondsSinceEpoch));
+    _commit();
+    return true;
+  }
+
+  void removeWish(String id) {
+    wishes.removeWhere((w) => w.id == id);
+    _commit();
+  }
+
+  void restoreWish(Wish w, int index) {
+    if (wishes.any((x) => x.id == w.id)) return;
+    wishes.insert(index.clamp(0, wishes.length).toInt(), w);
+    _commit();
+  }
+
+  /// Dizinden eklenen radyonun kapağını kaydeder
+  void setStationArt(String url, String art) {
+    if (art.isEmpty) return;
+    for (final c in radCats) {
+      for (final st in c.stations) {
+        if (st.url == url && st.art != art) {
+          st.art = art;
+          _commit();
+          return;
+        }
+      }
+    }
+  }
 
   /// Ekran açılırken: en az bir kategori olsun
   void tvReady() => _tvEnsure();
@@ -3973,6 +4034,25 @@ class TvCat {
       id: j['id'].toString(),
       name: (j['name'] ?? '').toString(),
       open: (j['open'] as bool?) ?? true);
+}
+
+/// "İsteklerim" listesindeki şarkı
+class Wish {
+  final String id;
+  String title; // şarkı adı
+  String artist; // sanatçı (bilinmiyorsa '')
+  String from; // hangi radyodan / çalardan eklendi
+  int at; // ekleme zamanı (ms)
+  Wish(this.id, this.title, this.artist, this.from, this.at);
+  Map<String, dynamic> toJson() =>
+      {'id': id, 't': title, 'a': artist, 'f': from, 'at': at};
+  factory Wish.fromJson(Map<String, dynamic> j) => Wish(
+      j['id'].toString(),
+      (j['t'] ?? '').toString(),
+      (j['a'] ?? '').toString(),
+      (j['f'] ?? '').toString(),
+      (j['at'] as num?)?.toInt() ?? 0);
+  String get query => artist.isEmpty ? title : '$artist $title';
 }
 
 class Wallet {

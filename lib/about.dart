@@ -11,12 +11,9 @@ import 'version.dart';
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
       tx('Verilerin korundu.'),
-      tx('Ana ekran arka planı her açılışta değişir: R, D ya da çapraz kalp biçimli dalgalar. D\'nin içinde köşelerden farklı tonlar var.'),
-      tx('Hava durumu sayfasının arka planı güncel havaya göre değişir: güneş, bulut, yağmur, kar, sis, fırtına ve gece.'),
-      tx('TV sekmesi radyo gibi oldu: kategoriler, favoriler, sürükleyerek sıralama ve kaydırarak düzenle/kaldır.'),
-      tx('Radyo ve TV dizinlerinde yazılı "Ekle" ve "Kaldır" düğmeleri; TV\'de eklerken kategori seçilir.'),
-      tx('Satır efektleri daha seyrek, dokunma halkası daha küçük.'),
-      tx('Soldaki menüden ve kilit ekranından "Your Book" yazısı kalktı. Ekle penceresinde Serbest satır, Kategori ile aynı çerçevede.'),
+      tx('Radyoda çalan şarkı adı (yayın gönderiyorsa) çalma çubuğunda ve ana ekrandaki radyo satırında görünür; istasyon kapağı da gösterilir.'),
+      tx('Şarkının yanındaki kalple "İsteklerim" listesine ekle (Müzik ve Radyo sayfasının sağ üstü). Listede Çal, YouTube, Spotify ve Amazon Music düğmeleri var.'),
+      tx('Telefonda Shazam kuruluysa radyo ve müzik çalarda Shazam düğmesi çıkar.'),
     ];
 
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {

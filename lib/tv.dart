@@ -549,10 +549,12 @@ class TvPlayerPage extends StatefulWidget {
 }
 
 class _TvPlayerPageState extends State<TvPlayerPage> {
+  late TvChan _ch = widget.chan; // şu an izlenen kanal (önceki/sonraki ile değişir)
   VideoPlayerController? _c;
   String? _err;
   bool _ui = true; // kontroller görünsün mü
   bool _land = false;
+  int _gen = 0; // kanal değişince eski açılışı geçersiz kılar
 
   @override
   void initState() {
@@ -563,8 +565,38 @@ class _TvPlayerPageState extends State<TvPlayerPage> {
     _open();
   }
 
+  /// Kanal listemdeki sıra: aynı kategorideki kanallar. Listede yoksa (dizinde deneme) boş.
+  List<TvChan> _siblings() {
+    final l = store.tvIn(_ch.cat);
+    return l.any((x) => x.id == _ch.id) ? l : const [];
+  }
+
+  bool get _canStep => _siblings().length > 1;
+
+  /// Önceki (-1) ya da sonraki (+1) kanal; sonda başa döner
+  void _step(int d) {
+    final l = _siblings();
+    if (l.length < 2) return;
+    final i = l.indexWhere((x) => x.id == _ch.id);
+    if (i < 0) return;
+    final n = (i + d) % l.length;
+    final next = l[n < 0 ? n + l.length : n];
+    HapticFeedback.selectionClick();
+    final old = _c;
+    _gen++;
+    setState(() {
+      _ch = next;
+      _c = null;
+      _err = null;
+      _ui = true;
+    });
+    old?.dispose();
+    _open();
+  }
+
   Future<void> _open() async {
-    final u = Uri.tryParse(widget.chan.url);
+    final g = _gen;
+    final u = Uri.tryParse(_ch.url);
     if (u == null) {
       setState(() => _err = tx('Yayın adresi geçersiz.'));
       return;
@@ -573,11 +605,14 @@ class _TvPlayerPageState extends State<TvPlayerPage> {
     _c = c;
     try {
       await c.initialize();
-      if (!mounted) return;
+      if (!mounted || g != _gen) {
+        if (g != _gen) await c.dispose();
+        return;
+      }
       await c.play();
       setState(() {});
     } catch (_) {
-      if (mounted) {
+      if (mounted && g == _gen) {
         setState(() => _err = tx('Yayın açılamadı. İnterneti ya da adresi kontrol et.'));
       }
     }
@@ -600,6 +635,7 @@ class _TvPlayerPageState extends State<TvPlayerPage> {
 
   @override
   void dispose() {
+    _gen++;
     try {
       WakelockPlus.disable();
     } catch (_) {}
@@ -618,6 +654,15 @@ class _TvPlayerPageState extends State<TvPlayerPage> {
       body: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => setState(() => _ui = !_ui),
+        // yukarı kaydır: sonraki kanal, aşağı kaydır: önceki kanal
+        onVerticalDragEnd: (d) {
+          final v = d.primaryVelocity ?? 0;
+          if (v < -400) {
+            _step(1);
+          } else if (v > 400) {
+            _step(-1);
+          }
+        },
         child: Stack(
           children: [
             Center(
@@ -649,7 +694,7 @@ class _TvPlayerPageState extends State<TvPlayerPage> {
                         onPressed: () => Navigator.of(context).maybePop(),
                       ),
                       Expanded(
-                        child: Text(widget.chan.name,
+                        child: Text(_ch.name,
                             style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 17,
@@ -667,22 +712,45 @@ class _TvPlayerPageState extends State<TvPlayerPage> {
                   ),
                 ),
               ),
-            if (_ui && ready)
+            if (_ui)
               Align(
                 alignment: Alignment.bottomCenter,
                 child: SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.only(bottom: 12),
-                    child: ValueListenableBuilder<VideoPlayerValue>(
-                      valueListenable: c!,
-                      builder: (_, v, __) => IconButton(
-                        iconSize: 46,
-                        color: Colors.white,
-                        icon: Icon(v.isPlaying
-                            ? Icons.pause_circle_filled_rounded
-                            : Icons.play_circle_fill_rounded),
-                        onPressed: () => v.isPlaying ? c!.pause() : c!.play(),
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_canStep)
+                          IconButton(
+                            iconSize: 38,
+                            color: Colors.white,
+                            tooltip: tx('Önceki kanal'),
+                            icon: const Icon(Icons.skip_previous_rounded),
+                            onPressed: () => _step(-1),
+                          ),
+                        if (ready)
+                          ValueListenableBuilder<VideoPlayerValue>(
+                            valueListenable: c!,
+                            builder: (_, v, __) => IconButton(
+                              iconSize: 46,
+                              color: Colors.white,
+                              icon: Icon(v.isPlaying
+                                  ? Icons.pause_circle_filled_rounded
+                                  : Icons.play_circle_fill_rounded),
+                              onPressed: () =>
+                                  v.isPlaying ? c!.pause() : c!.play(),
+                            ),
+                          ),
+                        if (_canStep)
+                          IconButton(
+                            iconSize: 38,
+                            color: Colors.white,
+                            tooltip: tx('Sonraki kanal'),
+                            icon: const Icon(Icons.skip_next_rounded),
+                            onPressed: () => _step(1),
+                          ),
+                      ],
                     ),
                   ),
                 ),

@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'ambient.dart';
@@ -31,6 +32,18 @@ class AppsChannel {
       return out;
     } catch (_) {
       return [];
+    }
+  }
+
+  /// Dosyayı telefonun İndirilenler/GunlukYedek klasörüne yazar (Android 10+).
+  /// Uygulama kaldırılsa da bu dosya silinmez. Başarılıysa true.
+  static Future<bool> saveDownload(String name, Uint8List bytes) async {
+    try {
+      return (await _c.invokeMethod<bool>(
+              'saveDownload', {'name': name, 'bytes': bytes})) ??
+          false;
+    } catch (_) {
+      return false;
     }
   }
 

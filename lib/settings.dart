@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'ambient.dart';
+import 'backup.dart';
 import 'data.dart';
 import 'about.dart';
 import 'intro.dart';
@@ -25,6 +26,11 @@ import 'weather.dart';
 // tanıtımı tekrar göster.
 // Dil değişince adı değiştirilmemiş hazır kategoriler de çevrilir.
 // ---------------------------------------------------------------
+String _bkDate(DateTime d) {
+  String t(int v) => v.toString().padLeft(2, '0');
+  return '${t(d.day)}.${t(d.month)}.${d.year} ${t(d.hour)}:${t(d.minute)}';
+}
+
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
@@ -524,12 +530,58 @@ class SettingsPage extends StatelessWidget {
               ]),
               sec(tx('Yedek'), [
               Text(
-                tx('Uygulamayı kaldırırsan tüm verilerin silinir. Kaldırmadan önce yedek al: yedek metin olarak panoya kopyalanır; bir not uygulamasına ya da kendine mesaj olarak yapıştırıp sakla. Yedek, günlük notların dahil tüm verini içerir; sakladığın yeri başkalarıyla paylaşma.'),
+                tx('Uygulamayı kaldırırsan tüm verilerin silinir. Yedek dosyası günlük notların, yapılacakların ve ses kayıtların dahil tüm verini tek bir .zip dosyasında toplar. Sakladığın yeri başkalarıyla paylaşma.'),
                 style: TextStyle(fontSize: 12.5, color: p.soft, height: 1.4),
               ),
               const SizedBox(height: 10),
               Wrap(spacing: 8, runSpacing: 8, children: [
                 FilledButton.icon(
+                  onPressed: () => saveBackupFile(context),
+                  icon: const Icon(Icons.save_alt_rounded),
+                  label: Text(tx('Yedeği dosyaya kaydet')),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => restoreBackupFile(context),
+                  icon: const Icon(Icons.folder_open_rounded),
+                  label: Text(tx('Dosyadan geri yükle')),
+                ),
+              ]),
+              const SizedBox(height: 14),
+              Text(tx('Otomatik yedek'),
+                  style: TextStyle(fontWeight: FontWeight.w700, color: p.ink)),
+              const SizedBox(height: 6),
+              Wrap(spacing: 8, children: [
+                for (final e in [(0, tx('Kapalı')), (1, tx('Haftalık')), (2, tx('Günlük'))])
+                  ChoiceChip(
+                    label: Text(e.$2),
+                    selected: store.pInt('abk', 1) == e.$1,
+                    onSelected: (_) {
+                      store.setProf('abk', e.$1);
+                      autoBackupTick();
+                    },
+                  ),
+              ]),
+              const SizedBox(height: 6),
+              Text(
+                tx('Otomatik yedek, verilerini telefonun İndirilenler/GunlukYedek klasörüne yazar (Android 10 ve üstü). Uygulamayı kaldırsan da dosya silinmez. Yeniden kurunca "Dosyadan geri yükle"yi seçip bu klasördeki en yeni dosyayı göster. Otomatik yedekte ses kayıtları yoktur; onlar için dosyaya kaydet.'),
+                style: TextStyle(fontSize: 12.5, color: p.soft, height: 1.4),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                store.pInt('lastbk', 0) > 0
+                    ? tx('Son yedek: {0}', [
+                        _bkDate(DateTime.fromMillisecondsSinceEpoch(
+                            store.pInt('lastbk', 0)))
+                      ])
+                    : tx('Henüz yedek alınmadı.'),
+                style: TextStyle(fontSize: 12.5, color: p.ink),
+              ),
+              const SizedBox(height: 12),
+              Text(tx('Metin olarak (eski yöntem)'),
+                  style: TextStyle(fontWeight: FontWeight.w700, color: p.ink)),
+              const SizedBox(height: 6),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                OutlinedButton.icon(
                   onPressed: () => _copyBackup(context),
                   icon: const Icon(Icons.copy_rounded),
                   label: Text(tx('Yedeği kopyala')),

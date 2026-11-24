@@ -70,7 +70,9 @@ class RbStation {
   final String country;
   final String tags;
   final int bitrate;
-  RbStation(this.name, this.url, this.country, this.tags, this.bitrate);
+  final String icon; // istasyon logosu (adres) ya da ''
+  RbStation(this.name, this.url, this.country, this.tags, this.bitrate,
+      [this.icon = '']);
 }
 
 class RbCountry {
@@ -129,7 +131,9 @@ Future<List<RbStation>> rbSearch(
     if (url.isEmpty || nm.isEmpty) continue;
     final tags = (m['tags'] ?? '').toString().split(',').where((x) => x.trim().isNotEmpty).take(2).join(', ');
     final br = (m['bitrate'] is num) ? (m['bitrate'] as num).toInt() : 0;
-    out.add(RbStation(nm, url, (m['country'] ?? '').toString(), tags, br));
+    final ic = (m['favicon'] ?? '').toString().trim();
+    out.add(RbStation(nm, url, (m['country'] ?? '').toString(), tags, br,
+        ic.startsWith('http') ? ic : ''));
   }
   return out;
 }

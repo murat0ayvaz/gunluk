@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'about.dart';
 import 'add_sheet.dart';
 import 'ambient.dart';
+import 'backup.dart';
+import 'wake.dart';
 import 'fx.dart';
 import 'data.dart';
 import 'profile.dart' show EntryLine;
@@ -13,6 +15,7 @@ import 'media.dart';
 import 'drawer.dart';
 import 'notes.dart';
 import 'notify.dart';
+import 'nowradio.dart';
 import 'reminders.dart';
 import 'rowedit.dart';
 import 'study.dart';
@@ -102,10 +105,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     weather.ensure(); // hava durumu açıksa verisini yükle
     voiceListener.ctx = context; // sürekli dinleme komutları bu ekranın üstünde çalıştırır
     voiceListener.sync();
+    wakeEngine.tryLoad().then((_) {
+      if (wakeEngine.ready) voiceListener.engineChanged();
+    });
     store.rollTodos(); // bitmeyen geçmiş maddeler bugüne taşınır
     _wasAll = store.todayGoals().all;
     store.addListener(_checkGoals);
     homeReset.addListener(_onHomeReset);
+    // Otomatik yedek: açılıştan kısa süre sonra, süresi dolduysa
+    Future<void>.delayed(const Duration(seconds: 4), () {
+      if (mounted) autoBackupTick();
+    });
     // Güncelleme sonrası ilk açılışta "Uygulama güncellendi" penceresi
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && store.takeUpdateNotice()) {
@@ -162,6 +172,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       weather.ensure(); // 30 dakikadan eskiyse yeniler
       prayer.ensure(); // gün değiştiyse namaz vakitleri
       store.rollTodos(); // gün değişmiş olabilir
+      autoBackupTick(); // süresi dolduysa otomatik yedek
       setState(() {});
     }
   }
@@ -929,6 +940,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     date == dKey(DateTime.now()))
                 ? EntryLine(onTap: () => setState(() => _openSec.add('routine')))
                 : null;
+            // Çalan radyo satırı (radyo çalmıyorsa kendiliğinden boş görünür)
+            final Widget? radLine = (!kbSection && !_hidden.contains('rad'))
+                ? RadioNowSlot(wrap: (w) => _bar('rad', w))
+                : null;
+            final bkLine = (!kbSection &&
+                    !_hidden.contains('bk') &&
+                    backupDue() &&
+                    date == dKey(DateTime.now()))
+                ? BackupLine(onTap: () => saveBackupFile(context))
+                : null;
             List<Widget> bars({bool reversed = false}) {
               final wxFirst =
                   store.secOrder.indexOf('wx') < store.secOrder.indexOf('pr');
@@ -943,6 +964,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               final firstWx = reversed ? !wxFirst : wxFirst;
               final l = [
                 if (erLine != null) _bar('er', erLine),
+                if (bkLine != null) _bar('bk', bkLine),
+                if (radLine != null) radLine,
                 ...(firstWx ? [...wx, ...pr] : [...pr, ...wx]),
               ];
               return l;

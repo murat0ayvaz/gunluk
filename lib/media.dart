@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'ambient.dart';
@@ -9,6 +10,7 @@ import 'music.dart';
 import 'news.dart';
 import 'online.dart';
 import 'net.dart';
+import 'nowsong.dart';
 import 'podcast.dart';
 import 'radio.dart';
 import 'strings.dart';
@@ -69,6 +71,8 @@ class MediaCtl extends ChangeNotifier {
   final Random _rnd = Random();
   String? nowId; // çalan şarkı / radyo / bölüm kimliği
   String nowTitle = '';
+  String icyTitle = ''; // radyo yayınından gelen şarkı adı (StreamTitle)
+  String icyUrl = ''; // yayından gelen adres / kapak (StreamUrl)
   String nowKind = ''; // song | radio | pod
   String? curListId; // çalan şarkının oynatma listesi
   String? podKey; // çalan podcast bölümünün kayıt anahtarı
@@ -78,6 +82,33 @@ class MediaCtl extends ChangeNotifier {
   int _lastSave = 0;
 
   bool get playing => player.playing;
+
+  /// Çalan radyonun kapağı: listedeki logo, yoksa yayının gönderdiği resim adresi
+  String get nowArt {
+    if (!isRadio) return '';
+    for (final c in store.radCats) {
+      for (final st in c.stations) {
+        if (st.id == nowId && st.art.isNotEmpty) return st.art;
+      }
+    }
+    final u = icyUrl.toLowerCase().split('?').first;
+    if (u.startsWith('http') &&
+        (u.endsWith('.jpg') || u.endsWith('.jpeg') || u.endsWith('.png') || u.endsWith('.webp'))) {
+      return icyUrl;
+    }
+    return '';
+  }
+
+  /// Şarkı: radyoda yayından gelen "Sanatçı - Şarkı", çalarda parça adı; (sanatçı, şarkı)
+  (String, String) get nowSong {
+    final t = isRadio ? icyTitle : (isSong || isOnline ? nowTitle : '');
+    if (t.isEmpty) return ('', '');
+    final i = t.indexOf(' - ');
+    if (i > 0 && i < t.length - 3) {
+      return (t.substring(0, i).trim(), t.substring(i + 3).trim());
+    }
+    return ('', t.trim());
+  }
   bool get isRadio => nowKind == _kRadio;
   bool get isSong => nowKind == _kSong;
   bool get isPod => nowKind == _kPod;
@@ -102,6 +133,16 @@ class MediaCtl extends ChangeNotifier {
     _started = true;
     player.currentIndexStream.listen((i) {
       if (_guarded && i != null && i != 1) _onGuard(i);
+    });
+    player.icyMetadataStream.listen((m) {
+      if (!isRadio) return;
+      var t = (m?.info?.title ?? '').trim();
+      final u = (m?.info?.url ?? '').trim();
+      if (t.toLowerCase() == nowTitle.toLowerCase()) t = ''; // istasyon adını tekrar etme
+      if (t == icyTitle && u == icyUrl) return;
+      icyTitle = t;
+      icyUrl = u;
+      notifyListeners();
     });
     player.playingStream.listen((pl) {
       if (!isNews || DateTime.now().isBefore(newsIgnoreUntil)) return;
@@ -181,6 +222,8 @@ class MediaCtl extends ChangeNotifier {
     } catch (_) {}
     podKey = pKey;
     error = null;
+    icyTitle = '';
+    icyUrl = '';
     nowKind = kind;
     nowId = id;
     nowTitle = title;
@@ -304,6 +347,13 @@ class MediaCtl extends ChangeNotifier {
         await player.pause();
       }
     } catch (_) {}
+  }
+
+  /// Radyoda önceki (-1) / sonraki (+1) istasyon; aynı kategoride döner.
+  /// Yüklenirken art arda basış yok sayılır.
+  void radioStep(int d) {
+    if (loading) return;
+    _radioStep(d);
   }
 
   void _radioStep(int d) {
@@ -486,6 +536,8 @@ class MediaCtl extends ChangeNotifier {
     _srcGen++;
     nowId = null;
     nowTitle = '';
+    icyTitle = '';
+    icyUrl = '';
     nowKind = '';
     podKey = null;
     error = null;
@@ -690,6 +742,14 @@ class MediaPage extends StatelessWidget {
             backgroundColor: ambBg(p),
             appBar: AppBar(
               title: Text(tx('Müzik ve Radyo')),
+              actions: [
+                IconButton(
+                  tooltip: tx('İsteklerim'),
+                  icon: const Icon(Icons.favorite_border_rounded),
+                  onPressed: () => Navigator.of(context)
+                      .push(slideFromRight(const WishesPage())),
+                ),
+              ],
               bottom: TabBar(tabs: [for (final id in ids) tab(id)]),
             ),
             body: Column(
@@ -738,7 +798,22 @@ class NowBar extends StatelessWidget {
         final rep = store.repeatMode;
         final shuf = store.shuffleOn;
         final tone = tagTone(media.nowId ?? '');
-        return Container(
+        return GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          // radyoda yukarı kaydır: sonraki istasyon, aşağı kaydır: önceki
+          onVerticalDragEnd: media.isRadio
+              ? (d) {
+                  final v = d.primaryVelocity ?? 0;
+                  if (v < -400) {
+                    HapticFeedback.selectionClick();
+                    media.radioStep(1);
+                  } else if (v > 400) {
+                    HapticFeedback.selectionClick();
+                    media.radioStep(-1);
+                  }
+                }
+              : null,
+          child: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
@@ -772,6 +847,8 @@ class NowBar extends StatelessWidget {
                         icon: const Icon(Icons.close_rounded)),
                   ],
                 ),
+                if (media.isRadio || media.isSong || media.isOnline)
+                  const SongInfoBlock(),
                 if (media.error != null)
                   Align(
                     alignment: Alignment.centerLeft,
@@ -837,6 +914,12 @@ class NowBar extends StatelessWidget {
                               : media.prev,
                           icon: const Icon(Icons.skip_previous_rounded,
                               size: 32)),
+                    if (media.isRadio)
+                      IconButton(
+                          tooltip: tx('Önceki istasyon'),
+                          onPressed: () => media.radioStep(-1),
+                          icon: const Icon(Icons.skip_previous_rounded,
+                              size: 32)),
                     if (media.isPod)
                       IconButton(
                           tooltip: tx('10 sn geri'),
@@ -859,6 +942,11 @@ class NowBar extends StatelessWidget {
                                     ? Icons.pause_circle_filled_rounded
                                     : Icons.play_circle_fill_rounded,
                                 size: 48)),
+                    if (media.isRadio)
+                      IconButton(
+                          tooltip: tx('Sonraki istasyon'),
+                          onPressed: () => media.radioStep(1),
+                          icon: const Icon(Icons.skip_next_rounded, size: 32)),
                     if (media.isSong || media.isOnline)
                       IconButton(
                           tooltip: tx('Sonraki'),
@@ -882,6 +970,7 @@ class NowBar extends StatelessWidget {
                 ),
               ],
             ),
+          ),
           ),
         );
       },
