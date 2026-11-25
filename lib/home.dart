@@ -810,8 +810,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     listenable: media,
                     builder: (context, _) => GestureDetector(
                       onLongPress: () => showDockMenu(context),
+                      // Not: IconButton'un tooltip'i uzun basmayı kendi alır; menü açılmaz. O yüzden tooltip yok.
                       child: IconButton(
-                        tooltip: tx('Müzik ve Radyo'),
                         onPressed: () => Navigator.of(context)
                             .push(slideFromRight(const MediaPage())),
                         icon: Icon(media.nowId != null && media.playing

@@ -1,11 +1,11 @@
-DAILY ROUTINE v1.25.27 - TAM PAKET
+DAILY ROUTINE v1.25.29 - TAM PAKET
 
 Bu zipte projenin TAMAMI var: .github, assets, lib, debug.keystore, pubspec.yaml.
 1) Zipi çıkar. GitHub'da "gunluk" reposunun ANA sayfasında: Add file > Upload files.
 2) Çıkan klasörlerin ve dosyaların HEPSİNİ (.github, assets, lib, debug.keystore, pubspec.yaml) sürükle-bırak > Commit changes.
    (YENİ: lib/backup.dart, lib/nowsong.dart, lib/icy.dart, lib/dock.dart, lib/tvpop.dart, lib/wake.dart. pubspec.yaml'a archive ve vosk_flutter_2 eklendi.)
 3) Actions > yeşil tik > Artifacts > gunluk-apk indir, telefona kur (veriler kalır).
-Derleme hatası olursa Actions'taki kırmızı satırları gönder.v1.25.27 yenilikleri:
+Derleme hatası olursa Actions'taki kırmızı satırları gönder.v1.25.29 yenilikleri:
 - Calma seridi: ustteki simgelerin altinda tam genisliklte; solda ok (kontroller), sagda X. Radyoda yukari/asagi kaydirinca sonraki/onceki istasyon, dokununca Favoriler.
 - Kulaklik simgesine uzun bas: Muzik, Radyo, TV, Podcast, Haber, Online menusu + Kisayol cubugunu sabitle.
 - TV: ana ekranin ustunde yuzen pencere (surukle, tam ekran, yan cevirince tam ekran). Uygulamadan cikinca durur.
@@ -13,3 +13,5 @@ Derleme hatası olursa Actions'taki kırmızı satırları gönder.v1.25.27 yeni
 - Rutini sola tam cekmek artik tum gunlerden kaldirmaz.
 - Cevrimdisi sesli dinleme (vosk_flutter_2). 1.25.26'da model indirince uygulama kapaniyordu: cokme korumasi eklendi. Bir yerel adim uygulamayi kapatirsa motor kendini kapatir ve eski yontem calisir.
 - GitHub'da DEGISIKLIK VAR: .github/workflows/build.yml guncellendi (Shazam simgesi + eklenti namespace yamasi + Vosk minSdk izni). .github klasorunu mutlaka yukle.
+- Kulaklik simgesine uzun basinca menu acilmiyordu (simgenin kendi ipucu uzun basmayi aliyordu): duzeltildi.
+- Cevrimdisi model indirince uygulama kapaniyordu (JNA kutuphanesi R8 kod kucultmesinde bozuluyordu): koruma kurallari eklendi. GitHub'da DEGISIKLIK VAR: .github/workflows/build.yml. .github klasorunu mutlaka yukle.
