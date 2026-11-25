@@ -300,6 +300,9 @@ jobs:
           s = open(m, encoding='utf-8').read()
           if 'RECORD_AUDIO' not in s:
               s = s.replace('<application', '    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <application', 1)
+          # vosk_flutter_2 kendini minSdk 30 ilan ediyor; uygulama minSdk 24 kalsın diye zorla kullan
+          if 'overrideLibrary' not in s:
+              s = s.replace('<application', '    <uses-sdk tools:overrideLibrary="org.vosk.vosk_flutter"/>\n    <application', 1)
           if 'android.speech.RecognitionService' not in s:
               add = '        <intent><action android:name="android.speech.RecognitionService"/></intent>\n'
               if '</queries>' in s:
