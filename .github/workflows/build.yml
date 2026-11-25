@@ -315,10 +315,10 @@ jobs:
                   done = True
                   break
               if g.endswith('.kts'):
-                  line = '\n            proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")'
+                  line = '\n            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")'
                   t2 = re.sub(r'(buildTypes\s*\{\s*(?:getByName\("release"\)|release)\s*\{)', lambda m: m.group(1) + line, t, count=1)
               else:
-                  line = "\n            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'"
+                  line = "\n            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'"
                   t2 = re.sub(r'(buildTypes\s*\{\s*release\s*\{)', lambda m: m.group(1) + line, t, count=1)
               if t2 != t:
                   open(g, 'w', encoding='utf-8').write(t2)
