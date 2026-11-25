@@ -1,11 +1,11 @@
-DAILY ROUTINE v1.25.29 - TAM PAKET
+DAILY ROUTINE v1.25.30 - TAM PAKET
 
 Bu zipte projenin TAMAMI var: .github, assets, lib, debug.keystore, pubspec.yaml.
 1) Zipi çıkar. GitHub'da "gunluk" reposunun ANA sayfasında: Add file > Upload files.
 2) Çıkan klasörlerin ve dosyaların HEPSİNİ (.github, assets, lib, debug.keystore, pubspec.yaml) sürükle-bırak > Commit changes.
    (YENİ: lib/backup.dart, lib/nowsong.dart, lib/icy.dart, lib/dock.dart, lib/tvpop.dart, lib/wake.dart. pubspec.yaml'a archive ve vosk_flutter_2 eklendi.)
 3) Actions > yeşil tik > Artifacts > gunluk-apk indir, telefona kur (veriler kalır).
-Derleme hatası olursa Actions'taki kırmızı satırları gönder.v1.25.29 yenilikleri:
+Derleme hatası olursa Actions'taki kırmızı satırları gönder.v1.25.30 yenilikleri:
 - Calma seridi: ustteki simgelerin altinda tam genisliklte; solda ok (kontroller), sagda X. Radyoda yukari/asagi kaydirinca sonraki/onceki istasyon, dokununca Favoriler.
 - Kulaklik simgesine uzun bas: Muzik, Radyo, TV, Podcast, Haber, Online menusu + Kisayol cubugunu sabitle.
 - TV: ana ekranin ustunde yuzen pencere (surukle, tam ekran, yan cevirince tam ekran). Uygulamadan cikinca durur.
