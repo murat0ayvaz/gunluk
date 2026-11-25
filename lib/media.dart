@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'ambient.dart';
 import 'data.dart';
+import 'icy.dart';
 import 'music.dart';
 import 'news.dart';
 import 'online.dart';
@@ -73,6 +75,40 @@ class MediaCtl extends ChangeNotifier {
   String nowTitle = '';
   String icyTitle = ''; // radyo yayınından gelen şarkı adı (StreamTitle)
   String icyUrl = ''; // yayından gelen adres / kapak (StreamUrl)
+  bool icyNone = false; // bu istasyon şarkı bilgisi göndermiyor
+  Timer? _icyTimer;
+  int _icyGen = 0;
+
+  /// Radyo çalarken yayından şarkı adını ~15 sn'de bir okur (çaladan bağımsız)
+  void _icyStart(String url) {
+    _icyStop();
+    final g = _icyGen;
+    Future<void> tick() async {
+      if (g != _icyGen || !isRadio) return;
+      final r = await icyFetch(url);
+      if (g != _icyGen || !isRadio) return;
+      var t = r.title;
+      if (t.toLowerCase() == nowTitle.toLowerCase()) t = '';
+      final none = !r.supported;
+      if (t != icyTitle || r.url != icyUrl || none != icyNone) {
+        icyTitle = t;
+        icyUrl = r.url;
+        icyNone = none;
+        notifyListeners();
+      }
+      if (none) _icyTimer?.cancel(); // desteklemiyor: boşuna tekrar etme
+    }
+
+    tick();
+    _icyTimer = Timer.periodic(const Duration(seconds: 15), (_) => tick());
+  }
+
+  void _icyStop() {
+    _icyGen++;
+    _icyTimer?.cancel();
+    _icyTimer = null;
+    icyNone = false;
+  }
   String nowKind = ''; // song | radio | pod
   String? curListId; // çalan şarkının oynatma listesi
   String? podKey; // çalan podcast bölümünün kayıt anahtarı
@@ -139,9 +175,10 @@ class MediaCtl extends ChangeNotifier {
       var t = (m?.info?.title ?? '').trim();
       final u = (m?.info?.url ?? '').trim();
       if (t.toLowerCase() == nowTitle.toLowerCase()) t = ''; // istasyon adını tekrar etme
-      if (t == icyTitle && u == icyUrl) return;
+      if (t.isEmpty || (t == icyTitle && u == icyUrl)) return; // boş gelen, kendi okuduğumuzu silmesin
       icyTitle = t;
-      icyUrl = u;
+      if (u.isNotEmpty) icyUrl = u;
+      icyNone = false;
       notifyListeners();
     });
     player.playingStream.listen((pl) {
@@ -222,6 +259,7 @@ class MediaCtl extends ChangeNotifier {
     } catch (_) {}
     podKey = pKey;
     error = null;
+    _icyStop();
     icyTitle = '';
     icyUrl = '';
     nowKind = kind;
@@ -254,6 +292,11 @@ class MediaCtl extends ChangeNotifier {
       }
       loading = false;
       notifyListeners();
+      if (kind == _kRadio) {
+        _icyStart(uri.toString());
+      } else {
+        _icyStop();
+      }
       player.play(); // çalma bitene kadar tamamlanmaz, beklenmez
     } catch (e) {
       loading = false;
@@ -264,6 +307,8 @@ class MediaCtl extends ChangeNotifier {
 
   Future<void> playSong(Playlist pl, Song s) async {
     curListId = pl.id;
+    store.setProf('lspl', pl.id); // ana ekran kısayolu: son çalan şarkı
+    store.setProf('lsong', s.id);
     if (!File(s.path).existsSync()) {
       _start();
       nowKind = _kSong;
@@ -536,6 +581,7 @@ class MediaCtl extends ChangeNotifier {
     _srcGen++;
     nowId = null;
     nowTitle = '';
+    _icyStop();
     icyTitle = '';
     icyUrl = '';
     nowKind = '';

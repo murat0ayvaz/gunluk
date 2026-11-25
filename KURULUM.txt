@@ -1,15 +1,15 @@
-DAILY ROUTINE v1.25.21 - TAM PAKET
+DAILY ROUTINE v1.25.22 - TAM PAKET
 
 Bu zipte projenin TAMAMI var: .github, assets, lib, debug.keystore, pubspec.yaml.
 1) Zipi çıkar. GitHub'da "gunluk" reposunun ANA sayfasında: Add file > Upload files.
 2) Çıkan klasörlerin ve dosyaların HEPSİNİ (.github, assets, lib, debug.keystore, pubspec.yaml) sürükle-bırak > Commit changes.
-   (YENİ: lib/backup.dart, lib/nowradio.dart, lib/nowsong.dart. pubspec.yaml'a archive eklendi.)
+   (YENİ: lib/backup.dart, lib/nowsong.dart, lib/icy.dart, lib/dock.dart, lib/tvpop.dart, lib/wake.dart. pubspec.yaml'a archive ve vosk_flutter_2 eklendi.)
 3) Actions > yeşil tik > Artifacts > gunluk-apk indir, telefona kur (veriler kalır).
-Derleme hatası olursa Actions'taki kırmızı satırları gönder.v1.25.21 yenilikleri:
-- Yedek: ses kayitlariyla tek .zip dosyasi olarak kaydet / dosyadan geri yukle. Otomatik yedek (Kapali/Haftalik/Gunluk) Indirilenler/GunlukYedek klasorune yazar. 7 gun yedek almazsan ana ekranda ve bildirimde uyarir.
-- Ana ekranda calan radyo satiri; radyo ve TV oynaticida onceki/sonraki tuslari, yukari kaydirinca sonraki, asagi kaydirinca onceki.
-- Sesli komut sirasinda radyo duraklar, sonra devam eder. Komut listesinde dinleme durumu paneli.
-- Radyo: yayinin gonderdigi sarki adi (varsa) calma cubugunda ve ana ekrandaki radyo satirinda; istasyon kapagi.
-- Isteklerim listesi (kalp ile ekle; Cal, YouTube, Spotify, Amazon Music) ve Shazam dugmesi (telefonda kuruluysa).
-- Vosk (cevrimdisi dinleme) cikarildi: eklentisi bildirim paketiyle uyusmuyordu.
-- GitHub'da DEGISIKLIK VAR: .github/workflows/build.yml guncellendi (Indirilenler'e yazma kodu). .github klasorunu mutlaka yukle.
+Derleme hatası olursa Actions'taki kırmızı satırları gönder.v1.25.22 yenilikleri:
+- Calma seridi: ustteki simgelerin altinda tam genisliklte; solda ok (kontroller), sagda X. Radyoda yukari/asagi kaydirinca sonraki/onceki istasyon, dokununca Favoriler.
+- Kulaklik simgesine uzun bas: Muzik, Radyo, TV, Podcast, Haber, Online menusu + Kisayol cubugunu sabitle.
+- TV: ana ekranin ustunde yuzen pencere (surukle, tam ekran, yan cevirince tam ekran). Uygulamadan cikinca durur.
+- Radyo sarki bilgisi yayindan dogrudan okunur; Shazam dugmesi gercek Shazam simgesiyle.
+- Rutini sola tam cekmek artik tum gunlerden kaldirmaz.
+- Cevrimdisi sesli dinleme yeniden denendi (vosk_flutter_2). Derlenmezse Actions satirlarini gonder.
+- GitHub'da DEGISIKLIK VAR: .github/workflows/build.yml guncellendi (Shazam simgesi icin Android kodu). .github klasorunu mutlaka yukle.

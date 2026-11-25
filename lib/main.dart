@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'tvpop.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'data.dart';
 import 'home.dart';
@@ -72,8 +73,14 @@ class GunlukApp extends StatelessWidget {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        builder: (context, child) =>
-            PullHome(navKey: navKey, child: child ?? const SizedBox.shrink()),
+        builder: (context, child) => Stack(
+          children: [
+            Positioned.fill(
+                child: PullHome(
+                    navKey: navKey, child: child ?? const SizedBox.shrink())),
+            const TvPopHost(), // TV pop-up: tüm sayfaların üstünde
+          ],
+        ),
         home: const Gate(),
       ),
     );

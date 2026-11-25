@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:vosk_flutter/vosk_flutter.dart';
+import 'package:vosk_flutter_2/vosk_flutter_2.dart';
 import 'data.dart';
 import 'strings.dart';
 
@@ -14,6 +14,7 @@ import 'strings.dart';
 // ---------------------------------------------------------------
 const String _kModelUrl =
     'https://alphacephei.com/vosk/models/vosk-model-small-tr-0.3.zip';
+const String _kModelName = 'vosk-model-small-tr-0.3';
 
 class WakeEngine extends ChangeNotifier {
   bool ready = false; // model yüklü, konuşma servisi hazır
@@ -39,8 +40,7 @@ class WakeEngine extends ChangeNotifier {
   Future<void> tryLoad() async {
     if (ready || downloading) return;
     try {
-      final loader = ModelLoader();
-      if (!await loader.isModelAlreadyLoaded('vosk-model-small-tr-0.3')) return;
+      if (!await ModelLoader().isModelAlreadyLoaded(_kModelName)) return;
       await _init();
     } catch (e) {
       _set(tx('Çevrimdışı motor başlatılamadı.'), err: '$e');
@@ -53,7 +53,6 @@ class WakeEngine extends ChangeNotifier {
     downloading = true;
     _set(tx('Model indiriliyor (~40 MB)...'));
     try {
-      await ModelLoader().loadFromNetwork(_kModelUrl);
       await _init();
     } catch (e) {
       _set(tx('İndirme ya da kurulum başarısız.'), err: '$e');
@@ -63,8 +62,7 @@ class WakeEngine extends ChangeNotifier {
   }
 
   Future<void> _init() async {
-    final loader = ModelLoader();
-    final path = await loader.loadFromNetwork(_kModelUrl);
+    final path = await ModelLoader().loadFromNetwork(_kModelUrl);
     final vosk = VoskFlutterPlugin.instance();
     _model = await vosk.createModel(path);
     _rec = await vosk.createRecognizer(model: _model!, sampleRate: 16000);

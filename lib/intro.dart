@@ -43,7 +43,7 @@ Widget _bookImage(double h) => SizedBox(
 // ---------------------------------------------------------------
 List<String> _tips() => [
       tx('Ekle için sağ alttaki DR düğmesine dokun.'),
-      tx('Bir satırı sağa kaydırınca düzenlenir; sola kısa kaydırınca rutin o gün kalkar, tamamen kaydırınca tüm günlerden kalkar.'),
+      tx('Bir satırı sağa kaydırınca düzenlenir; sola kaydırınca rutin o gün kalkar. Tüm günlerden kaldırmak için düzenlemede “Rutin olsun” anahtarını kapat.'),
       tx('Satırın solundaki ≡ simgesinden sürükleyerek rutinlerini sıralayabilirsin.'),
       tx('Boş yere sağa veya sola kaydırarak günler arasında geçebilirsin.'),
       tx('Günün notunu yazmak için ana ekranda rutinlerin altındaki Günlük başlığını açabilirsin.'),
@@ -249,7 +249,7 @@ List<_Pg> _pages() => [
       ),
       _Pg(
         tx('Rutin oluştur, hedef koy'),
-        tx('Sağ alttaki DR düğmesine dokun; kategori ve alt kategori seç, “Rutin olsun” anahtarını aç ve günlük hedefini yaz. Hedefe ulaşınca satır yeşile döner. Satırı sağa kaydırarak düzenle; sola kısa kaydırarak rutini o gün için, tamamen kaydırarak tüm günlerden kaldır; ≡ ile sürükleyip sırala. Boş yere sağa veya sola kaydırarak günler arasında geçebilirsin.'),
+        tx('Sağ alttaki DR düğmesine dokun; kategori ve alt kategori seç, “Rutin olsun” anahtarını aç ve günlük hedefini yaz. Hedefe ulaşınca satır yeşile döner. Satırı sağa kaydırarak düzenle; sola kaydırarak rutini o gün için kaldır (tüm günlerden kaldırmak için düzenlemede “Rutin olsun” anahtarını kapat); ≡ ile sürükleyip sırala. Boş yere sağa veya sola kaydırarak günler arasında geçebilirsin.'),
       ),
       _Pg(
         tx('İstatistikler soldaki menüde'),

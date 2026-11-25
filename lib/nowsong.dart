@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'ambient.dart';
@@ -26,6 +27,43 @@ Future<bool> shazamInstalled() {
     _shazamOk = l.any((e) => e.$2 == _kShazam);
     return _shazamOk!;
   });
+}
+
+Future<Uint8List?>? _shazamIcon;
+
+/// Shazam düğmesi: telefondaki gerçek Shazam simgesi; kurulu değilse hiçbir şey çizmez
+class ShazamButton extends StatelessWidget {
+  final double size;
+  const ShazamButton({super.key, this.size = 26});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<bool>(
+      future: shazamInstalled(),
+      builder: (context, snap) {
+        if (snap.data != true) return const SizedBox.shrink();
+        _shazamIcon ??= AppsChannel.icon(_kShazam);
+        return FutureBuilder<Uint8List?>(
+          future: _shazamIcon,
+          builder: (context, ic) {
+            final b = ic.data;
+            return IconButton(
+              tooltip: 'Shazam',
+              visualDensity: VisualDensity.compact,
+              onPressed: () => AppsChannel.launch(_kShazam),
+              icon: b == null
+                  ? Icon(Icons.graphic_eq_rounded, size: size)
+                  : ClipRRect(
+                      borderRadius: BorderRadius.circular(size / 4),
+                      child: Image.memory(b,
+                          width: size, height: size, fit: BoxFit.cover),
+                    ),
+            );
+          },
+        );
+      },
+    );
+  }
 }
 
 Future<void> _open(String url) async {
@@ -109,20 +147,15 @@ class SongInfoBlock extends StatelessWidget {
                             style: TextStyle(color: p.soft, fontSize: 12.5)),
                     ],
                   )
-                : Text(isRadio ? tx('Şarkı bilgisi yok') : '',
+                : Text(
+                    isRadio
+                        ? (media.icyNone
+                            ? tx('Bu istasyon şarkı bilgisi göndermiyor')
+                            : tx('Şarkı bilgisi aranıyor...'))
+                        : '',
                     style: TextStyle(color: p.soft, fontSize: 12.5)),
           ),
-          FutureBuilder<bool>(
-            future: shazamInstalled(),
-            builder: (context, snap) => snap.data == true
-                ? IconButton(
-                    tooltip: 'Shazam',
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () => AppsChannel.launch(_kShazam),
-                    icon: Icon(Icons.graphic_eq_rounded, color: p.accent),
-                  )
-                : const SizedBox.shrink(),
-          ),
+          const ShazamButton(),
           if (showSong)
             IconButton(
               tooltip: has ? tx('İsteklerimde') : tx('İsteklerime ekle'),

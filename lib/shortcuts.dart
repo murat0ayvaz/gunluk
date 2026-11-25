@@ -47,6 +47,16 @@ class AppsChannel {
     }
   }
 
+  /// Telefondaki uygulamanın kendi simgesi (PNG baytları); yoksa null
+  static Future<Uint8List?> icon(String pkg) async {
+    try {
+      final r = await _c.invokeMethod<Uint8List>('icon', {'pkg': pkg});
+      return r;
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<bool> launch(String pkg) async {
     try {
       return (await _c.invokeMethod<bool>('launch', {'pkg': pkg})) ?? false;

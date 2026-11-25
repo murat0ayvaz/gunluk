@@ -11,13 +11,13 @@ import 'version.dart';
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
       tx('Verilerin korundu.'),
-      tx('Yedek: ses kayıtlarıyla birlikte tek .zip dosyası olarak kaydet, dosyadan geri yükle. Otomatik yedek (haftalık/günlük) İndirilenler/GunlukYedek klasörüne yazar; 7 gün yedek almazsan ana ekranda ve bildirimde hatırlatır.'),
-      tx('Radyo çalarken ana ekranda çalan radyo satırı çıkar (önceki, durdur/oynat, sonraki).'),
-      tx('Radyo ve TV oynatıcıda önceki/sonraki tuşları; yukarı kaydırınca sonraki, aşağı kaydırınca önceki istasyon/kanal.'),
-      tx('Sesli komut sırasında çalan radyo duraklar, sonra kendiliğinden devam eder. Komut listesinde dinleme durumu paneli var.'),
-      tx('Radyoda çalan şarkı adı (yayın gönderiyorsa) çalma çubuğunda ve ana ekrandaki radyo satırında görünür; istasyon kapağı da gösterilir.'),
-      tx('Şarkının yanındaki kalple "İsteklerim" listesine ekle (Müzik ve Radyo sayfasının sağ üstü). Listede Çal, YouTube, Spotify ve Amazon Music düğmeleri var.'),
-      tx('Telefonda Shazam kuruluysa radyo ve müzik çalarda Shazam düğmesi çıkar.'),
+      tx('Çalan bir şey olunca üstteki simgelerin altında tam genişlikte çalma şeridi çıkar: solda ok (kontrolleri açar), sağda ✕. Radyoda yukarı/aşağı kaydırınca sonraki/önceki istasyon; dokununca Favoriler açılır.'),
+      tx('Kulaklık simgesine uzun bas: Müzik, Radyo, TV, Podcast, Haber, Online menüsü ve "Kısayol çubuğunu sabitle". Seçtiğin ana ekrana gelir.'),
+      tx('TV, ana ekranın üstünde yüzen küçük pencerede açılır; sürükle, tam ekran yap. Telefonu yan çevirince tam ekran olur.'),
+      tx('Radyo şarkı bilgisi artık yayından doğrudan okunur; Shazam düğmesi telefondaki gerçek Shazam simgesini kullanır.'),
+      tx('Rutin satırını sola tam çekmek artık tüm günlerden kaldırmaz.'),
+      tx('Çevrimdışı sesli dinleme yeniden denendi (Komut listesi sayfasından model indirilir).'),
+      tx('Yedek dosyası (.zip) ve otomatik yedek; çalan radyo komut sırasında duraklar.'),
     ];
 
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {

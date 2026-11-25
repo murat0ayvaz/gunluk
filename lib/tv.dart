@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'data.dart';
+import 'tvpop.dart';
 import 'media.dart';
 import 'net.dart';
 import 'ambient.dart';
@@ -562,6 +563,8 @@ class _TvPlayerPageState extends State<TvPlayerPage> {
     try {
       WakelockPlus.enable(); // izlerken ekran kapanmasın
     } catch (_) {}
+    tvPop.close(); // aynı anda iki TV açılmasın
+    store.setProf('ltv', _ch.id);
     _open();
   }
 

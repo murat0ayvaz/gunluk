@@ -4,6 +4,8 @@ import 'about.dart';
 import 'add_sheet.dart';
 import 'ambient.dart';
 import 'backup.dart';
+import 'dock.dart';
+import 'wake.dart';
 import 'fx.dart';
 import 'data.dart';
 import 'profile.dart' show EntryLine;
@@ -14,7 +16,6 @@ import 'media.dart';
 import 'drawer.dart';
 import 'notes.dart';
 import 'notify.dart';
-import 'nowradio.dart';
 import 'reminders.dart';
 import 'rowedit.dart';
 import 'study.dart';
@@ -104,6 +105,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     weather.ensure(); // hava durumu açıksa verisini yükle
     voiceListener.ctx = context; // sürekli dinleme komutları bu ekranın üstünde çalıştırır
     voiceListener.sync();
+    wakeEngine.tryLoad().then((_) {
+      if (wakeEngine.ready) voiceListener.engineChanged();
+    });
     store.rollTodos(); // bitmeyen geçmiş maddeler bugüne taşınır
     _wasAll = store.todayGoals().all;
     store.addListener(_checkGoals);
@@ -804,13 +808,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             (!store.appHidden('media') && mediaTabIds().isNotEmpty)
                 ? ListenableBuilder(
                     listenable: media,
-                    builder: (context, _) => IconButton(
-                      tooltip: tx('Müzik ve Radyo'),
-                      onPressed: () => Navigator.of(context)
-                          .push(slideFromRight(const MediaPage())),
-                      icon: Icon(media.nowId != null && media.playing
-                          ? Icons.graphic_eq_rounded
-                          : Icons.headphones_rounded),
+                    builder: (context, _) => GestureDetector(
+                      onLongPress: () => showDockMenu(context),
+                      child: IconButton(
+                        tooltip: tx('Müzik ve Radyo'),
+                        onPressed: () => Navigator.of(context)
+                            .push(slideFromRight(const MediaPage())),
+                        icon: Icon(media.nowId != null && media.playing
+                            ? Icons.graphic_eq_rounded
+                            : Icons.headphones_rounded),
+                      ),
                     ),
                   )
                 : null;
@@ -898,7 +905,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ? const []
                 : icons.skip(3).map((e) => e.$2).toList(),
           ),
-          body: Builder(builder: (context) {
+          body: Column(children: [const HomeDock(), Expanded(child: Builder(builder: (context) {
             // Hava ve namaz: tek satır yazı. Başlıktaki hava simgesi satırları getirir/götürür;
             // yazıya dokununca altına saatlik hava / tüm vakitler açılır.
             // Ekran yenilenince (ana ekranda aşağı çekince) açılan barlar kapanır, yazılar kalır.
@@ -936,10 +943,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     date == dKey(DateTime.now()))
                 ? EntryLine(onTap: () => setState(() => _openSec.add('routine')))
                 : null;
-            // Çalan radyo satırı (radyo çalmıyorsa kendiliğinden boş görünür)
-            final Widget? radLine = (!kbSection && !_hidden.contains('rad'))
-                ? RadioNowSlot(wrap: (w) => _bar('rad', w))
-                : null;
             final bkLine = (!kbSection &&
                     !_hidden.contains('bk') &&
                     backupDue() &&
@@ -961,7 +964,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               final l = [
                 if (erLine != null) _bar('er', erLine),
                 if (bkLine != null) _bar('bk', bkLine),
-                if (radLine != null) radLine,
                 ...(firstWx ? [...wx, ...pr] : [...pr, ...wx]),
               ];
               return l;
@@ -1001,7 +1003,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 Expanded(child: body),
               ],
             );
-          }),
+          }))]),
         );
 
         final scaffold = amb
@@ -1532,9 +1534,8 @@ class _DayRowState extends State<_DayRow> with SingleTickerProviderStateMixin {
       base: p.delBg,
       strong: const Color(0xFFD9534F),
       icon: Icons.delete_outline_rounded,
-      hotIcon: Icons.delete_forever_rounded,
       align: Alignment.centerRight,
-      label: (v) => v >= 0.6 ? tx('Tüm günlerden') : tx('Sadece bu gün'),
+      label: (v) => tx('Sadece bu gün'),
     );
     final editBg = FxFillBg(
       prog: _pe,
@@ -1586,7 +1587,7 @@ class _DayRowState extends State<_DayRow> with SingleTickerProviderStateMixin {
               _pe.value = 0;
               widget.onEdit(); // sağa kaydır: düzenle
             } else {
-              final f = _prog >= 0.6;
+              const f = false; // tüm günlerden kaldırma artık kaydırmayla yapılmaz
               _prog = 0;
               _pn.value = 0;
               if (fxLevel() > 0 && !f) {
