@@ -5,6 +5,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'ambient.dart';
 import 'data.dart';
+import 'dock.dart' show dockLaunch;
 import 'links.dart';
 import 'media.dart';
 import 'news.dart';
@@ -15,6 +16,7 @@ import 'strings.dart';
 import 'wake.dart';
 import 'tools.dart';
 import 'tv.dart';
+import 'tvpop.dart';
 import 'ui.dart';
 import 'wallet.dart' show parseMoney, money;
 
@@ -586,6 +588,84 @@ void _ok(BuildContext context, String m) {
   _say(m);
 }
 
+/// Komut radyoyu bilerek duraklattı ya da TV açtı: komuttan sonra radyo kendiliğinden devam etmesin
+bool voiceHold = false;
+
+/// Sürekli dinlemeyi aç/kapat (ana ekranda mikrofona uzun basınca)
+void toggleContinuousListen() {
+  HapticFeedback.mediumImpact();
+  store.setVoiceListen(!store.voiceListen);
+  voiceListener.sync();
+}
+
+int _lev(String a, String b) {
+  if (a == b) return 0;
+  if (a.isEmpty) return b.length;
+  if (b.isEmpty) return a.length;
+  var prev = List<int>.generate(b.length + 1, (i) => i);
+  for (var i = 1; i <= a.length; i++) {
+    final cur = List<int>.filled(b.length + 1, 0);
+    cur[0] = i;
+    for (var j = 1; j <= b.length; j++) {
+      final c = a.codeUnitAt(i - 1) == b.codeUnitAt(j - 1) ? 0 : 1;
+      var m = prev[j - 1] + c;
+      if (prev[j] + 1 < m) m = prev[j] + 1;
+      if (cur[j - 1] + 1 < m) m = cur[j - 1] + 1;
+      cur[j] = m;
+    }
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+/// Anlaşılmayan cümleye en yakın hazır komut (yoksa null)
+String? _nearestCommand(String heard) {
+  final h = vNorm(heard).trim();
+  if (h.isEmpty || h.length > 40) return null;
+  const cmds = [
+    'Radyo aç', 'Radyo kapat', 'Favori radyo çal', 'TV aç', 'TV kapat', 'Müzik aç',
+    'Durdur', 'Duraklat', 'Devam et', 'Sonraki', 'Önceki', 'Sesi kıs', 'Sesi aç',
+    'Sessize al', 'Haber oku', 'Saat kaç', 'Bugün ne yaptım', 'Şarkı ne',
+    'Komut listesi', 'Ana sayfaya git',
+  ];
+  String? best;
+  var bd = 999;
+  for (final c in cmds) {
+    final nc = vNorm(c);
+    final d = _lev(h, nc);
+    final lim = (nc.length * 0.4).floor().clamp(2, 5);
+    if (d <= lim && d < bd) {
+      bd = d;
+      best = c;
+    }
+  }
+  return best;
+}
+
+String _num(double v) =>
+    v == v.roundToDouble() ? v.round().toString() : v.toStringAsFixed(1);
+
+/// Verilen günlerdeki girişlerin özeti: "Su 2 litre, Kilo 82"
+String _daySummary(List<String> dates, {required bool sum}) {
+  final tot = <String, double>{};
+  final last = <String, double>{};
+  for (final e in store.entries) {
+    if (!dates.contains(e.date)) continue;
+    final sc = store.subById(e.sub);
+    if (sc == null) continue;
+    tot[e.sub] = (tot[e.sub] ?? 0) + e.value;
+    last[e.sub] = e.value;
+  }
+  final parts = <String>[];
+  for (final id in tot.keys) {
+    final sc = store.subById(id)!;
+    final v = (sum && sc.summable) ? tot[id]! : last[id]!;
+    parts.add('${sc.name} ${_num(v)}${sc.unit.isEmpty ? '' : ' ${sc.unit}'}');
+    if (parts.length >= 8) break;
+  }
+  return parts.join(', ');
+}
+
 Future<void> runVoiceText(BuildContext context, String heard) async {
   final raw = heard
       .replaceAll('₺', ' TL ')
@@ -610,10 +690,171 @@ Future<void> runVoiceText(BuildContext context, String heard) async {
     }
     return;
   }
-  // 1) Durdur
-  if (RegExp(r'\b(durdur\w*|sustur\w*|dur)\b').hasMatch(n)) {
+  final noData = !has('hatirla') && !has('yapilacak') && !has('cuzdan');
+  final wantsStop =
+      RegExp(r'\b(durdur\w*|sustur\w*|dur|kapat\w*|kapa|kapansin)\b').hasMatch(n);
+  final tvWord = RegExp(r'\b(tv|televizyon)\b').hasMatch(n);
+  final pageWord = RegExp(r'\b(sayfa\w*|ekran\w*|menu\w*|liste\w*|rehber\w*)\b').hasMatch(n);
+  final playWord = RegExp(r'\b(cal\w*|ac\w*|baslat\w*|dinle\w*)\b').hasMatch(n);
+
+  // 0b) Sürekli dinlemeyi kapat
+  if (noData && wantsStop && has('dinle') && (has('surekli') || has('dinleme'))) {
+    store.setVoiceListen(false);
+    voiceListener.sync();
+    _ok(context, tx('Sürekli dinleme kapatıldı.'));
+    return;
+  }
+  // 0c) Ana sayfaya dön
+  if ((has('ana sayfa') || has('ana ekran')) &&
+      RegExp(r'\b(git|don\w*|gel\w*|ac\w*)\b').hasMatch(n)) {
+    Navigator.of(context).popUntil((r) => r.isFirst);
+    return;
+  }
+  // 0d) Bilgi soruları
+  if (noData) {
+    final now = DateTime.now();
+    if (has('saat') && has('kac')) {
+      final t = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+      _ok(context, tx('Saat {0}', [t]));
+      return;
+    }
+    if (has('gunlerden') ||
+        has('ne gun') ||
+        (RegExp(r'\btarih').hasMatch(n) && nt.length <= 4 && !RegExp(r'\d').hasMatch(n))) {
+      _ok(context, dateLabel(now));
+      return;
+    }
+    if (has('bugun') && (has('yaptim') || has('ozet') || has('girdim'))) {
+      final sm = _daySummary([dKey(now)], sum: true);
+      _ok(context, sm.isEmpty ? tx('Bugün henüz veri girmedin.') : tx('Bugün: {0}', [sm]));
+      return;
+    }
+    if (has('hafta') && (has('toplam') || has('yaptim') || has('ozet'))) {
+      final mon = now.subtract(Duration(days: now.weekday - 1));
+      final days = [for (var i = 0; i < 7; i++) dKey(mon.add(Duration(days: i)))];
+      final sm = _daySummary(days, sum: true);
+      _ok(context, sm.isEmpty ? tx('Bu hafta henüz veri yok.') : tx('Bu hafta: {0}', [sm]));
+      return;
+    }
+    if (has('caliyor') || (has('sarki') && (has('hangi') || has('kim') || n.endsWith(' ne')))) {
+      final (artist, title) = media.nowSong;
+      if (title.isEmpty) {
+        _snack(context, tx('Şu an çalan şarkı bilgisi yok.'));
+      } else {
+        _ok(context, artist.isEmpty ? title : '$artist - $title');
+      }
+      return;
+    }
+    if (has('istek') && has('ekle')) {
+      final (artist, title) = media.nowSong;
+      if (title.isEmpty) {
+        _snack(context, tx('Şu an çalan şarkı bilgisi yok.'));
+      } else {
+        final added = store.addWish(
+            title, artist, media.isRadio ? media.nowTitle : tx('Müzik'));
+        _ok(context, added ? tx('İsteklerime eklendi.') : tx('Bu şarkı zaten İsteklerimde.'));
+      }
+      return;
+    }
+  }
+  // 0e) Ses düzeyi (radyo, müzik, podcast)
+  if ((noData && nt.length <= 5 && RegExp(r'\b(ses|sesi|sesini)\b').hasMatch(n)) ||
+      has('sessize')) {
+    if (media.nowId == null) {
+      _snack(context, tx('Şu an bir şey çalmıyor.'));
+      return;
+    }
+    var v = media.player.volume;
+    if (has('sessize') || has('sessiz')) {
+      v = 0;
+    } else if (RegExp(r'\b(kis\w*|azalt\w*|alcalt\w*|dusur\w*)\b').hasMatch(n)) {
+      v = (v - 0.2).clamp(0.0, 1.0).toDouble();
+    } else if (RegExp(r'\b(ac\w*|arttir\w*|yukselt\w*|artir\w*|coalt\w*|yukari)\b').hasMatch(n) ||
+        has('tam')) {
+      v = has('tam') ? 1.0 : (v + 0.2).clamp(0.0, 1.0).toDouble();
+    } else {
+      v = -1;
+    }
+    if (v >= 0) {
+      await media.player.setVolume(v);
+      _ok(context, v == 0 ? tx('Ses kapatıldı.') : tx('Ses: %{0}', ['${(v * 100).round()}']));
+      return;
+    }
+  }
+  // 0f) Çalma kontrolü: duraklat, devam, sonraki, önceki
+  if (noData && nt.length <= 4) {
+    if (RegExp(r'\b(duraklat\w*|beklet\w*)\b').hasMatch(n)) {
+      voiceHold = true;
+      if (media.nowId != null && media.playing) media.toggle();
+      if (newsReader.reading) await newsReader.pause();
+      _snack(context, tx('Duraklatıldı.'));
+      return;
+    }
+    if (RegExp(r'\b(devam\w*|surdur\w*|oynat\w*)\b').hasMatch(n)) {
+      if (media.nowId != null && !media.playing) {
+        media.toggle();
+        _snack(context, tx('Devam ediyor.'));
+      } else if (media.nowId == null) {
+        _snack(context, tx('Devam edecek bir şey yok.'));
+      }
+      return;
+    }
+    final nextW = RegExp(r'\b(sonraki\w*|ileri|atla\w*)\b').hasMatch(n);
+    final prevW = RegExp(r'\b(onceki\w*)\b').hasMatch(n);
+    if ((nextW || prevW) && (media.nowId != null || tvPop.chan != null)) {
+      final d = nextW ? 1 : -1;
+      if (tvPop.chan != null) {
+        tvPop.step(d);
+      } else if (media.isRadio) {
+        media.radioStep(d);
+      } else if (media.isOnline) {
+        media.nextOnline(step: d);
+      } else if (media.isSong) {
+        if (d > 0) {
+          media.next();
+        } else {
+          media.prev();
+        }
+      } else if (media.isPod) {
+        media.skipBy(d > 0 ? 30 : -10);
+      }
+      return;
+    }
+  }
+  // 1) Durdur / kapat (hedef: radyo, TV, müzik, podcast, haber; hedef yoksa her şey)
+  if (noData && wantsStop) {
+    final radW = has('radyo');
+    final musW = has('muzik') || has('sarki');
+    final podW = has('podcast');
+    if (tvWord) {
+      if (tvPop.chan != null) {
+        tvPop.close();
+        _ok(context, tx('Durduruldu.'));
+      } else {
+        _snack(context, tx('TV açık değil.'));
+      }
+      return;
+    }
+    if (radW || musW || podW) {
+      final match = (radW && media.isRadio) ||
+          (musW && (media.isSong || media.isOnline)) ||
+          (podW && media.isPod);
+      if (match) {
+        await media.stop();
+        _ok(context, tx('Durduruldu.'));
+      } else {
+        _snack(context, tx('Şu an çalmıyor.'));
+      }
+      return;
+    }
+    if (has('haber')) {
+      if (newsReader.reading) await newsReader.stop();
+      _ok(context, tx('Durduruldu.'));
+      return;
+    }
     if (newsReader.reading) await newsReader.stop();
     if (media.nowId != null) await media.stop();
+    tvPop.close();
     _ok(context, tx('Durduruldu.'));
     return;
   }
@@ -634,6 +875,19 @@ Future<void> runVoiceText(BuildContext context, String heard) async {
       RegExp(r'\b(cal(sin|sana|ar|abilir|si)?|ac\w*|baslat\w*|dinle\w*)\b').hasMatch(n) &&
       !RegExp(r'\b(sayfa\w*|ekran\w*|menu\w*|liste\w*)\b').hasMatch(n)) {
     await _playRadio(context, n); // "radyo aç": son çalan istasyon doğrudan çalar
+    return;
+  }
+  // 3b) Müzik çal (son şarkı), son çalan
+  if (has('muzik') && playWord && !pageWord) {
+    if (store.appHidden('media') || store.appHidden('music')) {
+      _snack(context, tx('Bu bölüm kapalı.'));
+      return;
+    }
+    await dockLaunch(context, 'music');
+    return;
+  }
+  if (has('son') && RegExp(r'\bcalan\w*').hasMatch(n)) {
+    await dockLaunch(context, store.lastRadioId.isNotEmpty ? 'radio' : 'music');
     return;
   }
   // 4) Cüzdan
@@ -678,9 +932,19 @@ Future<void> runVoiceText(BuildContext context, String heard) async {
           _snack(context, tx('Bu bölüm kapalı.'));
           return;
         }
-        await openTvChannel(context, c);
+        voiceHold = true; // radyo komuttan sonra geri başlamasın
+        tvPop.show(c);
         return;
       }
+    }
+    if (tvWord && !pageWord && wantsOpen) {
+      if (store.appHidden('media') || store.appHidden('tv')) {
+        _snack(context, tx('Bu bölüm kapalı.'));
+        return;
+      }
+      voiceHold = true;
+      await dockLaunch(context, 'tv');
+      return;
     }
   }
   if (wantsOpen || nt.length <= 2) {
@@ -741,7 +1005,7 @@ Future<void> _playRadio(BuildContext context, String n) async {
   }
   // "radyo çal TRT FM": ad geçiyorsa onu bul
   var q = n
-      .replaceAll(RegExp(r'\b(radyo\w*|cal\w*|ac\w*|baslat\w*|dinle\w*|lutfen|bir|bana)\b'), ' ')
+      .replaceAll(RegExp(r'\b(radyo\w*|cal\w*|ac\w*|baslat\w*|dinle\w*|lutfen|bir|bana|favori\w*)\b'), ' ')
       .replaceAll(RegExp(r'\s+'), ' ')
       .trim();
   Station? pick;
@@ -764,8 +1028,12 @@ Future<void> _playRadio(BuildContext context, String n) async {
     }
   }
   Station chosen = all.first;
+  final wantsFav = n.contains('favori');
   if (pick != null) {
     chosen = pick;
+  } else if (wantsFav && all.any((x) => x.fav)) {
+    final favs = all.where((x) => x.fav).toList();
+    chosen = favs.firstWhere((x) => x.id == store.lastRadioId, orElse: () => favs.first);
   } else {
     var found = false;
     for (final s in all) {
@@ -784,6 +1052,7 @@ Future<void> _playRadio(BuildContext context, String n) async {
       }
     }
   }
+  tvPop.close();
   await media.playStation(chosen);
   if (context.mounted) _snack(context, tx('Çalıyor: {0}', [chosen.name]));
 }
@@ -1176,14 +1445,21 @@ Future<bool> _doRoutine(
 
 // ---------- Anlaşılmadı ----------
 Future<void> _fallback(BuildContext context, String heard) async {
+  final sug = _nearestCommand(heard);
   final r = await showDialog<String>(
     context: context,
     builder: (ctx) => AlertDialog(
       title: Text(tx('Anlayamadım')),
-      content: Text('“$heard”\n\n${tx('Ne yapılsın?')}'),
+      content: Text(sug == null
+          ? '“$heard”\n\n${tx('Ne yapılsın?')}'
+          : '“$heard”\n\n${tx('Şunu mu demek istedin: “{0}”?', [sug])}'),
       actions: [
         TextButton(
             onPressed: () => Navigator.pop(ctx), child: Text(tx('Vazgeç'))),
+        if (sug != null)
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, 'sug'),
+              child: Text(tx('Evet, bunu yap'))),
         TextButton(
             onPressed: () => Navigator.pop(ctx, 'again'),
             child: Text(tx('Tekrar söyle'))),
@@ -1197,6 +1473,8 @@ Future<void> _fallback(BuildContext context, String heard) async {
   if (!context.mounted) return;
   if (r == 'again') {
     await voiceCommand(context);
+  } else if (r == 'sug' && sug != null) {
+    await runVoiceText(context, sug);
   } else if (r == 'todo') {
     final raw = heard.trim().split(RegExp(r'\s+'));
     await _doTodo(context, heard, raw, [for (final x in raw) vNorm(x)]);
@@ -1215,6 +1493,14 @@ class VoiceListener extends ChangeNotifier with WidgetsBindingObserver {
   final SpeechToText _stt = SpeechToText();
   BuildContext? ctx; // ana ekranın bağlamı (pencereler bunun üstünde açılır)
   bool listening = false; // şu an mikrofon açık mı (göstergede görünür)
+  String lastHeard = ''; // en son duyulan söz (ana ekran şeridinde ve durum panelinde görünür)
+
+  void _hear(String t) {
+    final x = t.trim();
+    if (x.isEmpty || x == lastHeard) return;
+    lastHeard = x.length > 60 ? '…${x.substring(x.length - 60)}' : x;
+    notifyListeners();
+  }
   bool _want = false; // dinleme istendi mi
   bool _busy = false; // komut işleniyor / başka mikrofon kullanımı
   bool _inited = false;
@@ -1354,6 +1640,28 @@ class VoiceListener extends ChangeNotifier with WidgetsBindingObserver {
   Timer? _wakeTimer; // ara sonuçta kelime duyulunca kısa bekleme (cümle bitsin)
   bool _firing = false;
 
+  // Küçük model uyandırma kelimesini sık yanlış duyar: yakın okunuşlar da kabul edilir
+  static const _wakeAlias = <String, List<String>>{
+    'gunluk': ['gunlu', 'gonluk', 'gunler', 'kunluk', 'gunluh', 'gunlug'],
+    'asistan': ['asistam', 'asistant', 'sistan', 'asistani'],
+    'bilgisayar': ['bilgisayer', 'bilgisayarr', 'bilgi sayar'],
+    'kaptan': ['kapitan', 'kaptam'],
+    'komutan': ['komutam', 'komutanm'],
+  };
+
+  bool _wakeTok(String a, String b) {
+    if (a.startsWith(b)) return true;
+    for (final al in _wakeAlias[b] ?? const <String>[]) {
+      if (a == al || a.startsWith(al)) return true;
+    }
+    final tol = b.length >= 8 ? 2 : (b.length >= 5 ? 1 : 0);
+    if (tol == 0) return false;
+    for (final len in [b.length - 1, b.length, b.length + 1]) {
+      if (len > 0 && len <= a.length && _lev(a.substring(0, len), b) <= tol) return true;
+    }
+    return false;
+  }
+
   /// Kelimeler arasında uyandırma kelimesini arar: (başlangıç, kullanılan kelime sayısı)
   (int, int)? _wakeAt(List<String> nt) {
     final wake = vNorm(store.voiceWake)
@@ -1367,7 +1675,7 @@ class VoiceListener extends ChangeNotifier with WidgetsBindingObserver {
       for (var j = 0; j < wake.length; j++) {
         final a = nt[i + j];
         final b = wake[j];
-        if (!(j == wake.length - 1 ? a.startsWith(b) : a == b)) {
+        if (!(j == wake.length - 1 ? _wakeTok(a, b) : a == b)) {
           ok = false;
           break;
         }
@@ -1395,6 +1703,7 @@ class VoiceListener extends ChangeNotifier with WidgetsBindingObserver {
   void _onPartial(String text) {
     final raw = _split(text);
     if (raw.isEmpty || _firing) return;
+    _hear(text);
     final nt = [for (final r in raw) vNorm(r).replaceAll(RegExp(r'[.,!?;]+$'), '')];
     final w = _wakeAt(nt);
     if (w == null) {
@@ -1412,6 +1721,7 @@ class VoiceListener extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> _onFinal(String text) async {
     final raw = _split(text);
     if (raw.isEmpty || _firing) return;
+    _hear(text);
     final nt = [for (final r in raw) vNorm(r).replaceAll(RegExp(r'[.,!?;]+$'), '')];
     final w = _wakeAt(nt);
     if (w == null) return; // cümle uyandırma kelimesiyle başlamıyor
@@ -1424,6 +1734,7 @@ class VoiceListener extends ChangeNotifier with WidgetsBindingObserver {
     final c = ctx;
     if (c == null || !c.mounted) return;
     _firing = true;
+    voiceHold = false;
     _wakeTimer?.cancel();
     _busy = true;
     HapticFeedback.mediumImpact(); // kelimeyi algıladım
@@ -1443,7 +1754,7 @@ class VoiceListener extends ChangeNotifier with WidgetsBindingObserver {
       }
     } catch (_) {}
     // komut radyoyu kendisi değiştirmediyse (çalıyor ya da durdurulmadıysa) eski durumuna döner
-    if (ducked && media.nowId != null && !media.playing) {
+    if (ducked && !voiceHold && tvPop.chan == null && media.nowId != null && !media.playing) {
       try {
         media.toggle();
       } catch (_) {}
@@ -1495,21 +1806,57 @@ List<_CmdGroup> _cmdGroups() {
     ]),
     _CmdGroup(tx('Açma'), Icons.open_in_new_rounded, [
       (tx('Cüzdanı aç'), true),
-      if (!mediaOff && !store.appHidden('tv')) (tx('TV aç'), true),
-      if (!mediaOff && !store.appHidden('tv')) (tx('Kanal adıyla: TRT Haber aç'), false),
+      (tx('Ana sayfaya git'), true),
+      (tx('Kanal adıyla: TRT Haber aç'), false),
       (tx('Kısayol uygulaması adıyla aç'), false),
     ]),
     if (!mediaOff && !store.appHidden('radio'))
       _CmdGroup(tx('Radyo'), Icons.radio_rounded, [
         (tx('Radyo aç (son çalan istasyon)'), false),
+        (tx('Favori radyo çal'), false),
         (tx('İstasyon adıyla: TRT FM çal'), false),
+        (tx('Radyo kapat'), true),
         (tx('Radyo sayfasını aç'), true),
+      ]),
+    if (!mediaOff && !store.appHidden('tv'))
+      _CmdGroup(tx('TV'), Icons.live_tv_rounded, [
+        (tx('TV aç (son izlenen kanal, pop-up)'), false),
+        (tx('TV kapat'), true),
+        (tx('TV sayfasını aç'), true),
+      ]),
+    if (!mediaOff)
+      _CmdGroup(tx('Müzik ve podcast'), Icons.music_note_rounded, [
+        (tx('Müzik aç (son şarkı)'), false),
+        (tx('Son çalanı aç'), false),
+        (tx('Müzik kapat'), true),
+        (tx('Podcast sayfasını aç'), true),
+      ]),
+    if (!mediaOff)
+      _CmdGroup(tx('Çalma kontrolü'), Icons.play_circle_outline_rounded, [
+        (tx('Duraklat'), true),
+        (tx('Devam et'), true),
+        (tx('Sonraki'), true),
+        (tx('Önceki'), true),
+        (tx('Sesi kıs'), true),
+        (tx('Sesi aç'), true),
+        (tx('Sessize al'), true),
       ]),
     if (!mediaOff && !store.appHidden('news'))
       _CmdGroup(tx('Haber ve durdurma'), Icons.newspaper_rounded, [
         (tx('Haber oku'), true),
         (tx('Durdur'), true),
       ]),
+    _CmdGroup(tx('Bilgi'), Icons.info_outline_rounded, [
+      (tx('Saat kaç'), true),
+      (tx('Bugün günlerden ne'), true),
+      (tx('Bugün ne yaptım'), true),
+      (tx('Bu hafta ne yaptım'), true),
+      (tx('Şarkı ne'), true),
+      (tx('Bu şarkıyı isteklerime ekle'), false),
+    ]),
+    _CmdGroup(tx('Dinleme'), Icons.hearing_rounded, [
+      (tx('Sürekli dinlemeyi kapat'), true),
+    ]),
     _CmdGroup(tx('Yardım'), Icons.help_outline_rounded, [
       (tx('Komut listesini aç'), false),
     ]),
@@ -1634,6 +1981,14 @@ class _VoiceStatus extends StatelessWidget {
                   style: TextStyle(color: p.ink, fontSize: 13)),
               const SizedBox(height: 4),
               Text(tx('Motor: {0}', [engine]), style: TextStyle(color: p.soft, fontSize: 12.5)),
+              if (on)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                      tx('Son duyulan: {0}',
+                          [voiceListener.lastHeard.isEmpty ? tx('(henüz yok)') : voiceListener.lastHeard]),
+                      style: TextStyle(color: p.ink, fontSize: 12.5)),
+                ),
               if (w.status.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 4),

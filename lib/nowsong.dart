@@ -147,13 +147,28 @@ class SongInfoBlock extends StatelessWidget {
                             style: TextStyle(color: p.soft, fontSize: 12.5)),
                     ],
                   )
-                : Text(
-                    isRadio
-                        ? (media.icyNone
-                            ? tx('Bu istasyon şarkı bilgisi göndermiyor')
-                            : tx('Şarkı bilgisi aranıyor...'))
-                        : '',
-                    style: TextStyle(color: p.soft, fontSize: 12.5)),
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                          isRadio
+                              ? (media.icyState == 'none'
+                                  ? tx('Bu istasyon şarkı bilgisi göndermiyor')
+                                  : media.icyState == 'empty'
+                                      ? tx('Yayında şarkı adı yok')
+                                      : media.icyState == 'err'
+                                          ? tx('Şarkı bilgisi alınamadı, tekrar denenecek')
+                                          : tx('Şarkı bilgisi aranıyor...'))
+                              : '',
+                          style: TextStyle(color: p.soft, fontSize: 12.5)),
+                      if (isRadio && media.icyDiag.isNotEmpty)
+                        Text(media.icyDiag,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                color: p.soft.withOpacity(0.7), fontSize: 10.5)),
+                    ],
+                  ),
           ),
           const ShazamButton(),
           if (showSong)

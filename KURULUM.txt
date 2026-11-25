@@ -3,15 +3,13 @@ DAILY ROUTINE v1.25.30 - TAM PAKET
 Bu zipte projenin TAMAMI var: .github, assets, lib, debug.keystore, pubspec.yaml.
 1) Zipi çıkar. GitHub'da "gunluk" reposunun ANA sayfasında: Add file > Upload files.
 2) Çıkan klasörlerin ve dosyaların HEPSİNİ (.github, assets, lib, debug.keystore, pubspec.yaml) sürükle-bırak > Commit changes.
-   (YENİ: lib/backup.dart, lib/nowsong.dart, lib/icy.dart, lib/dock.dart, lib/tvpop.dart, lib/wake.dart. pubspec.yaml'a archive ve vosk_flutter_2 eklendi.)
+   (YENİ: lib/tips.dart. Degisenler: dock, media, tv, tvpop, icy, voicecmd, home, settings, strings.)
 3) Actions > yeşil tik > Artifacts > gunluk-apk indir, telefona kur (veriler kalır).
-Derleme hatası olursa Actions'taki kırmızı satırları gönder.v1.25.30 yenilikleri:
-- Calma seridi: ustteki simgelerin altinda tam genisliklte; solda ok (kontroller), sagda X. Radyoda yukari/asagi kaydirinca sonraki/onceki istasyon, dokununca Favoriler.
-- Kulaklik simgesine uzun bas: Muzik, Radyo, TV, Podcast, Haber, Online menusu + Kisayol cubugunu sabitle.
-- TV: ana ekranin ustunde yuzen pencere (surukle, tam ekran, yan cevirince tam ekran). Uygulamadan cikinca durur.
-- Radyo sarki bilgisi yayindan dogrudan okunur; Shazam dugmesi gercek Shazam simgesiyle.
-- Rutini sola tam cekmek artik tum gunlerden kaldirmaz.
-- Cevrimdisi sesli dinleme (vosk_flutter_2). 1.25.26'da model indirince uygulama kapaniyordu: cokme korumasi eklendi. Bir yerel adim uygulamayi kapatirsa motor kendini kapatir ve eski yontem calisir.
-- GitHub'da DEGISIKLIK VAR: .github/workflows/build.yml guncellendi (Shazam simgesi + eklenti namespace yamasi + Vosk minSdk izni). .github klasorunu mutlaka yukle.
-- Kulaklik simgesine uzun basinca menu acilmiyordu (simgenin kendi ipucu uzun basmayi aliyordu): duzeltildi.
-- Cevrimdisi model indirince uygulama kapaniyordu (JNA kutuphanesi R8 kod kucultmesinde bozuluyordu): koruma kurallari eklendi. GitHub'da DEGISIKLIK VAR: .github/workflows/build.yml. .github klasorunu mutlaka yukle.
+Derleme hatası olursa Actions'taki kırmızı satırları gönder.v1.25.31 yenilikleri:
+- Muzik, Radyo, TV, Podcast, Haber ve Online sayfalarinin ustunde "Ana ekrana arayuz ekle" anahtari var. Acik sayfanin calma seridi ana ekranda gorunur (radyo varsayilan acik). Kulaklik uzun basma menusu ve kisayol cubugu kaldirildi.
+- Seridin ok (kontroller) panelinde favori istasyonlar ve favori TV kanallari; cift X duzeltildi.
+- Radyo sarki bilgisi: ham soketle yeniden yazildi ("ICY 200 OK" sunucular dahil), takili kalan "aranıyor" yerine durum yazar, kucuk ham baslik satiri.
+- TV pop-up'ina dokununca buyur/kuculur; TV rehberinde Tur secimi, ulke listesinde Tumu, A-Z sirala.
+- Mikrofona uzun bas: surekli dinleme ac/kapat; ana ekranda dinleme seridi ve ozlu soz / ipucu satiri (Ayarlar > Ana ekran'dan kapanir).
+- Yeni sesli komutlar (komut listesinde). Uyandirma kelimesi daha toleransli; "Son duyulan" gorunur; anlasilmayan cumlede en yakin komut onerilir.
+- GitHub'da DEGISIKLIK YOK: build.yml / .github ayni. Sadece lib, pubspec.yaml ve KURULUM.txt degisti (.github yuklemene gerek yok, yuklersen de sorun olmaz).

@@ -21,6 +21,7 @@ import 'rowedit.dart';
 import 'study.dart';
 import 'strings.dart';
 import 'theme.dart';
+import 'tips.dart';
 import 'todos.dart';
 import 'ui.dart';
 import 'voicecmd.dart';
@@ -808,16 +809,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             (!store.appHidden('media') && mediaTabIds().isNotEmpty)
                 ? ListenableBuilder(
                     listenable: media,
-                    builder: (context, _) => GestureDetector(
-                      onLongPress: () => showDockMenu(context),
-                      // Not: IconButton'un tooltip'i uzun basmayı kendi alır; menü açılmaz. O yüzden tooltip yok.
-                      child: IconButton(
-                        onPressed: () => Navigator.of(context)
-                            .push(slideFromRight(const MediaPage())),
-                        icon: Icon(media.nowId != null && media.playing
-                            ? Icons.graphic_eq_rounded
-                            : Icons.headphones_rounded),
-                      ),
+                    builder: (context, _) => IconButton(
+                      tooltip: tx('Müzik ve Radyo'),
+                      onPressed: () => Navigator.of(context)
+                          .push(slideFromRight(const MediaPage())),
+                      icon: Icon(media.nowId != null && media.playing
+                          ? Icons.graphic_eq_rounded
+                          : Icons.headphones_rounded),
                     ),
                   )
                 : null;
@@ -827,14 +825,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 builder: (context, _) {
                   // Sürekli dinleme açıkken mikrofon renkli ve küçük bir nokta görünür
                   final on = store.voiceListen && voiceListener.listening;
-                  return IconButton(
+                  // Not: IconButton'un tooltip'i uzun basmayı kendi alır; o yüzden tooltip yok.
+                  return GestureDetector(
+                    onLongPress: toggleContinuousListen,
+                    child: IconButton(
                     visualDensity: VisualDensity.compact,
                     padding: EdgeInsets.zero,
                     constraints:
                         const BoxConstraints(minWidth: 38, minHeight: 44),
-                    tooltip: on
-                        ? tx('Dinliyor: "{0}" de', [store.voiceWake])
-                        : tx('Sesli komut'),
                     icon: Stack(
                       clipBehavior: Clip.none,
                       children: [
@@ -853,7 +851,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       ],
                     ),
                     onPressed: () => voiceCommand(context),
-                  );
+                  ));
                 },
               )
             : null;
@@ -905,7 +903,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ? const []
                 : icons.skip(3).map((e) => e.$2).toList(),
           ),
-          body: Column(children: [const HomeDock(), Expanded(child: Builder(builder: (context) {
+          body: Column(children: [const HomeDock(), const HomeTicker(), Expanded(child: Builder(builder: (context) {
             // Hava ve namaz: tek satır yazı. Başlıktaki hava simgesi satırları getirir/götürür;
             // yazıya dokununca altına saatlik hava / tüm vakitler açılır.
             // Ekran yenilenince (ana ekranda aşağı çekince) açılan barlar kapanır, yazılar kalır.

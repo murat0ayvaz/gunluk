@@ -16,6 +16,7 @@ import 'profile.dart' show ProfilePage;
 import 'media.dart' show slideFromRight;
 import 'strings.dart';
 import 'theme.dart';
+import 'tips.dart' show tipsOn;
 import 'ui.dart';
 import 'voicecmd.dart' show voiceListener, VoiceCommandsPage;
 import 'version.dart';
@@ -153,6 +154,14 @@ class SettingsPage extends StatelessWidget {
                 ),
               ]),
               sec(tx('Ana ekran'), [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: const Icon(Icons.tips_and_updates_outlined),
+                  title: Text(tx('Söz ve ipucu satırı')),
+                  subtitle: Text(tx('Ana ekranda özlü sözler ve uygulama ipuçları dönüşümlü görünür.')),
+                  value: tipsOn(),
+                  onChanged: (v) => store.setProf('tipson', v),
+                ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   secondary: const Icon(Icons.gradient_rounded),

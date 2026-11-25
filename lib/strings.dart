@@ -2132,4 +2132,164 @@ const _en = <String, String>{
   'Şarkı bilgisi aranıyor...': 'Looking for song info...',
   'Model hazırlanıyor...': 'Preparing the model...',
   'Çevrimdışı motor bu telefonda uygulamayı kapattı; devre dışı bırakıldı. Eski yöntem kullanılıyor.': 'The offline engine closed the app on this phone; it has been disabled. The old method is in use.',
+  '"{0}" de':
+      'say "{0}"',
+  '(henüz yok)':
+      '(nothing yet)',
+  'A-Z sırala':
+      'Sort A-Z',
+  'Ana ekrana arayüz ekle':
+      'Add player to home screen',
+  'Ana ekranda özlü sözler ve uygulama ipuçları dönüşümlü görünür.':
+      'Quotes and app tips appear in turn on the home screen.',
+  'Ana sayfaya git':
+      'Go to home',
+  'Bilgi':
+      'Info',
+  'Bu hafta henüz veri yok.':
+      'No data yet this week.',
+  'Bu hafta ne yaptım':
+      'What did I do this week',
+  'Bu hafta: {0}':
+      'This week: {0}',
+  'Bu şarkıyı isteklerime ekle':
+      'Add this song to my wishes',
+  'Bugün günlerden ne':
+      'What day is it today',
+  'Bugün henüz veri girmedin.':
+      'You have not entered any data today.',
+  'Bugün ne yaptım':
+      'What did I do today',
+  'Bugün: {0}':
+      'Today: {0}',
+  'Devam edecek bir şey yok.':
+      'Nothing to resume.',
+  'Devam ediyor.':
+      'Resuming.',
+  'Devam et':
+      'Resume',
+  'Dinleme':
+      'Listening',
+  'Duraklatıldı.':
+      'Paused.',
+  'Evet, bunu yap':
+      'Yes, do that',
+  'Favori radyo çal':
+      'Play favorite radio',
+  'Favori yok, {0}':
+      'No favorites, {0}',
+  'Mikrofon açılıyor…':
+      'Starting microphone…',
+  'Müzik aç (son şarkı)':
+      'Open music (last song)',
+  'Müzik kapat':
+      'Stop music',
+  'Müzik ve podcast':
+      'Music and podcast',
+  'Podcast sayfasını aç':
+      'Open podcast page',
+  'Radyo kapat':
+      'Stop radio',
+  'Saat kaç':
+      'What time is it',
+  'Saat {0}':
+      'The time is {0}',
+  'Ses kapatıldı.':
+      'Muted.',
+  'Ses: %{0}':
+      'Volume: {0}%',
+  'Sesi aç':
+      'Volume up',
+  'Sesi kıs':
+      'Volume down',
+  'Sessize al':
+      'Mute',
+  'Son duyulan: {0}':
+      'Last heard: {0}',
+  'Son çalanı aç':
+      'Open last played',
+  'Söz ve ipucu satırı':
+      'Quote and tip line',
+  'Sürekli dinleme aktif':
+      'Continuous listening is on',
+  'Sürekli dinleme kapatıldı.':
+      'Continuous listening turned off.',
+  'Sürekli dinlemeyi kapat':
+      'Turn off continuous listening',
+  'TV aç (son izlenen kanal, pop-up)':
+      'Open TV (last channel, pop-up)',
+  'TV açık değil.':
+      'TV is not open.',
+  'TV kapat':
+      'Stop TV',
+  'TV sayfasını aç':
+      'Open TV page',
+  'Yayında şarkı adı yok':
+      'No song title in the broadcast',
+  'istasyonun yanındaki yıldıza bas':
+      'tap the star next to a station',
+  'kanalın yanındaki yıldıza bas':
+      'tap the star next to a channel',
+  '{0} kanal':
+      '{0} channels',
+  'Çalma kontrolü':
+      'Playback control',
+  'Şarkı bilgisi alınamadı, tekrar denenecek':
+      'Could not get song info, will retry',
+  'Şarkı ne':
+      'What song is this',
+  'Şu an bir şey çalmıyor.':
+      'Nothing is playing right now.',
+  'Şu an çalan şarkı bilgisi yok.':
+      'No song info for what is playing.',
+  'Şu an çalmıyor.':
+      'Not playing right now.',
+  'Şunu mu demek istedin: “{0}”?':
+      'Did you mean: “{0}”?',
+  'İpucu: Mikrofona uzun basınca sürekli dinleme açılır.':
+      'Tip: Long-press the microphone to turn on continuous listening.',
+  'İpucu: "Komut listesi" dersen tüm sesli komutları görürsün.':
+      'Tip: Say "command list" to see all voice commands.',
+  'İpucu: Radyo, TV ve diğer sayfaların üstündeki anahtarla çalma çubuğunu ana ekrana ekleyebilirsin.':
+      'Tip: Use the switch at the top of the Radio, TV and other pages to add their player to the home screen.',
+  'İpucu: Ana ekrandaki radyo şeridini yukarı ya da aşağı kaydırınca istasyon değişir.':
+      'Tip: Swipe the radio strip on the home screen up or down to change the station.',
+  'İpucu: Radyoda istasyonun yanındaki yıldıza basarak favori yap; şeridin ⌄ panelinde görünür.':
+      'Tip: Tap the star next to a station to favorite it; it shows in the strip\'s ⌄ panel.',
+  'İpucu: "TV aç" dersen son izlediğin kanal pop-up olarak açılır.':
+      'Tip: Say "open TV" and your last channel opens as a pop-up.',
+  'İpucu: TV pop-up\'ına dokununca büyür; köşedeki düğmeyle tam ekran olur.':
+      'Tip: Tap the TV pop-up to enlarge it; the corner button makes it full screen.',
+  'İpucu: Radyoda çalan şarkıyı tanımak için Shazam düğmesine bas.':
+      'Tip: Tap the Shazam button to identify the song playing on the radio.',
+  'İpucu: Beğendiğin şarkıyı kalp simgesiyle İsteklerim listene ekleyebilirsin.':
+      'Tip: Add a song you like to your Wishes list with the heart icon.',
+  'İpucu: Yedeği Ayarlar > Yedek bölümünden alabilirsin; otomatik yedek de var.':
+      'Tip: You can back up in Settings > Backup; there is also automatic backup.',
+  'İpucu: "Radyo kapat" ya da "durdur" diyerek çalanı susturabilirsin.':
+      'Tip: Say "stop radio" or "stop" to silence what is playing.',
+  'İpucu: Uyandırma kelimesini Ayarlar > Sesli komut bölümünden değiştirebilirsin.':
+      'Tip: You can change the wake word in Settings > Voice command.',
+  'İpucu: "Asistan" gibi uzun ve net bir uyandırma kelimesi daha iyi algılanır.':
+      'Tip: A long, clear wake word like "Asistan" is recognized better.',
+  'İpucu: Rutini sola tam çekersen yalnız o günden silinir.':
+      'Tip: Swipe a routine fully to the left to remove it from that day only.',
+  'İpucu: "Haber oku" dersen haberler sesli okunur.':
+      'Tip: Say "read the news" and the news is read aloud.',
+  'İpucu: "Saat kaç" ya da "bugün ne yaptım" diye sorabilirsin.':
+      'Tip: You can ask "what time is it" or "what did I do today".',
+  'İpucu: Bu satır dokununca bir sonrakine geçer; Ayarlar > Ana ekran\'dan kapatabilirsin.':
+      'Tip: Tap this line for the next one; you can turn it off in Settings > Home screen.',
+  'Medya sayfalarının (Radyo, TV, Müzik, Podcast, Haber, Online) üstünde "Ana ekrana arayüz ekle" anahtarı var: açınca o sayfanın çalma şeridi ana ekranda görünür. Kulaklığa uzun basma menüsü kalktı.':
+      'Each media page (Radio, TV, Music, Podcast, News, Online) has an "Add player to home screen" switch: turn it on and that page\'s player strip shows on the home screen. The long-press menu on the headphones icon is gone.',
+  'Şeridin ⌄ panelinde favori istasyonlar ve favori TV kanalları görünür; çift ✕ düzeltildi.':
+      'The strip\'s ⌄ panel shows favorite stations and favorite TV channels; the duplicate ✕ is fixed.',
+  'Radyo şarkı bilgisi okuyucusu yenilendi; takılı kalan "aranıyor" yazısı yerine durum yazar.':
+      'The radio song info reader was rebuilt; instead of a stuck "searching" text it now shows the status.',
+  'TV pop-up\'ına dokununca büyür; TV rehberinde tür seçimi ve ülkelerde Tümü seçeneği var.':
+      'Tap the TV pop-up to enlarge it; the TV guide has genre selection and an "All" option for countries.',
+  'Mikrofona uzun bas: sürekli dinleme açılır/kapanır. Ana ekranda dinleme şeridi ve özlü söz / ipucu satırı çıkar.':
+      'Long-press the microphone to turn continuous listening on/off. The home screen shows a listening strip and a quote / tip line.',
+  'Yeni sesli komutlar: radyo/TV/müzik kapat, duraklat, devam et, sonraki, önceki, ses, saat kaç, bugün ne yaptım, şarkı ne. "TV aç" artık TV\'yi doğrudan açar. Uyandırma kelimesi daha toleranslı; komut listesinde "Son duyulan" görünür.':
+      'New voice commands: stop radio/TV/music, pause, resume, next, previous, volume, what time is it, what did I do today, what song is this. "Open TV" now opens TV directly. The wake word is more tolerant; the command list shows "Last heard".',
 };

@@ -11,13 +11,12 @@ import 'version.dart';
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
       tx('Verilerin korundu.'),
-      tx('Çalan bir şey olunca üstteki simgelerin altında tam genişlikte çalma şeridi çıkar: solda ok (kontrolleri açar), sağda ✕. Radyoda yukarı/aşağı kaydırınca sonraki/önceki istasyon; dokununca Favoriler açılır.'),
-      tx('Kulaklık simgesine uzun bas: Müzik, Radyo, TV, Podcast, Haber, Online menüsü ve "Kısayol çubuğunu sabitle". Seçtiğin ana ekrana gelir.'),
-      tx('TV, ana ekranın üstünde yüzen küçük pencerede açılır; sürükle, tam ekran yap. Telefonu yan çevirince tam ekran olur.'),
-      tx('Radyo şarkı bilgisi artık yayından doğrudan okunur; Shazam düğmesi telefondaki gerçek Shazam simgesini kullanır.'),
-      tx('Rutin satırını sola tam çekmek artık tüm günlerden kaldırmaz.'),
-      tx('Çevrimdışı sesli dinleme yeniden denendi (Komut listesi sayfasından model indirilir).'),
-      tx('Yedek dosyası (.zip) ve otomatik yedek; çalan radyo komut sırasında duraklar.'),
+      tx('Medya sayfalarının (Radyo, TV, Müzik, Podcast, Haber, Online) üstünde "Ana ekrana arayüz ekle" anahtarı var: açınca o sayfanın çalma şeridi ana ekranda görünür. Kulaklığa uzun basma menüsü kalktı.'),
+      tx('Şeridin ⌄ panelinde favori istasyonlar ve favori TV kanalları görünür; çift ✕ düzeltildi.'),
+      tx('Radyo şarkı bilgisi okuyucusu yenilendi; takılı kalan "aranıyor" yazısı yerine durum yazar.'),
+      tx('TV pop-up\'ına dokununca büyür; TV rehberinde tür seçimi ve ülkelerde Tümü seçeneği var.'),
+      tx('Mikrofona uzun bas: sürekli dinleme açılır/kapanır. Ana ekranda dinleme şeridi ve özlü söz / ipucu satırı çıkar.'),
+      tx('Yeni sesli komutlar: radyo/TV/müzik kapat, duraklat, devam et, sonraki, önceki, ses, saat kaç, bugün ne yaptım, şarkı ne. "TV aç" artık TV\'yi doğrudan açar. Uyandırma kelimesi daha toleranslı; komut listesinde "Son duyulan" görünür.'),
     ];
 
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {

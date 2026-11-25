@@ -782,10 +782,14 @@ Future<List<TvFound>> tvDirectory(String cc) async {
   final key = cc.toLowerCase();
   final c = _tvDirCache[key];
   if (c != null) return c;
+  // Ülke boşsa (Tümü): dünya genelindeki tüm kanallar tek listede (büyük; ilk açılışta biraz sürer)
+  final all = key.isEmpty;
   final txt = await httpGetText(
-      Uri.parse('https://iptv-org.github.io/iptv/countries/$key.m3u'),
-      seconds: 20,
-      maxBytes: 8000000);
+      Uri.parse(all
+          ? 'https://iptv-org.github.io/iptv/index.m3u'
+          : 'https://iptv-org.github.io/iptv/countries/$key.m3u'),
+      seconds: all ? 60 : 20,
+      maxBytes: all ? 40000000 : 8000000);
   final out = <TvFound>[];
   String? name;
   var group = '';
@@ -809,6 +813,36 @@ Future<List<TvFound>> tvDirectory(String cc) async {
   return out;
 }
 
+// Tür (iptv-org kanal kategorisi): [kategori, görünen ad]
+const _tvTagList = <List<String>>[
+  ['', 'Hepsi'],
+  ['general', 'Genel'],
+  ['news', 'Haber'],
+  ['sports', 'Spor'],
+  ['music', 'Müzik'],
+  ['movies', 'Film'],
+  ['series', 'Dizi'],
+  ['documentary', 'Belgesel'],
+  ['kids', 'Çocuk'],
+  ['animation', 'Animasyon'],
+  ['entertainment', 'Eğlence'],
+  ['comedy', 'Komedi'],
+  ['lifestyle', 'Yaşam'],
+  ['culture', 'Kültür'],
+  ['family', 'Aile'],
+  ['education', 'Eğitim'],
+  ['science', 'Bilim'],
+  ['business', 'Ekonomi'],
+  ['religious', 'Dini'],
+  ['cooking', 'Mutfak'],
+  ['travel', 'Seyahat'],
+  ['weather', 'Hava durumu'],
+  ['outdoor', 'Doğa'],
+  ['legislative', 'Meclis'],
+  ['public', 'Kamu'],
+  ['shop', 'Alışveriş'],
+];
+
 class TvBrowserPage extends StatefulWidget {
   final String? catId; // doluysa kanallar doğrudan bu kategoriye eklenir
   const TvBrowserPage({super.key, this.catId});
@@ -821,6 +855,8 @@ class _TvBrowserPageState extends State<TvBrowserPage> {
   final _q = TextEditingController();
   String _cc = 'TR';
   String _ccName = '';
+  String _tag = ''; // seçili tür ('' = hepsi)
+  bool _sortAz = false; // ada göre sırala
   List<TvFound> _all = [];
   bool _loading = false;
   String? _err;
@@ -869,9 +905,51 @@ class _TvBrowserPageState extends State<TvBrowserPage> {
     if (c == null) return;
     setState(() {
       _cc = c.code;
-      _ccName = c.code == 'TR' ? tx('Türkiye') : c.name;
+      _ccName = c.code.isEmpty
+          ? tx('Tümü')
+          : (c.code == 'TR' ? tx('Türkiye') : c.name);
     });
     _load();
+  }
+
+  Future<void> _pickTag() async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.7),
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              for (final e in _tvTagList)
+                ListTile(
+                  title: Text(tx(e[1])),
+                  trailing: _tag == e[0] ? const Icon(Icons.check_rounded) : null,
+                  onTap: () => Navigator.pop(ctx, e[0]),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (picked == null) return;
+    setState(() => _tag = picked);
+  }
+
+  String _tagName() {
+    for (final t in _tvTagList) {
+      if (t[0] == _tag) return tx(t[1]);
+    }
+    return tx('Hepsi');
+  }
+
+  bool _hasTag(TvFound f) {
+    if (_tag.isEmpty) return true;
+    for (final g in f.group.toLowerCase().split(';')) {
+      if (g.trim() == _tag) return true;
+    }
+    return false;
   }
 
   Future<void> _add(TvFound f) async {
@@ -894,11 +972,15 @@ class _TvBrowserPageState extends State<TvBrowserPage> {
         final q = _q.text.trim().toLowerCase();
         final list = [
           for (final f in _all)
-            if (q.isEmpty ||
-                f.name.toLowerCase().contains(q) ||
-                f.group.toLowerCase().contains(q))
+            if (_hasTag(f) &&
+                (q.isEmpty ||
+                    f.name.toLowerCase().contains(q) ||
+                    f.group.toLowerCase().contains(q)))
               f
         ];
+        if (_sortAz) {
+          list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        }
         final have = {for (final c in store.tvChans) c.url};
         return AmbScaffold(
           kind: 'media',
@@ -907,13 +989,6 @@ class _TvBrowserPageState extends State<TvBrowserPage> {
             elevation: 0,
             scrolledUnderElevation: 0,
             title: Text(tx('TV rehberi')),
-            actions: [
-              TextButton.icon(
-                onPressed: _pickCountry,
-                icon: const Icon(Icons.public_rounded, size: 18),
-                label: Text(_ccName),
-              ),
-            ],
           ),
           body: Column(
             children: [
@@ -927,6 +1002,44 @@ class _TvBrowserPageState extends State<TvBrowserPage> {
                       prefixIcon: const Icon(Icons.search_rounded),
                       isDense: true),
                 ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _pickCountry,
+                        icon: const Icon(Icons.public_rounded, size: 18),
+                        label: Text(tx('Ülke: {0}', [_ccName]),
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _pickTag,
+                        icon: const Icon(Icons.category_outlined, size: 18),
+                        label: Text(tx('Tür: {0}', [_tagName()]),
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 2, 16, 0),
+                child: Row(children: [
+                  FilterChip(
+                    label: Text(tx('A-Z sırala')),
+                    selected: _sortAz,
+                    onSelected: (v) => setState(() => _sortAz = v),
+                  ),
+                  const SizedBox(width: 8),
+                  if (!_loading && _err == null)
+                    Text(tx('{0} kanal', ['${_all.length}']),
+                        style: TextStyle(color: p.soft, fontSize: 12)),
+                ]),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
@@ -1054,13 +1167,19 @@ class _TvCountrySheetState extends State<_TvCountrySheet> {
                       .toList();
                   final tr = all.where((c) => c.code == 'TR').toList();
                   final rest = all.where((c) => c.code != 'TR').toList();
-                  final list = [...tr, ...rest];
+                  final list = [
+                    if (q.isEmpty) RbCountry('', tx('Tümü'), 0),
+                    ...tr,
+                    ...rest,
+                  ];
                   return ListView.builder(
                     itemCount: list.length,
                     itemBuilder: (context, i) {
                       final c = list[i];
                       return ListTile(
-                        title: Text(c.code == 'TR' ? tx('Türkiye') : c.name),
+                        title: Text(c.code.isEmpty
+                            ? tx('Tümü')
+                            : (c.code == 'TR' ? tx('Türkiye') : c.name)),
                         onTap: () => Navigator.pop(context, c),
                       );
                     },

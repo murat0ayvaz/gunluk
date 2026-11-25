@@ -7,6 +7,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'ambient.dart';
 import 'data.dart';
+import 'dock.dart' show DockSwitch;
 import 'icy.dart';
 import 'music.dart';
 import 'news.dart';
@@ -75,7 +76,8 @@ class MediaCtl extends ChangeNotifier {
   String nowTitle = '';
   String icyTitle = ''; // radyo yayınından gelen şarkı adı (StreamTitle)
   String icyUrl = ''; // yayından gelen adres / kapak (StreamUrl)
-  bool icyNone = false; // bu istasyon şarkı bilgisi göndermiyor
+  String icyState = 'search'; // search | ok | empty | none | err
+  String icyDiag = ''; // yayından gelen ham bilgi / hata nedeni (küçük teşhis satırı)
   Timer? _icyTimer;
   int _icyGen = 0;
 
@@ -88,15 +90,21 @@ class MediaCtl extends ChangeNotifier {
       final r = await icyFetch(url);
       if (g != _icyGen || !isRadio) return;
       var t = r.title;
-      if (t.toLowerCase() == nowTitle.toLowerCase()) t = '';
-      final none = !r.supported;
-      if (t != icyTitle || r.url != icyUrl || none != icyNone) {
-        icyTitle = t;
-        icyUrl = r.url;
-        icyNone = none;
+      if (t.toLowerCase() == nowTitle.toLowerCase()) t = ''; // istasyon adını tekrar etme
+      var st = r.state;
+      if (st == 'ok' && t.isEmpty) st = 'empty';
+      if (t.isNotEmpty) st = 'ok';
+      // şarkı adı gelmediyse mevcut (çaladan gelen) adı silme
+      final nt = t.isNotEmpty ? t : icyTitle;
+      if (nt.isNotEmpty) st = 'ok';
+      if (nt != icyTitle || (r.url.isNotEmpty && r.url != icyUrl) || st != icyState || r.diag != icyDiag) {
+        icyTitle = nt;
+        if (r.url.isNotEmpty) icyUrl = r.url;
+        icyState = st;
+        icyDiag = r.diag;
         notifyListeners();
       }
-      if (none) _icyTimer?.cancel(); // desteklemiyor: boşuna tekrar etme
+      if (st == 'none') _icyTimer?.cancel(); // desteklemiyor: boşuna tekrar etme
     }
 
     tick();
@@ -107,7 +115,8 @@ class MediaCtl extends ChangeNotifier {
     _icyGen++;
     _icyTimer?.cancel();
     _icyTimer = null;
-    icyNone = false;
+    icyState = 'search';
+    icyDiag = '';
   }
   String nowKind = ''; // song | radio | pod
   String? curListId; // çalan şarkının oynatma listesi
@@ -178,7 +187,7 @@ class MediaCtl extends ChangeNotifier {
       if (t.isEmpty || (t == icyTitle && u == icyUrl)) return; // boş gelen, kendi okuduğumuzu silmesin
       icyTitle = t;
       if (u.isNotEmpty) icyUrl = u;
-      icyNone = false;
+      icyState = 'ok';
       notifyListeners();
     });
     player.playingStream.listen((pl) {
@@ -801,7 +810,13 @@ class MediaPage extends StatelessWidget {
             body: Column(
               children: [
                 Expanded(
-                  child: TabBarView(children: [for (final id in ids) view(id)]),
+                  child: TabBarView(children: [
+                    for (final id in ids)
+                      Column(children: [
+                        DockSwitch(id: id),
+                        Expanded(child: view(id)),
+                      ]),
+                  ]),
                 ),
                 const NowBar(),
               ],
@@ -815,7 +830,8 @@ class MediaPage extends StatelessWidget {
 
 // ---------- Alttaki çalan parça çubuğu ----------
 class NowBar extends StatelessWidget {
-  const NowBar({super.key});
+  final bool showClose; // ana ekran panelinde şeritte zaten ✕ var; orada false
+  const NowBar({super.key, this.showClose = true});
 
   static const _repIcons = [
     Icons.repeat_rounded,
@@ -887,10 +903,11 @@ class NowBar extends StatelessWidget {
                           style: TextStyle(
                               fontWeight: FontWeight.w700, color: p.ink)),
                     ),
-                    IconButton(
-                        tooltip: tx('Durdur'),
-                        onPressed: media.stop,
-                        icon: const Icon(Icons.close_rounded)),
+                    if (showClose)
+                      IconButton(
+                          tooltip: tx('Durdur'),
+                          onPressed: media.stop,
+                          icon: const Icon(Icons.close_rounded)),
                   ],
                 ),
                 if (media.isRadio || media.isSong || media.isOnline)

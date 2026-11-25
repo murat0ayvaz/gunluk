@@ -10,7 +10,8 @@ import 'tv.dart' show TvPlayerPage;
 
 // ---------------------------------------------------------------
 // TV POP-UP: ana ekranın (ve diğer sayfaların) üstünde yüzen küçük TV penceresi.
-//  Sürükleyerek taşınır; dokununca kontroller çıkar (önceki/sonraki kanal, tam ekran, kapat).
+//  Sürükleyerek taşınır; dokununca büyür (ekran genişliğine yakın), tekrar dokununca küçülür;
+//  büyükken önceki/sonraki kanal, tam ekran ve kapat düğmeleri çıkar. Boyut hatırlanır (prof 'tvbig').
 //  Telefon yan çevrilince pencere tam ekran olur, dikeye dönünce küçülür.
 //  Uygulamadan çıkınca durur (video oynatıcı arka planda çalışmaz).
 // ---------------------------------------------------------------
@@ -57,6 +58,7 @@ class _TvPopHostState extends State<TvPopHost> with WidgetsBindingObserver {
   String? _loaded; // açık kanalın kimliği
   String? _err;
   bool _ui = true;
+  bool _big = false; // büyük boyut (dokununca değişir, hatırlanır)
   Offset? _pos; // pencerenin sol üst köşesi
   int _gen = 0;
   static const double _w = 224, _h = 126;
@@ -64,6 +66,7 @@ class _TvPopHostState extends State<TvPopHost> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _big = store.pBool('tvbig', false);
     WidgetsBinding.instance.addObserver(this);
     tvPop.addListener(_sync);
   }
@@ -171,7 +174,7 @@ class _TvPopHostState extends State<TvPopHost> with WidgetsBindingObserver {
     );
   }
 
-  Widget _controls(bool big) {
+  Widget _controls(bool big, {bool compact = false}) {
     final ch = tvPop.chan!;
     final sz = big ? 28.0 : 20.0;
     Widget btn(IconData i, VoidCallback f, String tip) => IconButton(
@@ -199,11 +202,16 @@ class _TvPopHostState extends State<TvPopHost> with WidgetsBindingObserver {
             btn(Icons.close_rounded, tvPop.close, tx('Kapat')),
           ]),
           const Spacer(),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-            btn(Icons.skip_previous_rounded, () => tvPop.step(-1), tx('Önceki kanal')),
-            btn(Icons.fullscreen_rounded, _fullscreen, tx('Tam ekran')),
-            btn(Icons.skip_next_rounded, () => tvPop.step(1), tx('Sonraki kanal')),
-          ]),
+          if (compact)
+            Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+              btn(Icons.fullscreen_rounded, _fullscreen, tx('Tam ekran')),
+            ])
+          else
+            Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+              btn(Icons.skip_previous_rounded, () => tvPop.step(-1), tx('Önceki kanal')),
+              btn(Icons.fullscreen_rounded, _fullscreen, tx('Tam ekran')),
+              btn(Icons.skip_next_rounded, () => tvPop.step(1), tx('Sonraki kanal')),
+            ]),
         ],
       ),
     );
@@ -236,14 +244,16 @@ class _TvPopHostState extends State<TvPopHost> with WidgetsBindingObserver {
       );
     }
     final size = mq.size;
-    final pos = _pos ?? Offset(size.width - _w - 12, mq.padding.top + 120);
-    final dx = pos.dx.clamp(0.0, size.width - _w).toDouble();
-    final dy = pos.dy.clamp(0.0, size.height - _h).toDouble();
+    final w = _big ? (size.width - 16).clamp(_w, 560.0).toDouble() : _w;
+    final h = _big ? w * 9 / 16 : _h;
+    final pos = _pos ?? Offset(size.width - w - 12, mq.padding.top + 120);
+    final dx = pos.dx.clamp(0.0, size.width - w).toDouble();
+    final dy = pos.dy.clamp(0.0, size.height - h).toDouble();
     return Positioned(
       left: dx,
       top: dy,
-      width: _w,
-      height: _h,
+      width: w,
+      height: h,
       child: Material(
         elevation: 10,
         borderRadius: BorderRadius.circular(12),
@@ -251,11 +261,15 @@ class _TvPopHostState extends State<TvPopHost> with WidgetsBindingObserver {
         clipBehavior: Clip.antiAlias,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: () => setState(() => _ui = !_ui),
+          onTap: () {
+            HapticFeedback.selectionClick();
+            setState(() => _big = !_big);
+            store.setProf('tvbig', _big);
+          },
           onPanUpdate: (d) => setState(() => _pos = Offset(dx, dy) + d.delta),
           child: Stack(children: [
-            Positioned.fill(child: _video(context, big: false)),
-            if (_ui) Positioned.fill(child: _controls(false)),
+            Positioned.fill(child: _video(context, big: _big)),
+            Positioned.fill(child: _controls(_big, compact: !_big)),
           ]),
         ),
       ),
