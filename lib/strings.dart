@@ -2130,4 +2130,6 @@ const _en = <String, String>{
   'Çalan bir şey olunca üstteki simgelerin altında tam genişlikte çalma şeridi çıkar: solda ok (kontrolleri açar), sağda ✕. Radyoda yukarı/aşağı kaydırınca sonraki/önceki istasyon; dokununca Favoriler açılır.': 'When something plays, a full-width player strip appears under the top icons: an arrow on the left (opens controls), ✕ on the right. On radio, swipe up/down for next/previous station; tap to open Favorites.',
   'Çevrimdışı sesli dinleme yeniden denendi (Komut listesi sayfasından model indirilir).': 'Offline voice listening was tried again (download the model from the Command list page).',
   'Şarkı bilgisi aranıyor...': 'Looking for song info...',
+  'Model hazırlanıyor...': 'Preparing the model...',
+  'Çevrimdışı motor bu telefonda uygulamayı kapattı; devre dışı bırakıldı. Eski yöntem kullanılıyor.': 'The offline engine closed the app on this phone; it has been disabled. The old method is in use.',
 };

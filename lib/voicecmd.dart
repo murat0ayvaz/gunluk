@@ -1646,7 +1646,13 @@ class _VoiceStatus extends StatelessWidget {
                       style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
                 ),
               const SizedBox(height: 8),
-              if (w.downloading)
+              if (w.bad)
+                OutlinedButton.icon(
+                  onPressed: w.clearBad,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: Text(tx('Tekrar dene')),
+                )
+              else if (w.downloading)
                 const LinearProgressIndicator()
               else if (!w.ready)
                 FilledButton.icon(
