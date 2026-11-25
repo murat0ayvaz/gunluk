@@ -810,12 +810,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ? ListenableBuilder(
                     listenable: media,
                     builder: (context, _) => IconButton(
-                      tooltip: tx('Müzik ve Radyo'),
+                      tooltip: tx('Medya'),
                       onPressed: () => Navigator.of(context)
                           .push(slideFromRight(const MediaPage())),
                       icon: Icon(media.nowId != null && media.playing
                           ? Icons.graphic_eq_rounded
-                          : Icons.headphones_rounded),
+                          : Icons.play_circle_rounded),
                     ),
                   )
                 : null;
@@ -960,6 +960,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               // Tema 3'te varsayılan görünüm eskisi gibi kalsın (namaz üstte, hava altta)
               final firstWx = reversed ? !wxFirst : wxFirst;
               final l = [
+                // söz / ipucu kartı: alt bildirim alanının en üstünde
+                if (tipsOn() && !kbSection) const HomeTipCard(key: ValueKey('tipcard')),
                 if (erLine != null) _bar('er', erLine),
                 if (bkLine != null) _bar('bk', bkLine),
                 ...(firstWx ? [...wx, ...pr] : [...pr, ...wx]),

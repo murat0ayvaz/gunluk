@@ -11,12 +11,13 @@ import 'version.dart';
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
       tx('Verilerin korundu.'),
-      tx('Medya sayfalarının (Radyo, TV, Müzik, Podcast, Haber, Online) üstünde "Ana ekrana arayüz ekle" anahtarı var: açınca o sayfanın çalma şeridi ana ekranda görünür. Kulaklığa uzun basma menüsü kalktı.'),
-      tx('Şeridin ⌄ panelinde favori istasyonlar ve favori TV kanalları görünür; çift ✕ düzeltildi.'),
-      tx('Radyo şarkı bilgisi okuyucusu yenilendi; takılı kalan "aranıyor" yazısı yerine durum yazar.'),
-      tx('TV pop-up\'ına dokununca büyür; TV rehberinde tür seçimi ve ülkelerde Tümü seçeneği var.'),
-      tx('Mikrofona uzun bas: sürekli dinleme açılır/kapanır. Ana ekranda dinleme şeridi ve özlü söz / ipucu satırı çıkar.'),
-      tx('Yeni sesli komutlar: radyo/TV/müzik kapat, duraklat, devam et, sonraki, önceki, ses, saat kaç, bugün ne yaptım, şarkı ne. "TV aç" artık TV\'yi doğrudan açar. Uyandırma kelimesi daha toleranslı; komut listesinde "Son duyulan" görünür.'),
+      tx('Müzik ve Radyo sayfası artık Medya (yeni simge). Müzik sekmesinde Listelerim, Online ve İsteklerim bir arada; Online ayrı sekme olmaktan çıktı.'),
+      tx('Ana ekran şeridi yeniden düzenlendi: solda ⌄ ve oynat/duraklat, sağda ✕. ✕ çalanı durdurur, şeridi kaldırır ve "Geri al" sunar.'),
+      tx('Çalmıyorken şeritteki ▶: Haber\'de sesli okumayı, Podcast\'te kaldığın bölümü, Müzik\'te son şarkıyı (online dahil) başlatır.'),
+      tx('Ana ekran radyo paneli bütünleşik: tekrar eden ad ve şarkı yazısı yok, tek kontrol satırı var.'),
+      tx('Söz ve ipucu artık alttaki bildirim alanının en üstünde kart olarak görünür; dokununca kapanır, saat başı ve her açılışta yenilenir.'),
+      tx('TV pop-up\'ında dokununca düğmeler çıkar ve 3 sn sonra gizlenir; çift dokunuş büyütür/küçültür.'),
+      tx('Medya bildirimi (kilit ekranı düğmeleri) için düzeltme denendi; radyo bildirimi "Sanatçı - Şarkı" gösterir (Ayarlar\'dan kapanır).'),
     ];
 
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {
@@ -88,7 +89,7 @@ class FeaturesPage extends StatelessWidget {
           ]
         ),
         (
-          Icons.headphones_rounded,
+          Icons.play_circle_rounded,
           const Color(0xFFE8883A),
           tx('Müzik, radyo, podcast'),
           [

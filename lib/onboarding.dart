@@ -22,7 +22,7 @@ const _apps = <(String, String, IconData)>[
   ('study', 'Ders çalışma', Icons.school_rounded),
   ('shortcuts', 'Kısayollar', Icons.apps_rounded),
   ('tools', 'Araçlar', Icons.handyman_outlined),
-  ('media', 'Müzik ve Radyo', Icons.headphones_rounded),
+  ('media', 'Medya', Icons.play_circle_rounded),
 ];
 
 const _mediaSubs = <(String, String)>[

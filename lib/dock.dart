@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'ambient.dart';
 import 'data.dart';
 import 'media.dart';
+import 'news.dart' show newsReader, startNewsReading;
 import 'radio.dart' show radFavOnly;
 import 'strings.dart';
 import 'theme.dart';
@@ -13,10 +15,13 @@ import 'tvpop.dart';
 // ANA EKRAN: ÇALMA ŞERİTLERİ
 //  Her medya sayfasının (Müzik, Radyo, TV, Podcast, Haber, Online) üstünde "Ana ekrana arayüz ekle"
 //  anahtarı vardır. Anahtarı açık sayfanın şeridi, üstteki program simgelerinin hemen altında görünür.
-//  - O sayfadan bir şey çalıyorsa: canlı şerit. Solda ⌄ (aşağı açar: çalma kontrolleri + favoriler),
-//    ortada şarkı/başlık, oynat-duraklat, sağda ✕ (durdur). Radyoda yukarı/aşağı kaydırma:
-//    sonraki/önceki istasyon; dokununca sayfa açılır.
-//  - Çalmıyorsa: son çalınan öğe görünür; oynat düğmesi onu başlatır (TV'de pop-up açar).
+//  - Düzen: solda ⌄ (aşağı açar: çalma kontrolleri + favoriler) ve oynat-duraklat, ortada şarkı/başlık,
+//    sağda ✕. ✕ çalanı durdurur (TV'de pop-up'ı kapatır) ve şeridi ana ekrandan kaldırır
+//    ("Geri al" ile geri gelir; ya da sayfadaki anahtarla yeniden eklenir).
+//  - O sayfadan bir şey çalıyorsa: canlı şerit. Radyoda yukarı/aşağı kaydırma: sonraki/önceki
+//    istasyon; dokununca sayfa açılır.
+//  - Çalmıyorsa: son çalınan öğe görünür; ▶ onu başlatır (TV'de pop-up, Haber'de sesli okuma,
+//    Podcast'te kaldığın bölüm, Müzik'te son şarkı ya da online parça).
 //  - Anahtarı kapalı sayfanın şeridi çıkmaz.
 //  Radyo varsayılan olarak açıktır, diğerleri kapalı.
 // ---------------------------------------------------------------
@@ -53,6 +58,10 @@ String dockLastTitle(String id) {
       }
     }
   } else if (id == 'music') {
+    if (store.pStr('lmus') == 'online') {
+      final o = _lastOnline();
+      if (o != null) return o.title;
+    }
     final pid = store.pStr('lspl'), sid = store.pStr('lsong');
     for (final pl in store.playlists) {
       if (pl.id != pid) continue;
@@ -60,6 +69,11 @@ String dockLastTitle(String id) {
         if (s.id == sid) return s.title;
       }
     }
+    final o = _lastOnline();
+    if (o != null) return o.title;
+  } else if (id == 'podcast') {
+    final m = _lastPod();
+    if (m != null) return (m['t'] ?? '').toString();
   } else if (id == 'tv') {
     final tid = store.pStr('ltv');
     for (final c in store.tvChans) {
@@ -67,6 +81,30 @@ String dockLastTitle(String id) {
     }
   }
   return '';
+}
+
+/// Son çalınan online parça (yoksa null)
+OnTrack? _lastOnline() {
+  try {
+    final raw = store.pStr('lonl');
+    if (raw.isEmpty) return null;
+    final t = OnTrack.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    return t.url.isEmpty ? null : t;
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Son dinlenen podcast bölümü (yoksa null): {k, t, u, a, r}
+Map<String, dynamic>? _lastPod() {
+  try {
+    final raw = store.pStr('lpod');
+    if (raw.isEmpty) return null;
+    final m = jsonDecode(raw) as Map<String, dynamic>;
+    return (m['u'] ?? '').toString().isEmpty ? null : m;
+  } catch (_) {
+    return null;
+  }
 }
 
 /// Sekmenin son çalanını başlatır ve şerit görünür; son çalan yoksa sekmeyi açar
@@ -82,6 +120,12 @@ Future<void> dockLaunch(BuildContext context, String id) async {
       }
     }
   } else if (id == 'music') {
+    final o = _lastOnline();
+    if (store.pStr('lmus') == 'online' && o != null) {
+      tvPop.close();
+      await media.playOnline([o], 0);
+      return;
+    }
     final pid = store.pStr('lspl'), sid = store.pStr('lsong');
     for (final pl in store.playlists) {
       if (pl.id != pid) continue;
@@ -93,6 +137,23 @@ Future<void> dockLaunch(BuildContext context, String id) async {
         }
       }
     }
+    if (o != null) {
+      tvPop.close();
+      await media.playOnline([o], 0);
+      return;
+    }
+  } else if (id == 'podcast') {
+    final m = _lastPod();
+    if (m != null) {
+      tvPop.close();
+      await media.playPodRaw((m['k'] ?? '').toString(), (m['t'] ?? '').toString(),
+          (m['u'] ?? '').toString(), (m['a'] ?? '').toString(), (m['r'] ?? '').toString());
+      return;
+    }
+  } else if (id == 'news') {
+    tvPop.close();
+    await startNewsReading(context); // doğrudan sesli okumayı başlatır
+    return;
   } else if (id == 'tv') {
     final tid = store.pStr('ltv');
     for (final c in store.tvChans) {
@@ -116,7 +177,7 @@ String _kindTab() {
   if (media.isSong) return 'music';
   if (media.isPod) return 'podcast';
   if (media.isNews) return 'news';
-  if (media.isOnline) return 'online';
+  if (media.isOnline) return 'music'; // Online artık Müzik sekmesinin içinde
   return '';
 }
 
@@ -252,11 +313,38 @@ class _HomeDockState extends State<HomeDock> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (live) const NowBar(showClose: false),
+        if (live) const EmbeddedPlayer(),
         if (_hasFav(id)) _FavRow(id: id),
       ],
     );
   }
+
+  /// ✕: çalanı durdurur (TV'de pop-up'ı kapatır) ve şeridi ana ekrandan kaldırır.
+  /// "Geri al" ile geri gelir; Medya sayfasındaki anahtarla da yeniden eklenir.
+  Future<void> _removeStrip(BuildContext context, String id, {required bool live}) async {
+    final m = ScaffoldMessenger.of(context);
+    if (_open == id) setState(() => _open = '');
+    if (id == 'tv') {
+      tvPop.close();
+    } else if (live) {
+      if (media.isNews && newsReader.reading) await newsReader.stop();
+      if (media.nowId != null) await media.stop();
+    }
+    dockSet(id, false);
+    m.clearSnackBars();
+    m.showSnackBar(SnackBar(
+      duration: const Duration(seconds: 4),
+      content: Text(tx('Ana ekrandan kaldırıldı.')),
+      action: SnackBarAction(label: tx('Geri al'), onPressed: () => dockSet(id, true)),
+    ));
+  }
+
+  Widget _closeBtn(BuildContext context, Pal p, String id, bool live) => IconButton(
+        tooltip: tx('Ana ekrandan kaldır'),
+        visualDensity: VisualDensity.compact,
+        onPressed: () => _removeStrip(context, id, live: live),
+        icon: Icon(Icons.close_rounded, color: p.ink),
+      );
 
   /// Bu sekmeden bir şey çalıyor: canlı şerit
   Widget _live(BuildContext context, Pal p, String id) {
@@ -303,15 +391,6 @@ class _HomeDockState extends State<HomeDock> {
               height: 40,
               child: Row(children: [
                 _arrow(p, id, true),
-                Icon(dockTab(id).$1, size: 18, color: tone),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(media.playing ? title : '${tx('Duraklatıldı')} · $title',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w600, color: p.ink)),
-                ),
                 media.loading
                     ? const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 10),
@@ -328,12 +407,17 @@ class _HomeDockState extends State<HomeDock> {
                             media.playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
                             color: p.ink),
                       ),
-                IconButton(
-                  tooltip: tx('Durdur'),
-                  visualDensity: VisualDensity.compact,
-                  onPressed: media.stop,
-                  icon: Icon(Icons.close_rounded, color: p.ink),
+                const SizedBox(width: 2),
+                Icon(dockTab(id).$1, size: 18, color: tone),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(media.playing ? title : '${tx('Duraklatıldı')} · $title',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600, color: p.ink)),
                 ),
+                _closeBtn(context, p, id, true),
               ]),
             ),
           ),
@@ -347,7 +431,7 @@ class _HomeDockState extends State<HomeDock> {
     );
   }
 
-  /// Çalmıyor: son çalınan öğe + oynat (TV'de pop-up açıksa kapat)
+  /// Çalmıyor: son çalınan öğe + ▶ (TV'de pop-up açıksa pop-up'ın adı ve kapat)
   Widget _idle(BuildContext context, Pal p, String id) {
     final popping = id == 'tv' && tvPop.chan != null;
     final last = popping ? tvPop.chan!.name : dockLastTitle(id);
@@ -365,6 +449,21 @@ class _HomeDockState extends State<HomeDock> {
               height: 40,
               child: Row(children: [
                 _arrow(p, id, _hasFav(id)),
+                if (popping)
+                  IconButton(
+                    tooltip: tx('Durdur'),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: tvPop.close,
+                    icon: Icon(Icons.pause_rounded, color: p.ink),
+                  )
+                else
+                  IconButton(
+                    tooltip: tx('Çal'),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => dockLaunch(context, id),
+                    icon: Icon(Icons.play_arrow_rounded, color: p.ink),
+                  ),
+                const SizedBox(width: 2),
                 Icon(dockTab(id).$1, size: 18, color: p.accent),
                 const SizedBox(width: 8),
                 Expanded(
@@ -374,20 +473,7 @@ class _HomeDockState extends State<HomeDock> {
                       style: TextStyle(
                           fontSize: 13, fontWeight: FontWeight.w600, color: p.soft)),
                 ),
-                if (popping)
-                  IconButton(
-                    tooltip: tx('Durdur'),
-                    visualDensity: VisualDensity.compact,
-                    onPressed: tvPop.close,
-                    icon: Icon(Icons.close_rounded, color: p.ink),
-                  )
-                else
-                  IconButton(
-                    tooltip: tx('Çal'),
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () => dockLaunch(context, id),
-                    icon: Icon(Icons.play_arrow_rounded, color: p.ink),
-                  ),
+                _closeBtn(context, p, id, false),
               ]),
             ),
           ),

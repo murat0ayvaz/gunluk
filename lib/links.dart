@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'data.dart';
 import 'diary.dart';
 import 'media.dart';
+import 'music.dart' show musicSub;
 import 'settings.dart';
 import 'shortcuts.dart';
 import 'strings.dart';
@@ -34,17 +35,17 @@ List<LinkTarget> inAppTargets() => [
           Icons.translate_rounded),
       for (final t in toolList())
         LinkTarget('in:tool:${t.$1}', '${tx('Araçlar')}: ${t.$2}', t.$3),
-      LinkTarget('in:media:music', '${tx('Müzik ve Radyo')}: ${tx('Müzik')}',
+      LinkTarget('in:media:music', '${tx('Medya')}: ${tx('Müzik')}',
           Icons.music_note_rounded),
-      LinkTarget('in:media:radio', '${tx('Müzik ve Radyo')}: ${tx('Radyo')}',
+      LinkTarget('in:media:radio', '${tx('Medya')}: ${tx('Radyo')}',
           Icons.radio_rounded),
-      LinkTarget('in:media:tv', '${tx('Müzik ve Radyo')}: ${tx('TV')}',
+      LinkTarget('in:media:tv', '${tx('Medya')}: ${tx('TV')}',
           Icons.live_tv_rounded),
-      LinkTarget('in:media:podcast', '${tx('Müzik ve Radyo')}: ${tx('Podcast')}',
+      LinkTarget('in:media:podcast', '${tx('Medya')}: ${tx('Podcast')}',
           Icons.podcasts_rounded),
-      LinkTarget('in:media:news', '${tx('Müzik ve Radyo')}: ${tx('Haber')}',
+      LinkTarget('in:media:news', '${tx('Medya')}: ${tx('Haber')}',
           Icons.newspaper_rounded),
-      LinkTarget('in:media:online', '${tx('Müzik ve Radyo')}: ${tx('Online')}',
+      LinkTarget('in:media:online', '${tx('Medya')}: ${tx('Online')}',
           Icons.cloud_queue_rounded),
       LinkTarget('in:diary', tx('Günlük'), Icons.menu_book_rounded),
       LinkTarget('in:shortcuts', tx('Kısayollar'), Icons.apps_rounded),
@@ -120,7 +121,8 @@ Future<void> openLink(BuildContext context, String link) async {
           (tab != null && store.appHidden(tab))) {
         return warn(tx('Bu bölüm kapalı.'));
       }
-      nav.push(slideFromRight(MediaPage(initial: tab)));
+      if (tab == 'online') musicSub.value = 1; // Online artık Müzik sekmesinin içinde
+      nav.push(slideFromRight(MediaPage(initial: tab == 'online' ? 'music' : tab)));
       break;
     case 'diary':
       if (store.appHidden('diary')) return warn(tx('Bu bölüm kapalı.'));

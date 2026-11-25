@@ -2292,4 +2292,21 @@ const _en = <String, String>{
       'Long-press the microphone to turn continuous listening on/off. The home screen shows a listening strip and a quote / tip line.',
   'Yeni sesli komutlar: radyo/TV/müzik kapat, duraklat, devam et, sonraki, önceki, ses, saat kaç, bugün ne yaptım, şarkı ne. "TV aç" artık TV\'yi doğrudan açar. Uyandırma kelimesi daha toleranslı; komut listesinde "Son duyulan" görünür.':
       'New voice commands: stop radio/TV/music, pause, resume, next, previous, volume, what time is it, what did I do today, what song is this. "Open TV" now opens TV directly. The wake word is more tolerant; the command list shows "Last heard".',
+  'Radyo panelinde şarkı ve sanatçı artık şeritle aynı anda güncellenir (eski şarkı kalıyordu).':
+      'In the radio panel the song and artist now update together with the strip (an old song used to stay).',
+  'Alt bildirim alanında özlü sözler ve uygulama ipuçları kart olarak görünür.': 'Quotes and app tips appear as a card in the bottom notification area.',
+  'Ana ekran radyo paneli bütünleşik: tekrar eden ad ve şarkı yazısı yok, tek kontrol satırı var.': 'The home radio panel is integrated: no repeated name or song text, a single controls row.',
+  'Ana ekran şeridi yeniden düzenlendi: solda ⌄ ve oynat/duraklat, sağda ✕. ✕ çalanı durdurur, şeridi kaldırır ve "Geri al" sunar.': 'The home strip was rearranged: ⌄ and play/pause on the left, ✕ on the right. ✕ stops playback, removes the strip and offers "Undo".',
+  'Ana ekrandan kaldır': 'Remove from home screen',
+  'Ana ekrandan kaldırıldı.': 'Removed from the home screen.',
+  'Bildirimde şarkı adı (radyo)': 'Song name in notification (radio)',
+  'Listelerim': 'My lists',
+  'Listeyi aç': 'Open list',
+  'Medya': 'Media',
+  'Medya bildirimi (kilit ekranı düğmeleri) için düzeltme denendi; radyo bildirimi "Sanatçı - Şarkı" gösterir (Ayarlar\'dan kapanır).': 'A fix was attempted for the media notification (lock screen buttons); the radio notification shows "Artist - Song" (can be turned off in Settings).',
+  'Müzik ve Radyo sayfası artık Medya (yeni simge). Müzik sekmesinde Listelerim, Online ve İsteklerim bir arada; Online ayrı sekme olmaktan çıktı.': 'The Music and Radio page is now Media (new icon). The Music tab combines My lists, Online and Wishes; Online is no longer a separate tab.',
+  'Radyoda bildirimde "Sanatçı - Şarkı" yazar. Şarkı değişince yayında kısa bir kesinti olabilir.': 'On radio the notification shows "Artist - Song". The stream may glitch briefly when the song changes.',
+  'Söz ve ipucu artık alttaki bildirim alanının en üstünde kart olarak görünür; dokununca kapanır, saat başı ve her açılışta yenilenir.': 'Quotes and tips now appear as a card at the top of the bottom notification area; tap to dismiss; refreshed hourly and on every launch.',
+  'TV pop-up\'ında dokununca düğmeler çıkar ve 3 sn sonra gizlenir; çift dokunuş büyütür/küçültür.': 'Tapping the TV pop-up shows the buttons and hides them after 3 s; double tap enlarges/shrinks.',
+  'Çalmıyorken şeritteki ▶: Haber\'de sesli okumayı, Podcast\'te kaldığın bölümü, Müzik\'te son şarkıyı (online dahil) başlatır.': 'When idle, the strip\'s ▶ starts news reading, resumes your podcast episode, or plays the last song (online included).',
 };

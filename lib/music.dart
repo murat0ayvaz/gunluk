@@ -3,6 +3,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'data.dart';
 import 'media.dart';
+import 'nowsong.dart' show WishesList;
+import 'online.dart' show OnlineTab;
 import 'strings.dart';
 import 'ui.dart';
 
@@ -14,6 +16,73 @@ import 'ui.dart';
 //  - Soldaki ≡ tutamacı ile şarkıları sürükleyip sırala
 //  - Çalma stili düğmesi alttaki çalma çubuğundadır
 // ---------------------------------------------------------------
+/// Medya > Müzik içindeki bölüm: 0 Listelerim, 1 Online, 2 İsteklerim
+final ValueNotifier<int> musicSub = ValueNotifier<int>(0);
+
+/// Müzik sekmesi: Listelerim (telefondaki şarkılar) | Online | İsteklerim
+class MusicHub extends StatefulWidget {
+  const MusicHub({super.key});
+
+  @override
+  State<MusicHub> createState() => _MusicHubState();
+}
+
+class _MusicHubState extends State<MusicHub> {
+  final _seen = <int>{0}; // bölümler ilk açıldığında kurulur (Online açılışta kendiliğinden aramasın)
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palOf(context);
+    return ListenableBuilder(
+      listenable: Listenable.merge([musicSub, store]),
+      builder: (context, _) {
+        final onlineOff = store.appHidden('online');
+        var sub = musicSub.value;
+        if (onlineOff && sub == 1) sub = 0;
+        _seen.add(sub);
+        final items = <(int, String, IconData)>[
+          (0, tx('Listelerim'), Icons.queue_music_rounded),
+          if (!onlineOff) (1, tx('Online'), Icons.cloud_queue_rounded),
+          (2, tx('İsteklerim'), Icons.favorite_border_rounded),
+        ];
+        Widget lazy(int i, Widget w) => _seen.contains(i) ? w : const SizedBox.shrink();
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final it in items)
+                      ChoiceChip(
+                        avatar: Icon(it.$3, size: 18, color: p.ink),
+                        label: Text(it.$2),
+                        selected: sub == it.$1,
+                        onSelected: (_) => musicSub.value = it.$1,
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            Expanded(
+              child: IndexedStack(
+                index: sub,
+                children: [
+                  lazy(0, const MusicTab()),
+                  lazy(1, const OnlineTab()),
+                  lazy(2, const WishesList()),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 class MusicTab extends StatelessWidget {
   const MusicTab({super.key});
 

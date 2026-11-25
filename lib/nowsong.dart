@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'ambient.dart';
 import 'data.dart';
 import 'media.dart';
+import 'music.dart' show musicSub;
 import 'shortcuts.dart' show AppsChannel;
 import 'strings.dart';
 import 'theme.dart';
@@ -98,12 +99,73 @@ Future<bool> playLocalMatch(String title, String artist) async {
   return false;
 }
 
+/// Radyoda şarkı adı gelmediğinde gösterilen kısa durum yazısı
+String icyStatusLine() => media.icyState == 'none'
+    ? tx('Bu istasyon şarkı bilgisi göndermiyor')
+    : media.icyState == 'empty'
+        ? tx('Yayında şarkı adı yok')
+        : media.icyState == 'err'
+            ? tx('Şarkı bilgisi alınamadı, tekrar denenecek')
+            : tx('Şarkı bilgisi aranıyor...');
+
+/// Çalan şarkıyı İsteklerim'e ekler; mesajdaki "Listeyi aç" Müzik > İsteklerim'e götürür
+void addWishNow(BuildContext context) {
+  final (artist, title) = media.nowSong;
+  if (title.isEmpty) return;
+  final from = media.isRadio ? media.nowTitle : tx('Müzik');
+  final added = store.addWish(title, artist, from);
+  final m = ScaffoldMessenger.of(context);
+  m.clearSnackBars();
+  m.showSnackBar(SnackBar(
+    duration: const Duration(milliseconds: 2400),
+    content: Text(added ? tx('İsteklerime eklendi.') : tx('Bu şarkı zaten İsteklerimde.')),
+    action: SnackBarAction(
+      label: tx('Listeyi aç'),
+      onPressed: () {
+        musicSub.value = 2;
+        Navigator.of(context).push(slideFromRight(const MediaPage(initial: 'music')));
+      },
+    ),
+  ));
+}
+
+/// "İsteklerime ekle" kalbi (ana ekran panelinde)
+class WishButton extends StatelessWidget {
+  const WishButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palOf(context);
+    return ListenableBuilder(
+      listenable: Listenable.merge([media, store]),
+      builder: (context, _) {
+        final (artist, title) = media.nowSong;
+        if (title.isEmpty) return const SizedBox.shrink();
+        final has = store.hasWish(title, artist);
+        return IconButton(
+          tooltip: has ? tx('İsteklerimde') : tx('İsteklerime ekle'),
+          onPressed: () => addWishNow(context),
+          icon: Icon(has ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+              color: has ? Colors.redAccent : p.soft),
+        );
+      },
+    );
+  }
+}
+
 /// Çalma çubuğunda: kapak + şarkı adı + Shazam ve "İsteklerime ekle" düğmeleri
 class SongInfoBlock extends StatelessWidget {
   const SongInfoBlock({super.key});
 
+  // Not: Bu pencere "const" olarak kullanıldığı için üst widget yenilense de yeniden çizilmez.
+  // Bu yüzden kendi dinleyicisi var: yayında şarkı değişince burası da güncellenir.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+        listenable: Listenable.merge([media, store]),
+        builder: (context, _) => _build(context),
+      );
+
+  Widget _build(BuildContext context) {
     final p = palOf(context);
     final (artist, title) = media.nowSong;
     final art = media.nowArt;
@@ -112,7 +174,6 @@ class SongInfoBlock extends StatelessWidget {
     if (!showSong && art.isEmpty && !(isRadio || media.isSong || media.isOnline)) {
       return const SizedBox.shrink();
     }
-    final from = isRadio ? media.nowTitle : tx('Müzik');
     final has = showSong && store.hasWish(title, artist);
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
@@ -151,15 +212,7 @@ class SongInfoBlock extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                          isRadio
-                              ? (media.icyState == 'none'
-                                  ? tx('Bu istasyon şarkı bilgisi göndermiyor')
-                                  : media.icyState == 'empty'
-                                      ? tx('Yayında şarkı adı yok')
-                                      : media.icyState == 'err'
-                                          ? tx('Şarkı bilgisi alınamadı, tekrar denenecek')
-                                          : tx('Şarkı bilgisi aranıyor...'))
-                              : '',
+                          isRadio ? icyStatusLine() : '',
                           style: TextStyle(color: p.soft, fontSize: 12.5)),
                       if (isRadio && media.icyDiag.isNotEmpty)
                         Text(media.icyDiag,
@@ -175,16 +228,7 @@ class SongInfoBlock extends StatelessWidget {
             IconButton(
               tooltip: has ? tx('İsteklerimde') : tx('İsteklerime ekle'),
               visualDensity: VisualDensity.compact,
-              onPressed: () {
-                final added = store.addWish(title, artist, from);
-                final m = ScaffoldMessenger.of(context);
-                m.clearSnackBars();
-                m.showSnackBar(SnackBar(
-                    duration: const Duration(milliseconds: 1400),
-                    content: Text(added
-                        ? tx('İsteklerime eklendi.')
-                        : tx('Bu şarkı zaten İsteklerimde.'))));
-              },
+              onPressed: () => addWishNow(context),
               icon: Icon(has ? Icons.favorite_rounded : Icons.favorite_border_rounded,
                   color: has ? Colors.redAccent : p.soft),
             ),
@@ -205,7 +249,19 @@ class WishesPage extends StatelessWidget {
       kind: 'media',
       backgroundColor: ambBg(p),
       appBar: AppBar(title: Text(tx('İsteklerim'))),
-      body: ListenableBuilder(
+      body: const WishesList(),
+    );
+  }
+}
+
+/// İsteklerim listesi (Medya > Müzik > İsteklerim içinde gösterilir)
+class WishesList extends StatelessWidget {
+  const WishesList({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palOf(context);
+    return ListenableBuilder(
         listenable: store,
         builder: (context, _) {
           if (store.wishes.isEmpty) {
@@ -289,7 +345,6 @@ class WishesPage extends StatelessWidget {
             },
           );
         },
-      ),
     );
   }
 }

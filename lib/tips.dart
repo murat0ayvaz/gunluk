@@ -12,8 +12,9 @@ import 'voicecmd.dart' show voiceListener;
 // ANA EKRAN: SÜREKLİ DİNLEME ŞERİDİ + ÖZLÜ SÖZ / İPUCU SATIRI
 //  - Sürekli dinleme açıkken (mikrofona uzun basınca ya da Ayarlar'dan) üstte "Sürekli dinleme aktif"
 //    şeridi görünür; dokununca kapanır. İkinci satırda son duyulan söz ya da uyandırma kelimesi yazar.
-//  - Altında ince bir satırda özlü sözler (Ayarlar > Özlü sözler'de seçili türlerden) ve uygulama
-//    ipuçları dönüşümlü görünür. Dokununca bir sonrakine geçer. Ayarlar > Ana ekran'dan kapatılır.
+//  - Aşağıdaki bildirim alanının (hava, namaz) en üstünde bir kart: özlü sözler (Ayarlar > Özlü
+//    sözler'de seçili türlerden) ve uygulama ipuçları sırayla gelir. Dokununca kapanır. Saat başı ve her
+//    açılışta yenilenir. Ayarlar > Ana ekran'dan kapatılır.
 // ---------------------------------------------------------------
 bool tipsOn() => store.pBool('tipson', true);
 
@@ -37,44 +38,129 @@ const _tips = <String>[
   'İpucu: Bu satır dokununca bir sonrakine geçer; Ayarlar > Ana ekran\'dan kapatabilirsin.',
 ];
 
-class HomeTicker extends StatefulWidget {
-  const HomeTicker({super.key});
-
-  @override
-  State<HomeTicker> createState() => _HomeTickerState();
-}
-
-class _HomeTickerState extends State<HomeTicker> {
+/// Söz / ipucu seçimi: uygulama genelinde tek yerde tutulur (sayfa yenilense de aynı kalır).
+/// Yenilenme: program açıkken saat başı; program kapalıyken her açılışta; arka plandan 1 dakikadan
+/// uzun süre sonra dönüşte. Sözler ve ipuçları sırayla (söz, ipucu, söz...) gelir.
+class _TipBrain extends ChangeNotifier with WidgetsBindingObserver {
   final _rnd = Random();
   Timer? _t;
+  String text = '';
+  bool isQuote = false;
+  bool dismissed = false; // karta dokununca kapanır; yenisi gelene kadar görünmez
+  DateTime _at = DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime? _paused;
   int _n = 0;
-  String _cur = '';
 
+  void start() {
+    if (_t != null) return;
+    WidgetsBinding.instance.addObserver(this);
+    _t = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (DateTime.now().difference(_at) >= const Duration(hours: 1)) next();
+    });
+    next(); // uygulama her açıldığında yeni söz / ipucu
+  }
+
+  void next() {
+    _n++;
+    _at = DateTime.now();
+    dismissed = false;
+    final pool = store.quotePool();
+    if (_n.isOdd || pool.isEmpty) {
+      isQuote = false;
+      text = tx(_tips[_rnd.nextInt(_tips.length)]);
+    } else {
+      isQuote = true;
+      final q = pool[_rnd.nextInt(pool.length)];
+      text = q.ref.isEmpty ? '“${q.text}”' : '“${q.text}” · ${q.ref}';
+    }
+    notifyListeners();
+  }
+
+  void dismiss() {
+    dismissed = true;
+    notifyListeners();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState s) {
+    if (s == AppLifecycleState.paused) {
+      _paused = DateTime.now();
+    } else if (s == AppLifecycleState.resumed) {
+      final p = _paused;
+      _paused = null;
+      if (p != null && DateTime.now().difference(p) >= const Duration(minutes: 1)) next();
+    }
+  }
+}
+
+final _tipBrain = _TipBrain();
+
+/// Ana ekranın alt bildirim alanında (hava, namaz kartlarıyla birlikte) en üstte görünen söz / ipucu kartı
+class HomeTipCard extends StatefulWidget {
+  const HomeTipCard({super.key});
+
+  @override
+  State<HomeTipCard> createState() => _HomeTipCardState();
+}
+
+class _HomeTipCardState extends State<HomeTipCard> {
   @override
   void initState() {
     super.initState();
-    _cur = _next();
-    _t = Timer.periodic(const Duration(seconds: 9), (_) {
-      if (!mounted || !tipsOn()) return;
-      setState(() => _cur = _next());
-    });
+    _tipBrain.start();
   }
 
   @override
-  void dispose() {
-    _t?.cancel();
-    super.dispose();
+  Widget build(BuildContext context) {
+    final p = palOf(context);
+    return ListenableBuilder(
+      listenable: Listenable.merge([_tipBrain, store]),
+      builder: (context, _) {
+        if (!tipsOn() || _tipBrain.dismissed || _tipBrain.text.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+          child: Material(
+            color: p.card,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: p.line),
+            ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: _tipBrain.dismiss,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+                child: Row(children: [
+                  Icon(
+                      _tipBrain.isQuote
+                          ? Icons.format_quote_rounded
+                          : Icons.lightbulb_outline_rounded,
+                      size: 22,
+                      color: p.accent),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(_tipBrain.text,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 12.5, height: 1.3, color: p.ink)),
+                  ),
+                ]),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
+}
 
-  String _next() {
-    _n++;
-    final pool = store.quotePool();
-    if (_n.isOdd || pool.isEmpty) {
-      return tx(_tips[_rnd.nextInt(_tips.length)]);
-    }
-    final q = pool[_rnd.nextInt(pool.length)];
-    return q.ref.isEmpty ? '“${q.text}”' : '“${q.text}” · ${q.ref}';
-  }
+/// Sürekli dinleme açıkken ana ekranda üstte görünen şerit (çalma şeridinin altında).
+/// Dokununca dinleme kapanır. İkinci satırda son duyulan söz ya da uyandırma kelimesi yazar.
+class HomeTicker extends StatelessWidget {
+  const HomeTicker({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -83,71 +169,42 @@ class _HomeTickerState extends State<HomeTicker> {
       listenable: Listenable.merge([store, voiceListener]),
       builder: (context, _) {
         final listen = store.voiceListen && !store.appHidden('voice');
-        final tips = tipsOn();
-        if (!listen && !tips) return const SizedBox.shrink();
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (listen)
-              InkWell(
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  store.setVoiceListen(false);
-                  voiceListener.sync();
-                },
-                child: Container(
-                  width: double.infinity,
-                  color: p.accent.withOpacity(0.12),
-                  padding: const EdgeInsets.fromLTRB(14, 6, 8, 6),
-                  child: Row(children: [
-                    _Pulse(child: Icon(Icons.mic_rounded, size: 18, color: p.accent)),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(tx('Sürekli dinleme aktif'),
-                              style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: p.ink)),
-                          Text(
-                              voiceListener.lastHeard.isNotEmpty
-                                  ? tx('Son duyulan: {0}', [voiceListener.lastHeard])
-                                  : (voiceListener.listening
-                                      ? tx('"{0}" de', [store.voiceWake])
-                                      : tx('Mikrofon açılıyor…')),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 11.5, color: p.soft)),
-                        ],
-                      ),
-                    ),
-                    Icon(Icons.close_rounded, size: 18, color: p.soft),
-                  ]),
-                ),
-              ),
-            if (tips && _cur.isNotEmpty)
-              InkWell(
-                onTap: () => setState(() => _cur = _next()),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(16, 5, 16, 5),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 350),
-                    child: Text(_cur,
-                        key: ValueKey(_cur),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+        if (!listen) return const SizedBox.shrink();
+        return InkWell(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            store.setVoiceListen(false);
+            voiceListener.sync();
+          },
+          child: Container(
+            width: double.infinity,
+            color: p.accent.withOpacity(0.12),
+            padding: const EdgeInsets.fromLTRB(14, 6, 8, 6),
+            child: Row(children: [
+              _Pulse(child: Icon(Icons.mic_rounded, size: 18, color: p.accent)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(tx('Sürekli dinleme aktif'),
                         style: TextStyle(
-                            fontSize: 12,
-                            height: 1.25,
-                            fontStyle: FontStyle.italic,
-                            color: p.soft)),
-                  ),
+                            fontSize: 13, fontWeight: FontWeight.w700, color: p.ink)),
+                    Text(
+                        voiceListener.lastHeard.isNotEmpty
+                            ? tx('Son duyulan: {0}', [voiceListener.lastHeard])
+                            : (voiceListener.listening
+                                ? tx('"{0}" de', [store.voiceWake])
+                                : tx('Mikrofon açılıyor…')),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 11.5, color: p.soft)),
+                  ],
                 ),
               ),
-          ],
+              Icon(Icons.close_rounded, size: 18, color: p.soft),
+            ]),
+          ),
         );
       },
     );

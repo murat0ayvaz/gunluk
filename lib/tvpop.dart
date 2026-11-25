@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
@@ -10,8 +11,9 @@ import 'tv.dart' show TvPlayerPage;
 
 // ---------------------------------------------------------------
 // TV POP-UP: ana ekranın (ve diğer sayfaların) üstünde yüzen küçük TV penceresi.
-//  Sürükleyerek taşınır; dokununca büyür (ekran genişliğine yakın), tekrar dokununca küçülür;
-//  büyükken önceki/sonraki kanal, tam ekran ve kapat düğmeleri çıkar. Boyut hatırlanır (prof 'tvbig').
+//  Sürükleyerek taşınır. Tek dokunuş: düğmeleri (kapat, önceki/sonraki kanal, tam ekran) gösterir ya da
+//  gizler; düğmeler 3 sn sonra kendiliğinden kaybolur, görüntü açık kalır. Çift dokunuş: büyütür /
+//  küçültür (ekran genişliğine yakın). Boyut hatırlanır (prof 'tvbig').
 //  Telefon yan çevrilince pencere tam ekran olur, dikeye dönünce küçülür.
 //  Uygulamadan çıkınca durur (video oynatıcı arka planda çalışmaz).
 // ---------------------------------------------------------------
@@ -57,7 +59,8 @@ class _TvPopHostState extends State<TvPopHost> with WidgetsBindingObserver {
   VideoPlayerController? _c;
   String? _loaded; // açık kanalın kimliği
   String? _err;
-  bool _ui = true;
+  bool _ui = false; // düğmeler görünüyor mu (varsayılan gizli; 3 sn sonra kendiliğinden kaybolur)
+  Timer? _hideT;
   bool _big = false; // büyük boyut (dokununca değişir, hatırlanır)
   Offset? _pos; // pencerenin sol üst köşesi
   int _gen = 0;
@@ -75,6 +78,7 @@ class _TvPopHostState extends State<TvPopHost> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     tvPop.removeListener(_sync);
+    _hideT?.cancel();
     _release();
     super.dispose();
   }
@@ -82,6 +86,30 @@ class _TvPopHostState extends State<TvPopHost> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState s) {
     if (s == AppLifecycleState.paused) tvPop.close(); // arka planda TV çalmaz
+  }
+
+  /// Düğmeleri gösterir ve 3 sn sonra gizlemek üzere süre başlatır
+  void _armUi() {
+    _hideT?.cancel();
+    if (!_ui && mounted) setState(() => _ui = true);
+    _hideT = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _ui = false);
+    });
+  }
+
+  void _toggleUi() {
+    if (_ui) {
+      _hideT?.cancel();
+      setState(() => _ui = false);
+    } else {
+      _armUi();
+    }
+  }
+
+  void _toggleSize() {
+    HapticFeedback.selectionClick();
+    setState(() => _big = !_big);
+    store.setProf('tvbig', _big);
   }
 
   void _release() {
@@ -116,7 +144,7 @@ class _TvPopHostState extends State<TvPopHost> with WidgetsBindingObserver {
     _loaded = ch.id;
     _c = null;
     _err = null;
-    _ui = true;
+    _armUi(); // yeni kanalda düğmeler 3 sn görünür
     old?.dispose();
     if (mounted) setState(() {});
     try {
@@ -184,7 +212,10 @@ class _TvPopHostState extends State<TvPopHost> with WidgetsBindingObserver {
           visualDensity: VisualDensity.compact,
           padding: EdgeInsets.zero,
           constraints: BoxConstraints(minWidth: sz + 12, minHeight: sz + 12),
-          onPressed: f,
+          onPressed: () {
+            f();
+            _armUi(); // düğmeye basınca süre yeniden başlar
+          },
           icon: Icon(i),
         );
     return Container(
@@ -229,7 +260,7 @@ class _TvPopHostState extends State<TvPopHost> with WidgetsBindingObserver {
           color: Colors.black,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () => setState(() => _ui = !_ui),
+            onTap: _toggleUi,
             onVerticalDragEnd: (d) {
               final v = d.primaryVelocity ?? 0;
               if (v < -400) tvPop.step(1);
@@ -261,15 +292,12 @@ class _TvPopHostState extends State<TvPopHost> with WidgetsBindingObserver {
         clipBehavior: Clip.antiAlias,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: () {
-            HapticFeedback.selectionClick();
-            setState(() => _big = !_big);
-            store.setProf('tvbig', _big);
-          },
+          onTap: _toggleUi,
+          onDoubleTap: _toggleSize,
           onPanUpdate: (d) => setState(() => _pos = Offset(dx, dy) + d.delta),
           child: Stack(children: [
             Positioned.fill(child: _video(context, big: _big)),
-            Positioned.fill(child: _controls(_big, compact: !_big)),
+            if (_ui) Positioned.fill(child: _controls(_big, compact: !_big)),
           ]),
         ),
       ),

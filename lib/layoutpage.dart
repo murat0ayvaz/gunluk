@@ -27,7 +27,7 @@ const _iconNames = {
   'short': ('Kısayollar', Icons.apps_rounded),
   'mic': ('Mikrofon', Icons.mic_none_rounded),
   'tools': ('Araçlar', Icons.handyman_outlined),
-  'media': ('Müzik ve Radyo', Icons.headphones_rounded),
+  'media': ('Medya', Icons.play_circle_rounded),
 };
 
 class HomeLayoutPage extends StatelessWidget {

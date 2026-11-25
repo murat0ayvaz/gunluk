@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -70,7 +71,11 @@ const _kOnline = 'online';
 const _kNews = 'news';
 
 class MediaCtl extends ChangeNotifier {
-  AudioPlayer player = AudioPlayer(); // ✕ ile kapatınca yenisi oluşturulur (bildirimi kaldırmak için)
+  // Çalar ilk gerektiğinde oluşturulur. ✕ ile kapatınca eski çalar bırakılır ve YENİSİ hemen oluşturulmaz:
+  // boşta duran yeni çalar telefondaki medya bildirimini ekranda tutabiliyordu.
+  AudioPlayer? _p;
+  AudioPlayer get player => _p ??= AudioPlayer();
+  set player(AudioPlayer v) => _p = v;
   final Random _rnd = Random();
   String? nowId; // çalan şarkı / radyo / bölüm kimliği
   String nowTitle = '';
@@ -80,6 +85,42 @@ class MediaCtl extends ChangeNotifier {
   String icyDiag = ''; // yayından gelen ham bilgi / hata nedeni (küçük teşhis satırı)
   Timer? _icyTimer;
   int _icyGen = 0;
+  String? _radioUrl; // çalan radyonun yayın adresi (bildirim başlığını yenilemek için)
+  String _tagged = ''; // bildirim başlığına yazılan son şarkı
+  bool _retagBusy = false;
+
+  /// Radyoda şarkı değişince bildirimin / kilit ekranının başlığını "Sanatçı - Şarkı" yapar.
+  /// Paket başlığı yalnız kaynakla birlikte değiştirebildiği için yayın kısa süre yeniden bağlanır
+  /// (Ayarlar'dan kapatılabilir: prof 'ntitle').
+  Future<void> _retag() async {
+    if (!isRadio || nowId == null || _retagBusy) return;
+    if (!store.pBool('ntitle', true)) return;
+    final t = icyTitle;
+    final u = _radioUrl == null ? null : Uri.tryParse(_radioUrl!);
+    if (u == null || t.isEmpty || t == _tagged) return;
+    _retagBusy = true;
+    final id = nowId!;
+    final station = nowTitle;
+    final my = ++_srcGen;
+    try {
+      final wasPlaying = player.playing;
+      _guarded = false;
+      final real = AudioSource.uri(u,
+          tag: MediaItem(id: id, title: t, album: station, artist: station));
+      await player.setAudioSource(
+          ConcatenatingAudioSource(
+              children: [_guard('p', t), real, _guard('n', t)]),
+          initialIndex: 1);
+      if (my != _srcGen || !isRadio || nowId != id) return;
+      _guarded = true;
+      _tagged = t;
+      if (wasPlaying) player.play();
+    } catch (_) {
+      if (my == _srcGen) _guarded = true;
+    } finally {
+      _retagBusy = false;
+    }
+  }
 
   /// Radyo çalarken yayından şarkı adını ~15 sn'de bir okur (çaladan bağımsız)
   void _icyStart(String url) {
@@ -103,6 +144,7 @@ class MediaCtl extends ChangeNotifier {
         icyState = st;
         icyDiag = r.diag;
         notifyListeners();
+        _retag();
       }
       if (st == 'none') _icyTimer?.cancel(); // desteklemiyor: boşuna tekrar etme
     }
@@ -126,7 +168,7 @@ class MediaCtl extends ChangeNotifier {
   bool _started = false;
   int _lastSave = 0;
 
-  bool get playing => player.playing;
+  bool get playing => _p?.playing ?? false;
 
   /// Çalan radyonun kapağı: listedeki logo, yoksa yayının gönderdiği resim adresi
   String get nowArt {
@@ -189,6 +231,7 @@ class MediaCtl extends ChangeNotifier {
       if (u.isNotEmpty) icyUrl = u;
       icyState = 'ok';
       notifyListeners();
+      _retag();
     });
     player.playingStream.listen((pl) {
       if (!isNews || DateTime.now().isBefore(newsIgnoreUntil)) return;
@@ -271,6 +314,8 @@ class MediaCtl extends ChangeNotifier {
     _icyStop();
     icyTitle = '';
     icyUrl = '';
+    _tagged = '';
+    _radioUrl = kind == _kRadio ? uri.toString() : null;
     nowKind = kind;
     nowId = id;
     nowTitle = title;
@@ -318,6 +363,7 @@ class MediaCtl extends ChangeNotifier {
     curListId = pl.id;
     store.setProf('lspl', pl.id); // ana ekran kısayolu: son çalan şarkı
     store.setProf('lsong', s.id);
+    store.setProf('lmus', 'song'); // Müzik şeridinde ▶ en son çalınanı başlatır
     if (!File(s.path).existsSync()) {
       _start();
       nowKind = _kSong;
@@ -346,14 +392,21 @@ class MediaCtl extends ChangeNotifier {
   }
 
   Future<void> playEpisode(Podcast p, Episode e) async {
-    final u = Uri.tryParse(e.url);
+    // ana ekran şeridinde ▶ son dinlenen bölümü devam ettirir
+    store.setProf('lpod',
+        jsonEncode({'k': e.key, 't': e.title, 'u': e.url, 'a': p.title, 'r': p.art}));
+    await playPodRaw(e.key, e.title, e.url, p.title, p.art);
+  }
+
+  Future<void> playPodRaw(String key, String title, String url, String album, String art) async {
+    final u = Uri.tryParse(url);
     if (u == null) return;
-    final saved = store.epPos[e.key] ?? 0;
-    await _play(e.key, e.title, u, _kPod,
+    final saved = store.epPos[key] ?? 0;
+    await _play(key, title, u, _kPod,
         start: saved > 0 ? Duration(milliseconds: saved) : null,
-        album: p.title,
-        art: p.art,
-        pKey: e.key);
+        album: album,
+        art: art,
+        pKey: key);
   }
 
   /// Online parçayı çalar; q = çalma sırası (liste), i = sıradaki
@@ -363,6 +416,8 @@ class MediaCtl extends ChangeNotifier {
     final tr = q[i];
     final u = Uri.tryParse(tr.url);
     if (u == null) return;
+    store.setProf('lonl', jsonEncode(tr.toJson())); // Müzik şeridinde ▶ için son online parça
+    store.setProf('lmus', 'online');
     await _play(tr.id, tr.title, u, _kOnline, album: tr.artist, art: tr.art);
   }
 
@@ -600,14 +655,14 @@ class MediaCtl extends ChangeNotifier {
     notifyListeners();
     // Çaları tamamen kapatıp yenisini oluştururuz: telefondaki medya bildirimi ve
     // oturumu da kapanır (yalnız stop() bildirimi ekranda bırakıyordu).
-    final old = player;
-    player = AudioPlayer();
+    final old = _p;
+    _p = null; // yenisi bir sonraki çalmada oluşturulur
     _started = false; // sonraki çalmada dinleyiciler yeni çaların üstüne bağlanır
     try {
-      await old.stop();
+      await old?.stop();
     } catch (_) {}
     try {
-      await old.dispose();
+      await old?.dispose();
     } catch (_) {}
     notifyListeners();
   }
@@ -733,7 +788,7 @@ class MediaGroup extends StatelessWidget {
 // ---------------------------------------------------------------
 /// Açık olan sekmeler (Ayarlar > Uygulamalar'dan kapatılanlar çıkar)
 List<String> mediaTabIds() => [
-      for (final id in const ['music', 'radio', 'tv', 'podcast', 'news', 'online'])
+      for (final id in const ['music', 'radio', 'tv', 'podcast', 'news'])
         if (!store.appHidden(id)) id
     ];
 
@@ -748,10 +803,11 @@ class MediaPage extends StatelessWidget {
       listenable: store,
       builder: (context, _) {
         final ids = mediaTabIds();
+        final initial2 = initial == 'online' ? 'music' : initial; // Online artık Müzik sekmesinin içinde
         if (ids.isEmpty) {
           return AmbScaffold(kind: 'media', 
             backgroundColor: ambBg(p),
-            appBar: AppBar(title: Text(tx('Müzik ve Radyo'))),
+            appBar: AppBar(title: Text(tx('Medya'))),
             body: Center(child: Text(tx('Tüm sekmeler Ayarlar > Uygulamalar bölümünden kapatılmış.'))),
           );
         }
@@ -775,7 +831,7 @@ class MediaPage extends StatelessWidget {
         Widget view(String id) {
           switch (id) {
             case 'music':
-              return const MusicTab();
+              return const MusicHub();
             case 'radio':
               return const RadioTab();
             case 'tv':
@@ -792,19 +848,11 @@ class MediaPage extends StatelessWidget {
         return DefaultTabController(
           key: ValueKey(ids.join(',')),
           length: ids.length,
-          initialIndex: (initial != null && ids.contains(initial)) ? ids.indexOf(initial!) : 0,
+          initialIndex: (initial2 != null && ids.contains(initial2)) ? ids.indexOf(initial2) : 0,
           child: AmbScaffold(kind: 'media', 
             backgroundColor: ambBg(p),
             appBar: AppBar(
-              title: Text(tx('Müzik ve Radyo')),
-              actions: [
-                IconButton(
-                  tooltip: tx('İsteklerim'),
-                  icon: const Icon(Icons.favorite_border_rounded),
-                  onPressed: () => Navigator.of(context)
-                      .push(slideFromRight(const WishesPage())),
-                ),
-              ],
+              title: Text(tx('Medya')),
               bottom: TabBar(tabs: [for (final id in ids) tab(id)]),
             ),
             body: Column(
@@ -1034,6 +1082,165 @@ class NowBar extends StatelessWidget {
               ],
             ),
           ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+
+String _repLabel(int m) {
+  switch (m) {
+    case 1:
+      return tx('Sürekli tekrar');
+    case 2:
+      return tx('Tek parça tekrar');
+    default:
+      return tx('Tekrar kapalı');
+  }
+}
+
+/// Ana ekran şeridinin ⌄ paneli: başlık / şarkı yazısı YOK (şeritte zaten yazıyor), ayrı kutu ve
+/// zemin YOK (şeritle aynı zeminde, bütünleşik). Yalnız kontroller; radyoda Shazam ve ♥ aynı satırda.
+class EmbeddedPlayer extends StatelessWidget {
+  const EmbeddedPlayer({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palOf(context);
+    return ListenableBuilder(
+      listenable: Listenable.merge([media, store]),
+      builder: (context, _) {
+        if (media.nowId == null) return const SizedBox.shrink();
+        final rep = store.repeatMode;
+        final shuf = store.shuffleOn;
+        final tone = tagTone(media.nowId ?? '');
+        final songish = media.isSong || media.isOnline;
+        final hasSong = media.nowSong.$2.isNotEmpty;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (media.error != null)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: Text(media.error!,
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.error, fontSize: 12.5)),
+                  ),
+                ),
+              if (media.isRadio && !hasSong)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 8, bottom: 2),
+                    child: Text(icyStatusLine(),
+                        style: TextStyle(color: p.soft, fontSize: 12)),
+                  ),
+                ),
+              if (!media.isRadio)
+                StreamBuilder<Duration>(
+                  stream: media.player.positionStream,
+                  builder: (context, snap) {
+                    final pos = snap.data ?? Duration.zero;
+                    final dur = media.player.duration ?? Duration.zero;
+                    final maxMs = dur.inMilliseconds.toDouble();
+                    final v = pos.inMilliseconds.clamp(0, dur.inMilliseconds).toDouble();
+                    return Row(
+                      children: [
+                        const SizedBox(width: 8),
+                        Text(mmss(pos), style: TextStyle(color: p.soft, fontSize: 12)),
+                        Expanded(
+                          child: Slider(
+                            value: v,
+                            max: maxMs > 0 ? maxMs : 1,
+                            onChanged: maxMs > 0
+                                ? (x) => media.player.seek(Duration(milliseconds: x.round()))
+                                : null,
+                          ),
+                        ),
+                        Text(mmss(dur), style: TextStyle(color: p.soft, fontSize: 12)),
+                        const SizedBox(width: 8),
+                      ],
+                    );
+                  },
+                ),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (media.isRadio || songish) const ShazamButton(),
+                  if (songish)
+                    IconButton(
+                      tooltip: _repLabel(rep),
+                      onPressed: () => store.setRepeat((rep + 1) % 3),
+                      icon: Icon(
+                          rep == 2 ? Icons.repeat_one_rounded : Icons.repeat_rounded,
+                          color: rep == 0 ? p.soft : tone),
+                    ),
+                  if (songish)
+                    IconButton(
+                        tooltip: tx('Önceki'),
+                        onPressed: media.isOnline
+                            ? () => media.nextOnline(step: -1)
+                            : media.prev,
+                        icon: const Icon(Icons.skip_previous_rounded, size: 30)),
+                  if (media.isRadio)
+                    IconButton(
+                        tooltip: tx('Önceki istasyon'),
+                        onPressed: () => media.radioStep(-1),
+                        icon: const Icon(Icons.skip_previous_rounded, size: 30)),
+                  if (media.isPod)
+                    IconButton(
+                        tooltip: tx('10 sn geri'),
+                        onPressed: () => media.skipBy(-10),
+                        icon: const Icon(Icons.replay_10_rounded, size: 28)),
+                  media.loading
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: SizedBox(
+                              width: 26,
+                              height: 26,
+                              child: CircularProgressIndicator(strokeWidth: 3)),
+                        )
+                      : IconButton(
+                          tooltip: media.playing ? tx('Duraklat') : tx('Çal'),
+                          onPressed: media.toggle,
+                          icon: Icon(
+                              media.playing
+                                  ? Icons.pause_circle_filled_rounded
+                                  : Icons.play_circle_fill_rounded,
+                              size: 44)),
+                  if (media.isRadio)
+                    IconButton(
+                        tooltip: tx('Sonraki istasyon'),
+                        onPressed: () => media.radioStep(1),
+                        icon: const Icon(Icons.skip_next_rounded, size: 30)),
+                  if (songish)
+                    IconButton(
+                        tooltip: tx('Sonraki'),
+                        onPressed: media.isOnline ? () => media.nextOnline() : media.next,
+                        icon: const Icon(Icons.skip_next_rounded, size: 30)),
+                  if (songish)
+                    IconButton(
+                      tooltip: tx('Karışık'),
+                      onPressed: () => store.setShuffle(!shuf),
+                      icon: Icon(Icons.shuffle_rounded, color: shuf ? tone : p.soft),
+                    ),
+                  if (media.isPod)
+                    IconButton(
+                        tooltip: tx('30 sn ileri'),
+                        onPressed: () => media.skipBy(30),
+                        icon: const Icon(Icons.forward_30_rounded, size: 28)),
+                  if (media.isRadio || songish) const WishButton(),
+                ],
+              )),
+            ],
           ),
         );
       },
