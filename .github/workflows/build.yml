@@ -292,6 +292,44 @@ jobs:
           PY
           grep -n "minSdk\|RECORD_AUDIO" android/app/build.gradle* android/app/src/main/AndroidManifest.xml
 
+      # Vosk (JNA) R8 kod küçültmesinde bozuluyordu: "Can't obtain peer field ID for class com.sun.jna.Pointer".
+      # JNA ve Vosk sınıfları korunur (proguard-rules.pro) ve release derlemesine bağlanır.
+      - name: Android ayarları (Vosk koruma kuralları)
+        run: |
+          cat > android/app/proguard-rules.pro <<'EOF'
+          -keep class com.sun.jna.** { *; }
+          -keepclassmembers class * extends com.sun.jna.* { public *; }
+          -keep class org.vosk.** { *; }
+          -dontwarn java.awt.**
+          -dontwarn com.sun.jna.**
+          EOF
+          python3 - <<'PY'
+          import os, re
+          done = False
+          for g in ('android/app/build.gradle.kts', 'android/app/build.gradle'):
+              if not os.path.exists(g):
+                  continue
+              t = open(g, encoding='utf-8').read()
+              if 'proguard-rules.pro' in t:
+                  print('proguard zaten bagli:', g)
+                  done = True
+                  break
+              if g.endswith('.kts'):
+                  line = '\n            proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")'
+                  t2 = re.sub(r'(buildTypes\s*\{\s*(?:getByName\("release"\)|release)\s*\{)', lambda m: m.group(1) + line, t, count=1)
+              else:
+                  line = "\n            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'"
+                  t2 = re.sub(r'(buildTypes\s*\{\s*release\s*\{)', lambda m: m.group(1) + line, t, count=1)
+              if t2 != t:
+                  open(g, 'w', encoding='utf-8').write(t2)
+                  print('proguard baglandi:', g)
+                  done = True
+              break
+          if not done:
+              print('UYARI: release blogu bulunamadi, proguard baglanamadi')
+          PY
+          grep -n "proguard" android/app/build.gradle* || true
+
       # Sesli komut: telefonun ses tanıma servisini görebilmek için (Android 11+ paket görünürlüğü)
       - name: Android ayarları (sesli komut)
         run: |
