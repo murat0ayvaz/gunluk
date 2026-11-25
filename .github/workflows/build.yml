@@ -141,6 +141,9 @@ jobs:
                       kt = (
                           'package ' + pk + '\n\n'
                           'import android.content.ContentValues\n'
+                          'import android.graphics.Bitmap\n'
+                          'import android.graphics.Canvas\n'
+                          'import java.io.ByteArrayOutputStream\n'
                           'import android.content.Intent\n'
                           'import android.os.Build\n'
                           'import android.provider.MediaStore\n'
@@ -202,6 +205,24 @@ jobs:
                           '                    } catch (e: Exception) {\n'
                           '                    }\n'
                           '                    result.success(ok)\n'
+                          '                }\n'
+                          '                "icon" -> {\n'
+                          '                    val pkg = call.argument<String>("pkg")\n'
+                          '                    var out: ByteArray? = null\n'
+                          '                    try {\n'
+                          '                        if (pkg != null) {\n'
+                          '                            val d = packageManager.getApplicationIcon(pkg)\n'
+                          '                            val bmp = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888)\n'
+                          '                            val cv = Canvas(bmp)\n'
+                          '                            d.setBounds(0, 0, 96, 96)\n'
+                          '                            d.draw(cv)\n'
+                          '                            val bo = ByteArrayOutputStream()\n'
+                          '                            bmp.compress(Bitmap.CompressFormat.PNG, 100, bo)\n'
+                          '                            out = bo.toByteArray()\n'
+                          '                        }\n'
+                          '                    } catch (e: Exception) {\n'
+                          '                    }\n'
+                          '                    result.success(out)\n'
                           '                }\n'
                           '                else -> result.notImplemented()\n'
                           '            }\n'
@@ -302,6 +323,30 @@ jobs:
           echo "Anahtar kopyalandi."
 
       - run: flutter pub get
+
+      # Eski eklentilerde android/build.gradle'da "namespace" yok; yeni Gradle bunu reddeder.
+      # Eksik olanlara AndroidManifest'teki package adı namespace olarak eklenir.
+      - name: Eklenti namespace yamasi
+        run: |
+          python3 - <<'PY'
+          import glob, os, re
+          for g in glob.glob(os.path.expanduser('~/.pub-cache/hosted/pub.dev/*/android/build.gradle')):
+              t = open(g).read()
+              if re.search(r'^\s*namespace\b', t, re.M):
+                  continue
+              d = os.path.dirname(g)
+              pkg = None
+              mf = os.path.join(d, 'src', 'main', 'AndroidManifest.xml')
+              if os.path.exists(mf):
+                  m = re.search(r'package\s*=\s*"([^"]+)"', open(mf).read())
+                  if m:
+                      pkg = m.group(1)
+              if not pkg:
+                  pkg = 'plugin.' + os.path.basename(os.path.dirname(d)).split('-')[0]
+              t2 = re.sub(r'android\s*\{', "android {\n    namespace '" + pkg + "'", t, count=1)
+              open(g, 'w').write(t2)
+              print('namespace eklendi:', g, pkg)
+          PY
 
       # Uygulama simgesini üret (hata verirse derleme yine de devam eder)
       - name: Uygulama simgesi
