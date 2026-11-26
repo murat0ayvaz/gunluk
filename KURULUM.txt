@@ -1,11 +1,24 @@
-DAILY ROUTINE v1.25.37 - TAM PAKET
+DAILY ROUTINE v1.25.39 - TAM PAKET
 
 Bu zipte projenin TAMAMI var: .github, assets, lib, debug.keystore, pubspec.yaml.
 1) Zipi çıkar. GitHub'da "gunluk" reposunun ANA sayfasında: Add file > Upload files.
 2) Çıkan klasörlerin ve dosyaların HEPSİNİ (.github, assets, lib, debug.keystore, pubspec.yaml) sürükle-bırak > Commit changes.
-   (Degisenler: build.yml, about, strings, version.)
+   (Degisenler: build.yml, dock, media, widget, settings, about, strings, version.)
 3) Actions > yeşil tik > Artifacts > gunluk-apk indir, telefona kur (veriler kalır).
 Derleme hatası olursa Actions'taki kırmızı satırları gönder.
+
+v1.25.39 yenilikleri:
+- Ana ekran radyo seridi iki satir: ustte radyo adi, altta sanatci - sarki.
+- Ayarlar > Ana ekran: widget durumu ("Telefonda kayitli mi / ana ekranda kac tane") ve "Ana ekrana ekle" dugmesi.
+- Muzik bildirimi icin yeni sessiz kanal ve bildirim basligi durumu (1.25.38'den).
+- GitHub'da DEGISIKLIK VAR: .github/workflows/build.yml (tum dosyayi yapistir ya da yukle).
+
+
+v1.25.38 yenilikleri:
+- Medya bildirimi icin yeni sessiz kanal (bildirim sesi gelmemeli). Eski "Daily Routine muzik" kanalini telefon ayarlarindan silebilirsin.
+- Radyo panelinde bildirim basliginin durumu kucuk satirda yazar.
+- GitHub'da DEGISIKLIK VAR: .github/workflows/build.yml (tum dosyayi yapistir ya da yukle).
+
 
 v1.25.37 yenilikleri:
 - Ana ekran araci (widget) dosyalari artik build.yml'nin ICINE gomulu; .github/widget klasoru gerekmez.

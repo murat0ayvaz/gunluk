@@ -349,9 +349,14 @@ class _HomeDockState extends State<HomeDock> {
   /// Bu sekmeden bir şey çalıyor: canlı şerit
   Widget _live(BuildContext context, Pal p, String id) {
     final tone = tagTone(media.nowId ?? '');
-    String title = media.nowTitle;
-    if (media.isRadio && media.icyTitle.isNotEmpty) {
-      title = '${media.icyTitle} · ${media.nowTitle}';
+    // Radyoda iki satır: üstte radyo adı, altında "Sanatçı - Şarkı"; diğerlerinde tek satır başlık
+    final title = media.nowTitle;
+    var sub = '';
+    if (media.isRadio) {
+      final (artist, song) = media.nowSong;
+      sub = song.isEmpty
+          ? media.icyTitle
+          : (artist.isEmpty ? song : '$artist - $song');
     }
     void openTab() {
       if (media.isRadio) {
@@ -388,7 +393,7 @@ class _HomeDockState extends State<HomeDock> {
                   }
                 : null,
             child: SizedBox(
-              height: 40,
+              height: (media.isRadio && sub.isNotEmpty) ? 54 : 40,
               child: Row(children: [
                 media.loading
                     ? const Padding(
@@ -410,15 +415,22 @@ class _HomeDockState extends State<HomeDock> {
                 Icon(dockTab(id).$1, size: 18, color: tone),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Row(children: [
-                    Expanded(
-                      child: Text(title,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                              fontSize: 13, fontWeight: FontWeight.w600, color: p.ink)),
-                    ),
-                  ]),
+                              fontSize: 13, fontWeight: FontWeight.w700, color: p.ink)),
+                      if (sub.isNotEmpty)
+                        Text(sub,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 12, color: p.soft)),
+                    ],
+                  ),
                 ),
                 _closeBtn(context, p, id, true),
               ]),

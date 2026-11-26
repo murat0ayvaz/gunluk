@@ -113,6 +113,26 @@ class WidgetSvc {
     }
   }
 
+  /// Telefonda widget kayıtlı mı: (kayıtlı sağlayıcı sayısı, ana ekrana konmuş sayısı); eski sürümde null
+  Future<(int, int)?> status() async {
+    try {
+      final m = await _ch.invokeMapMethod<String, dynamic>('status');
+      if (m == null) return null;
+      return (((m['providers'] ?? 0) as num).toInt(), ((m['placed'] ?? 0) as num).toInt());
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Ana ekrana widget eklemeyi ister (telefon onay penceresi gösterir); desteklenmiyorsa false
+  Future<bool> pin() async {
+    try {
+      return (await _ch.invokeMethod<bool>('pin')) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Araçtan gelen istek: "radio" (hiçbir şey çalmıyordu) ya da "tv"
   Future<void> takeAction() async {
     try {
@@ -134,3 +154,59 @@ class WidgetSvc {
 }
 
 final widgetSvc = WidgetSvc();
+
+/// Ayarlar > Ana ekran: widget durumu ve "Ana ekrana ekle" düğmesi
+class WidgetSetupTile extends StatefulWidget {
+  const WidgetSetupTile({super.key});
+
+  @override
+  State<WidgetSetupTile> createState() => _WidgetSetupTileState();
+}
+
+class _WidgetSetupTileState extends State<WidgetSetupTile> {
+  String _st = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final r = await widgetSvc.status();
+    if (!mounted) return;
+    setState(() {
+      _st = r == null
+          ? tx('Bu sürümde araç desteği yok (eski sürüm kurulu olabilir).')
+          : r.$1 == 0
+              ? tx('Telefonda kayıtlı değil (derleme eksik olabilir).')
+              : r.$2 > 0
+                  ? tx('Ana ekranda {0} adet var.', ['${r.$2}'])
+                  : tx('Telefonda kayıtlı, henüz ana ekranda yok.');
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.widgets_outlined),
+      title: Text(tx('Ana ekran aracı (widget)')),
+      subtitle: Text(_st),
+      trailing: TextButton(
+        onPressed: () async {
+          final m = ScaffoldMessenger.of(context);
+          final ok = await widgetSvc.pin();
+          widgetSvc.push();
+          m.clearSnackBars();
+          m.showSnackBar(SnackBar(
+              content: Text(ok
+                  ? tx('Telefon onay isterse "Ekle"ye dokun.')
+                  : tx('Telefon eklemeyi desteklemiyor ya da izin kapalı. Uygulama izinlerinde "Ana ekrana kısayol oluştur"u aç ya da ana ekranda boş yere uzun basıp Widget\'lar\'dan ekle.'))));
+          _load();
+        },
+        child: Text(tx('Ana ekrana ekle')),
+      ),
+    );
+  }
+}

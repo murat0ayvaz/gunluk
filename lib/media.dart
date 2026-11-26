@@ -37,7 +37,7 @@ import 'ui.dart';
 Future<void> initAudio() async {
   try {
     await JustAudioBackground.init(
-      androidNotificationChannelId: 'com.example.gunluk.audio',
+      androidNotificationChannelId: 'com.example.gunluk.audio3', // yeni kimlik: eski kanalın (sesli kalmış olabilir) ayarları atlanır
       androidNotificationChannelName: 'Daily Routine müzik',
       androidNotificationOngoing: false,
       // false: duraklatınca bildirim yerinde kalır, tekrar başlatınca yeni bildirim sesi çıkmaz.
@@ -82,6 +82,7 @@ class MediaCtl extends ChangeNotifier {
   String icyTitle = ''; // radyo yayınından gelen şarkı adı (StreamTitle)
   String icyUrl = ''; // yayından gelen adres / kapak (StreamUrl)
   String icyState = 'search'; // search | ok | empty | none | err
+  String notifDiag = ''; // bildirim başlığı yenilemesinin durumu (teşhis)
   String icyDiag = ''; // yayından gelen ham bilgi / hata nedeni (küçük teşhis satırı)
   Timer? _icyTimer;
   int _icyGen = 0;
@@ -94,7 +95,10 @@ class MediaCtl extends ChangeNotifier {
   /// (Ayarlar'dan kapatılabilir: prof 'ntitle').
   Future<void> _retag() async {
     if (!isRadio || nowId == null || _retagBusy || loading) return;
-    if (!store.pBool('ntitle', true)) return;
+    if (!store.pBool('ntitle', true)) {
+      notifDiag = 'bildirim başlığı: ayardan kapalı';
+      return;
+    }
     final t = icyTitle;
     final u = _radioUrl == null ? null : Uri.tryParse(_radioUrl!);
     if (u == null || t.isEmpty || t == _tagged) return;
@@ -114,11 +118,13 @@ class MediaCtl extends ChangeNotifier {
       if (my != _srcGen || !isRadio || nowId != id) return;
       _guarded = true;
       _tagged = t;
+      notifDiag = 'bildirim başlığı yenilendi';
+      notifyListeners();
       if (wasPlaying) player.play();
     } catch (e) {
       if (my == _srcGen) {
         _guarded = true;
-        icyDiag = 'bildirim: ${_msg(e)}'; // teşhis için küçük satırda görünür
+        notifDiag = 'bildirim hatası: ${_msg(e)}'; // teşhis için küçük satırda görünür
         notifyListeners();
       }
     } finally {
@@ -319,6 +325,7 @@ class MediaCtl extends ChangeNotifier {
     icyTitle = '';
     icyUrl = '';
     _tagged = '';
+    notifDiag = '';
     _radioUrl = kind == _kRadio ? uri.toString() : null;
     nowKind = kind;
     nowId = id;
@@ -1148,6 +1155,15 @@ class EmbeddedPlayer extends StatelessWidget {
                     padding: const EdgeInsets.only(left: 8, bottom: 2),
                     child: Text(icyStatusLine(),
                         style: TextStyle(color: p.soft, fontSize: 12)),
+                  ),
+                ),
+              if (media.isRadio && media.notifDiag.isNotEmpty)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 8, bottom: 2),
+                    child: Text(media.notifDiag,
+                        style: TextStyle(color: p.soft.withOpacity(0.7), fontSize: 10.5)),
                   ),
                 ),
               if (!media.isRadio)

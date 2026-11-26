@@ -11,7 +11,10 @@ import 'version.dart';
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
       tx('Verilerin korundu.'),
-      tx('Ana ekran aracı (widget) derleme dosyasına gömüldü; artık Ana ekran > Araçlar\'da Daily Routine olarak görünür.'),
+      tx('Ana ekran radyo şeridinde iki satır: üstte radyo adı, altında sanatçı ve şarkı.'),
+      tx('Ayarlar > Ana ekran: ana ekran aracı (widget) durumu ve "Ana ekrana ekle" düğmesi.'),
+      tx('Medya bildirimi için yeni sessiz kanal açıldı (bildirim sesi gelmemeli). Eski "Daily Routine müzik" kanalını telefon ayarlarından silebilirsin.'),
+      tx('Radyo panelinde bildirim başlığının durumu küçük satırda yazar (şarkı adı bildirime geçmezse nedeni görmek için).'),
     ];
 
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {

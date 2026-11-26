@@ -20,6 +20,7 @@ import 'tips.dart' show tipsOn;
 import 'ui.dart';
 import 'voicecmd.dart' show voiceListener, VoiceCommandsPage;
 import 'version.dart';
+import 'widget.dart' show WidgetSetupTile;
 import 'weather.dart';
 
 // ---------------------------------------------------------------
@@ -154,6 +155,7 @@ class SettingsPage extends StatelessWidget {
                 ),
               ]),
               sec(tx('Ana ekran'), [
+                const WidgetSetupTile(),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   secondary: const Icon(Icons.tips_and_updates_outlined),
