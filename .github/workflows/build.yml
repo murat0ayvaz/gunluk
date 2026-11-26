@@ -237,6 +237,112 @@ jobs:
           PY
           grep -n "LAUNCHER" android/app/src/main/AndroidManifest.xml
 
+      # Ana ekran aracı (widget): hava, radyo, TV, rutinler. Dosyalar bu adımın içine gömülüdür (base64 + tar);
+      # çıkarılınca .github/widget/ oluşur.
+      - name: Android ayarları (ana ekran aracı)
+        run: |
+          mkdir -p .github
+          base64 -d <<'WIDGET_B64' | tar xz -C .github
+          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
+          HjbWRdqLPNq9jrkoteoklDfOE0fEqfGk/mgnAyYUb5neXeTqG+vsvbOs9w7Sf/Okiak4/YY2PpqKbH2TQm9NvwUc3hbZrrWGecRP
+          XovsqHiyM/J66UlkF0gTyAx6G9dNvx353hHccxnE2A6KIlJBTfabzeo6xtYWKfIl0hnZc7QJsL62XgyRNzRpqcWfyJtl/HkLvUP6
+          eacB6d0beXt673vQloWjQuT7iJ7eazrH70zTkb1HFPls1tqqvdSat71ldNHTO0lPfw1Y9qnfXweYnaY9uiL7y/raGTmA9lWBPBg5
+          OL2vgradkUPIFXGj/dP71Z60Ne4pW+Om+KZxG5cBn0pxHOYu4q3A+a5Bb9Tiyc4ST6YPQOvD0+2wgprLn5XDJGxe35/w1/H8HjV5
+          FW/rfgnF/GlI4/JDAkh+l1lNfnt5mhekgufp00NTQ/10xWNIQUllwbMLIaV8S1aePdLntRXaIPNCxO65/Ot/oWZ+TEuHPR9NLzA/
+          OOz9EyYvv70i1bzQqqQeF2wLsaaKvQeP72uXDe89H5WkvslkJbQYn31UXDEXbNqaEprK8LSZrdULTRFbpAmvu4+K9u9khxnkBija
+          VqSI0ihaP5YPaa1tSQMlKG/z+NQXeAYWIbgQFZPetkKTKBXsGVaeK9g/Fnmh0Dw5Eim0pdkkBGmRVGiV5iDckyrYY2ImV7CfHpkc
+          8TYXmmYBUMrOFGxxCbMfXKKFTibBy3NZLeVYNRChUTOkYaHdAPU2/JPG4c8S9Yc25w3HdceNjusdP40s719re2dp6A/21qtnf3L2
+          pm355G/s+/5gd+JfP2267bjluN1xq+Mfpu4G11479E9NP3N84fhZxxcdP/+zNc97v7UPfI1Hl9+hS+RhFtOpQquSSpTfrauK8sKs
+          SOqb4U9+l75yJkGq2rQ8Ta+94FDjsIU2LTWAPMLhU6UO4r95u4IRWk0hLDL5LVCT5LgMfp7/j4Hj8AGRZyRBes+gK8B0QXqBugwG
+          XWRluI4fcw4UU65ogBekfhkyVqRB15wsZ/r9fglM7zQL4ZFi9nraTyBcxCtNvvbjTgdd7ytj9+tG53sfsPqN3PC9rw3XD1S/W/6z
+          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
+          WIDGET_B64
+          python3 .github/widget/apply.py
+
       # Hava durumu için konum izni (telefonun konumunu kullan seçeneği)
       - name: Android ayarları (konum)
         run: |
@@ -305,6 +411,33 @@ jobs:
           -keep class com.google.android.exoplayer2.** { *; }
           -dontwarn java.awt.**
           -dontwarn com.sun.jna.**
+          EOF
+          # Bildirim düğmeleri: köşeleri yuvarlatılmış simgeler (yuvarlak birleşimli kenarlık)
+          mkdir -p android/app/src/main/res/drawable-anydpi-v21
+          cat > android/app/src/main/res/drawable-anydpi-v21/audio_service_play_arrow.xml <<'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+            <path android:fillColor="#FFFFFFFF" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.4" android:strokeLineJoin="round" android:strokeLineCap="round" android:pathData="M8,5 L19,12 L8,19 Z"/>
+          </vector>
+          EOF
+          cat > android/app/src/main/res/drawable-anydpi-v21/audio_service_pause.xml <<'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+            <path android:fillColor="#FFFFFFFF" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.4" android:strokeLineJoin="round" android:strokeLineCap="round" android:pathData="M7,5 L10.5,5 L10.5,19 L7,19 Z M13.5,5 L17,5 L17,19 L13.5,19 Z"/>
+          </vector>
+          EOF
+          cat > android/app/src/main/res/drawable-anydpi-v21/audio_service_stop.xml <<'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+            <path android:fillColor="#FFFFFFFF" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.4" android:strokeLineJoin="round" android:strokeLineCap="round" android:pathData="M7,7 L17,7 L17,17 L7,17 Z"/>
+          </vector>
+          EOF
+          cat > android/app/src/main/res/drawable-anydpi-v21/audio_service_skip_next.xml <<'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+            <path android:fillColor="#FFFFFFFF" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.4" android:strokeLineJoin="round" android:strokeLineCap="round" android:pathData="M6,6 L15,12 L6,18 Z M17,6 L19,6 L19,18 L17,18 Z"/>
+          </vector>
+          EOF
+          cat > android/app/src/main/res/drawable-anydpi-v21/audio_service_skip_previous.xml <<'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+            <path android:fillColor="#FFFFFFFF" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.4" android:strokeLineJoin="round" android:strokeLineCap="round" android:pathData="M18,6 L9,12 L18,18 Z M5,6 L7,6 L7,18 L5,18 Z"/>
+          </vector>
           EOF
           python3 - <<'PY'
           import os, re
