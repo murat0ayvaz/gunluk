@@ -6,6 +6,9 @@ import 'data.dart';
 import 'dock.dart' show dockLaunch, dockLastTitle;
 import 'main.dart' show navKey;
 import 'media.dart';
+import 'pip.dart';
+import 'prayer.dart' show prayer, prayerNextText;
+import 'tvpop.dart' show tvPop;
 import 'strings.dart';
 import 'weather.dart';
 
@@ -31,6 +34,13 @@ class WidgetSvc {
     store.addListener(_soon);
     media.addListener(_soon);
     weather.addListener(_soon);
+    prayer.addListener(_soon);
+    prayer.ensure(); // namaz vakitleri (ana ekranda gösterilmese de araç için)
+    // "İmsaka 6 sa 21 dk kaldı" dakikada bir tazelenir (metin değişmezse gönderilmez)
+    Timer.periodic(const Duration(minutes: 1), (_) {
+      prayer.ensure();
+      _soon();
+    });
     _soon();
   }
 
@@ -83,13 +93,60 @@ class WidgetSvc {
     return (met, total, open);
   }
 
+  /// Araçta hangi bölümler görünsün (Ayarlar > Ana ekran > Ana ekran aracı bölümleri)
+  static const sections = <(String, String)>[
+    ('radio', 'Radyo'),
+    ('tv', 'TV'),
+    ('rt', 'Rutinler'),
+    ('todo', 'Yapılacaklar'),
+    ('note', 'Günlük'),
+    ('rem', 'Hatırlatıcı'),
+    ('pray', 'Namaz vakti'),
+    ('wx', 'Hava durumu'),
+    ('date', 'Tarih ve sıcaklık'),
+  ];
+
+  bool _dark() {
+    switch (store.themeMode) {
+      case ThemeMode.dark:
+        return true;
+      case ThemeMode.light:
+        return false;
+      case ThemeMode.system:
+        return WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+            Brightness.dark;
+    }
+  }
+
   Future<void> push() async {
     try {
       final active = media.nowId != null;
       final (artist, title) = media.nowSong;
       final song = title.isEmpty ? '' : (artist.isEmpty ? title : '$artist - $title');
       final (met, total, open) = _routines();
+      final now = DateTime.now();
+      final day = dKey(now);
+      final todoN = store.todosFor(day).where((t) => !t.done).length;
+      final remN = store.reminders
+          .where((r) => r.enabled && !reminderFinished(r))
+          .length;
+      String two(int n) => n.toString().padLeft(2, '0');
+      final wd = weather.data;
       final json = jsonEncode({
+        'dark': _dark(),
+        for (final sc in sections) 's_${sc.$1}': store.pBool('wg_${sc.$1}', true),
+        'pray': prayerNextText(),
+        'tttodo': tx('Yapılacaklar'),
+        'todon': todoN > 0 ? '$todoN' : '',
+        'ttnote': tx('Günlük'),
+        'noteb': store.noteOf(day).isNotEmpty ? '•' : '',
+        'ttrem': tx('Hatırlatıcı'),
+        'remn': remN > 0 ? '$remN' : '',
+        'date': tx('Bugün') +
+            ' ${two(now.day)}.${two(now.month)}.${now.year} ${wdName(now.weekday)}',
+        'wtemp': (store.wxOn && wd != null && wd.nowTemp != null)
+            ? '${wd.nowTemp!.round()}°'
+            : '',
         'wx': _wxLine(),
         'rname': active ? media.nowTitle : dockLastTitle('radio'),
         'rsong': active ? song : '',
@@ -148,12 +205,46 @@ class WidgetSvc {
         }
       } else if (a == 'tv') {
         await dockLaunch(ctx, 'tv');
+        // araçtan başlatılan TV: uygulama ekranı görünmeden hemen küçük pencereye geç
+        if (pip.enabled && tvPop.chan != null) {
+          await Future.delayed(const Duration(milliseconds: 1200));
+          if (tvPop.chan != null) pip.enter();
+        }
       }
     } catch (_) {}
   }
 }
 
 final widgetSvc = WidgetSvc();
+
+/// Ayarlar > Ana ekran: araçta hangi bölümlerin görüneceği (açma / kapama anahtarları)
+class WidgetSectionsTile extends StatelessWidget {
+  const WidgetSectionsTile({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: store,
+      builder: (context, _) => ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        leading: const Icon(Icons.dashboard_customize_outlined),
+        title: Text(tx('Araçta görünecekler')),
+        children: [
+          for (final sc in WidgetSvc.sections)
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(tx(sc.$2)),
+              value: store.pBool('wg_${sc.$1}', true),
+              onChanged: (v) {
+                store.setProf('wg_${sc.$1}', v);
+                widgetSvc.push();
+              },
+            ),
+        ],
+      ),
+    );
+  }
+}
 
 /// Ayarlar > Ana ekran: widget durumu ve "Ana ekrana ekle" düğmesi
 class WidgetSetupTile extends StatefulWidget {

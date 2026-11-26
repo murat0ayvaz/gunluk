@@ -6,6 +6,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'data.dart';
 import 'main.dart' show navKey;
 import 'media.dart';
+import 'pip.dart';
 import 'strings.dart';
 import 'tv.dart' show TvPlayerPage;
 
@@ -15,7 +16,7 @@ import 'tv.dart' show TvPlayerPage;
 //  gizler; düğmeler 3 sn sonra kendiliğinden kaybolur, görüntü açık kalır. Çift dokunuş: büyütür /
 //  küçültür (ekran genişliğine yakın). Boyut hatırlanır (prof 'tvbig').
 //  Telefon yan çevrilince pencere tam ekran olur, dikeye dönünce küçülür.
-//  Uygulamadan çıkınca durur (video oynatıcı arka planda çalışmaz).
+//  Uygulamadan çıkınca da çalmaya devam eder (ses); dönünce görüntü kaldığı yerden görünür.
 // ---------------------------------------------------------------
 class TvPop extends ChangeNotifier {
   TvChan? chan;
@@ -25,12 +26,14 @@ class TvPop extends ChangeNotifier {
     if (media.nowId != null && media.playing) media.toggle();
     chan = c;
     store.setProf('ltv', c.id);
+    pip.want(true); // Ana ekrana çıkınca küçük pencereye geçsin
     notifyListeners();
   }
 
   void close() {
     if (chan == null) return;
     chan = null;
+    pip.want(false);
     notifyListeners();
   }
 
@@ -72,12 +75,21 @@ class _TvPopHostState extends State<TvPopHost> with WidgetsBindingObserver {
     _big = store.pBool('tvbig', false);
     WidgetsBinding.instance.addObserver(this);
     tvPop.addListener(_sync);
+    pip.init();
+    pip.onClosedInPip = tvPop.close; // küçük pencere X ile kapatıldı
+    pip.inPip.addListener(_pipChanged);
+  }
+
+  void _pipChanged() {
+    if (pip.inPip.value) _hideT?.cancel();
+    if (mounted) setState(() => _ui = false);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     tvPop.removeListener(_sync);
+    pip.inPip.removeListener(_pipChanged);
     _hideT?.cancel();
     _release();
     super.dispose();
@@ -85,7 +97,8 @@ class _TvPopHostState extends State<TvPopHost> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState s) {
-    if (s == AppLifecycleState.paused) tvPop.close(); // arka planda TV çalmaz
+    // Arka plana geçince pencere KAPANMAZ: yayın (ses) çalmaya devam eder; dönünce görüntü geri gelir.
+    // (Android uzun süre arka planda kalan uygulamayı uyutabilir; durursa tekrar açmak yeter.)
   }
 
   /// Düğmeleri gösterir ve 3 sn sonra gizlemek üzere süre başlatır
@@ -230,6 +243,8 @@ class _TvPopHostState extends State<TvPopHost> with WidgetsBindingObserver {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: Colors.white, fontSize: big ? 16 : 12, fontWeight: FontWeight.w600)),
             ),
+            btn(Icons.picture_in_picture_alt_rounded, () => pip.enter(),
+                tx('Küçük pencere')),
             btn(Icons.close_rounded, tvPop.close, tx('Kapat')),
           ]),
           const Spacer(),
@@ -268,7 +283,7 @@ class _TvPopHostState extends State<TvPopHost> with WidgetsBindingObserver {
             },
             child: Stack(children: [
               Positioned.fill(child: _video(context, big: true)),
-              if (_ui) Positioned.fill(child: _controls(true)),
+              if (_ui && !pip.inPip.value) Positioned.fill(child: _controls(true)),
             ]),
           ),
         ),

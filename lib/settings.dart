@@ -20,7 +20,9 @@ import 'tips.dart' show tipsOn;
 import 'ui.dart';
 import 'voicecmd.dart' show voiceListener, VoiceCommandsPage;
 import 'version.dart';
-import 'widget.dart' show WidgetSetupTile;
+import 'pip.dart';
+import 'tvpop.dart' show tvPop;
+import 'widget.dart' show WidgetSetupTile, WidgetSectionsTile;
 import 'weather.dart';
 
 // ---------------------------------------------------------------
@@ -156,6 +158,18 @@ class SettingsPage extends StatelessWidget {
               ]),
               sec(tx('Ana ekran'), [
                 const WidgetSetupTile(),
+                const WidgetSectionsTile(),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: const Icon(Icons.picture_in_picture_alt_rounded),
+                  title: Text(tx('TV küçük pencerede devam etsin')),
+                  subtitle: Text(tx('TV açıkken ana ekrana ya da başka uygulamaya çıkınca TV telefonun üstünde küçük pencerede çalar. Telefon ayarlarında uygulama için "Resim içinde resim" izni açık olmalı.')),
+                  value: store.pBool('tvpip', true),
+                  onChanged: (v) {
+                    store.setProf('tvpip', v);
+                    pip.want(v && tvPop.chan != null);
+                  },
+                ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   secondary: const Icon(Icons.tips_and_updates_outlined),

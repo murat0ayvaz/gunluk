@@ -111,10 +111,8 @@ class MediaCtl extends ChangeNotifier {
       _guarded = false;
       final real = AudioSource.uri(u,
           tag: MediaItem(id: id, title: t, album: station, artist: station));
-      await player.setAudioSource(
-          ConcatenatingAudioSource(
-              children: [_guard('p', t), real, _guard('n', t)]),
-          initialIndex: 1);
+      final w = _wrapReal(real, t);
+      await player.setAudioSource(w.$1, initialIndex: w.$2);
       if (my != _srcGen || !isRadio || nowId != id) return;
       _guarded = true;
       _tagged = t;
@@ -126,6 +124,10 @@ class MediaCtl extends ChangeNotifier {
         _guarded = true;
         notifDiag = 'bildirim hatası: ${_msg(e)}'; // teşhis için küçük satırda görünür
         notifyListeners();
+        // bildirim başlığı yazılamadıysa 6 sn sonra bir kez daha dene
+        Timer(const Duration(seconds: 6), () {
+          if (isRadio && nowId == id) _retag();
+        });
       }
     } finally {
       _retagBusy = false;
@@ -220,6 +222,24 @@ class MediaCtl extends ChangeNotifier {
   Duration _realPos = Duration.zero;
   Duration? _realDur;
 
+  int _real = 1; // gerçek parçanın sırası (1 ya da 2)
+  bool _flip = false;
+
+  /// [nöbetçi, (nöbetçi), gerçek parça, nöbetçi] listesi kurar. Telefondaki medya bildirimi çalan parçanın
+  /// SIRASI değişince yenilenir; bu yüzden her yüklemede gerçek parça sırası 1 ile 2 arasında gider gelir
+  /// (yoksa istasyon / başlık değişse de bildirimde eski ad kalıyordu).
+  (ConcatenatingAudioSource, int) _wrapReal(AudioSource real, String title) {
+    _flip = !_flip;
+    _real = _flip ? 2 : 1;
+    final kids = <AudioSource>[
+      _guard('p', title),
+      if (_real == 2) _guard('p2', title),
+      real,
+      _guard('n', title),
+    ];
+    return (ConcatenatingAudioSource(children: kids), _real);
+  }
+
   AudioSource _guard(String id, String title) => AudioSource.asset(
       'assets/sounds/silence.wav',
       tag: MediaItem(id: 'g_$id', title: title, artist: 'Daily Routine'));
@@ -229,7 +249,7 @@ class MediaCtl extends ChangeNotifier {
     if (_started) return;
     _started = true;
     player.currentIndexStream.listen((i) {
-      if (_guarded && i != null && i != 1) _onGuard(i);
+      if (_guarded && i != null && i != _real) _onGuard(i);
     });
     player.icyMetadataStream.listen((m) {
       if (!isRadio) return;
@@ -261,7 +281,7 @@ class MediaCtl extends ChangeNotifier {
     });
     // Podcast konumunu 15 saniyede bir kaydet
     player.positionStream.listen((pos) {
-      if (_guarded && player.currentIndex == 1) {
+      if (_guarded && player.currentIndex == _real) {
         _realPos = pos;
         _realDur = player.duration;
       }
@@ -339,7 +359,7 @@ class MediaCtl extends ChangeNotifier {
               id: id,
               title: title,
               album: album,
-              artist: 'Daily Routine',
+              artist: kind == _kRadio ? title : 'Daily Routine',
               artUri: (art == null || art.isEmpty) ? null : Uri.tryParse(art)));
       my = ++_srcGen;
       _realPos = start ?? Duration.zero;
@@ -349,11 +369,9 @@ class MediaCtl extends ChangeNotifier {
         await player.setAudioSource(real, initialPosition: start);
       } else {
         _guarded = false;
-        await player.setAudioSource(
-            ConcatenatingAudioSource(
-                children: [_guard('p', title), real, _guard('n', title)]),
-            initialIndex: 1,
-            initialPosition: start);
+        final w = _wrapReal(real, title);
+        await player.setAudioSource(w.$1,
+            initialIndex: w.$2, initialPosition: start);
         _guarded = true;
       }
       loading = false;
@@ -464,7 +482,7 @@ class MediaCtl extends ChangeNotifier {
   Future<void> _backToReal(int gen, {Duration? pos, bool play = true}) async {
     if (gen != _srcGen || !_guarded) return;
     try {
-      await player.seek(pos ?? _realPos, index: 1);
+      await player.seek(pos ?? _realPos, index: _real);
       if (play) {
         player.play();
       } else {
@@ -494,7 +512,7 @@ class MediaCtl extends ChangeNotifier {
   void _onGuard(int i) {
     final gen = _srcGen;
     if (isNews) {
-      if (i == 2) {
+      if (i > _real) {
         newsReader.nextItem();
       } else {
         newsReader.prevItem();
@@ -503,14 +521,14 @@ class MediaCtl extends ChangeNotifier {
       return;
     }
     final dur = _realDur;
-    final ended = i == 2 &&
+    final ended = i > _real &&
         dur != null &&
         _realPos >= dur - const Duration(seconds: 2);
     if (ended && (isSong || isOnline) && store.repeatMode == 2) {
       _backToReal(gen, pos: Duration.zero);
       return;
     }
-    if (i == 2) {
+    if (i > _real) {
       if (ended) {
         _onCompleted();
       } else if (isSong) {
@@ -563,13 +581,8 @@ class MediaCtl extends ChangeNotifier {
       _realPos = Duration.zero;
       final src = AudioSource.asset('assets/sounds/silence.wav',
           tag: MediaItem(id: 'news', title: title, artist: 'Daily Routine'));
-      await player.setAudioSource(
-          ConcatenatingAudioSource(children: [
-            _guard('p', title),
-            src,
-            _guard('n', title),
-          ]),
-          initialIndex: 1);
+      final w = _wrapReal(src, title);
+      await player.setAudioSource(w.$1, initialIndex: w.$2);
       _guarded = true;
       await player.setLoopMode(LoopMode.one);
       player.play();

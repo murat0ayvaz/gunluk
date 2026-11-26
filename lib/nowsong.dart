@@ -301,43 +301,61 @@ class WishesList extends StatelessWidget {
                   ));
                 },
                 child: Container(
-                  margin: const EdgeInsets.only(top: 8),
-                  padding: const EdgeInsets.fromLTRB(14, 10, 8, 8),
+                  margin: const EdgeInsets.only(top: 6),
+                  padding: const EdgeInsets.fromLTRB(2, 0, 0, 0),
                   decoration: BoxDecoration(
                     color: p.card,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: p.line),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  // Tek satır, ince: [▶]  Şarkı – Sanatçı · Kaynak  [⋮]
+                  child: Row(
                     children: [
-                      Text(w.title,
-                          style: TextStyle(
-                              color: p.ink, fontSize: 15, fontWeight: FontWeight.w700)),
-                      if (w.artist.isNotEmpty)
-                        Text(w.artist, style: TextStyle(color: p.soft, fontSize: 13)),
-                      if (w.from.isNotEmpty)
-                        Text(w.from, style: TextStyle(color: p.soft, fontSize: 11.5)),
-                      const SizedBox(height: 6),
-                      Wrap(spacing: 6, runSpacing: 0, children: [
-                        ActionChip(
-                          avatar: const Icon(Icons.play_arrow_rounded, size: 18),
-                          label: Text(tx('Çal')),
-                          onPressed: () async {
-                            final ok = await playLocalMatch(w.title, w.artist);
-                            if (!ok) searchYoutubeMusic(w.query);
-                          },
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        tooltip: tx('Çal'),
+                        icon: Icon(Icons.play_arrow_rounded, color: p.accent),
+                        onPressed: () async {
+                          final ok = await playLocalMatch(w.title, w.artist);
+                          if (!ok) searchYoutubeMusic(w.query);
+                        },
+                      ),
+                      Expanded(
+                        child: Text.rich(
+                          TextSpan(children: [
+                            TextSpan(
+                                text: w.title,
+                                style: TextStyle(
+                                    color: p.ink,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700)),
+                            if (w.artist.isNotEmpty)
+                              TextSpan(
+                                  text: ' – ${w.artist}',
+                                  style: TextStyle(color: p.soft, fontSize: 13)),
+                            if (w.from.isNotEmpty)
+                              TextSpan(
+                                  text: ' · ${w.from}',
+                                  style: TextStyle(color: p.soft, fontSize: 11.5)),
+                          ]),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        ActionChip(
-                            label: const Text('YouTube'),
-                            onPressed: () => searchYoutube(w.query)),
-                        ActionChip(
-                            label: const Text('Spotify'),
-                            onPressed: () => searchSpotify(w.query)),
-                        ActionChip(
-                            label: const Text('Amazon Music'),
-                            onPressed: () => searchAmazon(w.query)),
-                      ]),
+                      ),
+                      PopupMenuButton<int>(
+                        padding: EdgeInsets.zero,
+                        icon: Icon(Icons.more_vert_rounded, color: p.soft),
+                        onSelected: (v) {
+                          if (v == 0) searchYoutube(w.query);
+                          if (v == 1) searchSpotify(w.query);
+                          if (v == 2) searchAmazon(w.query);
+                        },
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(value: 0, child: Text('YouTube')),
+                          PopupMenuItem(value: 1, child: Text('Spotify')),
+                          PopupMenuItem(value: 2, child: Text('Amazon Music')),
+                        ],
+                      ),
                     ],
                   ),
                 ),

@@ -10,11 +10,10 @@ import 'version.dart';
 // Her sürümde aşağıdaki liste yeni sürümün maddeleriyle değiştirilir.
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
-      tx('Verilerin korundu.'),
-      tx('Ana ekran radyo şeridinde iki satır: üstte radyo adı, altında sanatçı ve şarkı.'),
-      tx('Ayarlar > Ana ekran: ana ekran aracı (widget) durumu ve "Ana ekrana ekle" düğmesi.'),
-      tx('Medya bildirimi için yeni sessiz kanal açıldı (bildirim sesi gelmemeli). Eski "Daily Routine müzik" kanalını telefon ayarlarından silebilirsin.'),
-      tx('Radyo panelinde bildirim başlığının durumu küçük satırda yazar (şarkı adı bildirime geçmezse nedeni görmek için).'),
+      tx('TV küçük pencerede devam eder: TV açıkken Ana ekran tuşuna basınca ya da başka uygulamaya geçince TV telefonun üstünde küçük yüzen pencereye geçer (sürüklenir, çift dokunuşla büyür).'),
+      tx('Widget\'taki TV düğmesi TV\'yi başlatır ve hemen küçük pencereye geçer.'),
+      tx('TV pop-up\'ında ve tam ekran TV sayfasında "Küçük pencere" düğmesi; Ayarlar > Ana ekran\'da açma/kapama anahtarı.'),
+      tx('Telefon ayarlarında uygulama için "Resim içinde resim" izni açık olmalı (Xiaomi\'de kapalı olabilir).'),
     ];
 
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {

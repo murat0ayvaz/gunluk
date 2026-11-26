@@ -1,11 +1,34 @@
-DAILY ROUTINE v1.25.39 - TAM PAKET
+DAILY ROUTINE v1.25.42 - TAM PAKET
 
 Bu zipte projenin TAMAMI var: .github, assets, lib, debug.keystore, pubspec.yaml.
 1) Zipi çıkar. GitHub'da "gunluk" reposunun ANA sayfasında: Add file > Upload files.
 2) Çıkan klasörlerin ve dosyaların HEPSİNİ (.github, assets, lib, debug.keystore, pubspec.yaml) sürükle-bırak > Commit changes.
-   (Degisenler: build.yml, dock, media, widget, settings, about, strings, version.)
+   (Degisenler: build.yml, pip, tvpop, tv, widget, settings, about, strings, version.)
 3) Actions > yeşil tik > Artifacts > gunluk-apk indir, telefona kur (veriler kalır).
 Derleme hatası olursa Actions'taki kırmızı satırları gönder.
+
+v1.25.42 yenilikleri:
+- TV küçük pencerede devam eder: TV açıkken Ana ekran tuşuna basınca ya da başka uygulamaya geçince TV telefonun üstünde küçük yüzen pencereye geçer (sürüklenir, çift dokunuşla büyür).
+- Widget'taki TV düğmesi TV'yi başlatır ve hemen küçük pencereye geçer.
+- TV pop-up'ında ve tam ekran TV sayfasında "Küçük pencere" düğmesi; Ayarlar > Ana ekran'da açma/kapama anahtarı.
+- Telefon ayarlarında uygulama için "Resim içinde resim" izni açık olmalı (Xiaomi'de kapalı olabilir).
+- GitHub'da DEGISIKLIK VAR: build.yml degisti (kucuk pencere destegi). Tum dosyalari TEK commit ile yukle.
+
+
+v1.25.41 yenilikleri:
+- Ana ekran aracı (widget) yenilendi: ana sayfa gibi renkli kartlar, radyo/TV, rutinler, yapılacaklar, günlük, hatırlatıcı, namaz vakti, hava ve tarih.
+- Ayarlar > Ana ekran > "Araçta görünecekler" ile araçta hangi bölümlerin olacağını seçebilirsin.
+- TV, uygulama arka plana geçince ya da ekran kilitlenince de çalmaya devam eder.
+- İstekler listesi tek satır ve ince: ▶ ve ⋮ menüsü (YouTube, Spotify, Amazon Music).
+- Radyoda bildirimde istasyon adı ve şarkı adı daha güvenilir görünür.
+- Derleme: yeni commit gelince eski derleme iptal edilir.
+- GitHub'da DEGISIKLIK VAR: build.yml degisti (widget + derleme iptali). Tum dosyalari TEK commit ile yukle.
+
+
+v1.25.40 yenilikleri:
+- Radyoda istasyon degisince medya bildirimi yeni istasyon adini ve sarkiyi gosterir (eski ad kaliyordu).
+- GitHub'da DEGISIKLIK YOK: build.yml / .github ayni (1.25.39'daki build.yml duruyor).
+
 
 v1.25.39 yenilikleri:
 - Ana ekran radyo seridi iki satir: ustte radyo adi, altta sanatci - sarki.

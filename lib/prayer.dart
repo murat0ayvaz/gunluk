@@ -302,6 +302,37 @@ class _PrayerBarState extends State<PrayerBar> {
 // ---------------------------------------------------------------
 const _dative = ['İmsaka', 'Güneşe', 'Öğleye', 'İkindiye', 'Akşama', 'Yatsıya'];
 
+/// Bir sonraki vakte kalan süre metni ("İmsaka 6 sa 21 dk kaldı."); vakitler yoksa boş (ana ekran aracı için)
+String prayerNextText() {
+  final t = prayer.times;
+  if (!store.prayOn || t == null || t.length < 6) return '';
+  final now = DateTime.now();
+  final nm = now.hour * 60 + now.minute;
+  var next = -1;
+  for (var i = 0; i < 6; i++) {
+    if (_mins(t[i]) > nm) {
+      next = i;
+      break;
+    }
+  }
+  int diff;
+  if (next < 0) {
+    next = 0;
+    diff = 1440 - nm + _mins(t[0]);
+  } else {
+    diff = _mins(t[next]) - nm;
+  }
+  String left;
+  if (diff >= 60) {
+    final h = diff ~/ 60;
+    final m = diff % 60;
+    left = m == 0 ? tx('{0} sa', [h]) : tx('{0} sa {1} dk', [h, m]);
+  } else {
+    left = tx('{0} dk', [diff < 1 ? 1 : diff]);
+  }
+  return tx('{0} {1} kaldı.', [tx(_dative[next]), left]);
+}
+
 class PrayerLine extends StatefulWidget {
   final bool open;
   final DateTime day; // seçili gün

@@ -9,6 +9,7 @@ import 'tvpop.dart';
 import 'media.dart';
 import 'net.dart';
 import 'ambient.dart';
+import 'pip.dart';
 import 'strings.dart';
 import 'theme.dart';
 import 'ui.dart';
@@ -567,7 +568,17 @@ class _TvPlayerPageState extends State<TvPlayerPage> {
     } catch (_) {}
     tvPop.close(); // aynı anda iki TV açılmasın
     store.setProf('ltv', _ch.id);
+    pip.init();
+    pip.want(true); // Ana ekrana çıkınca küçük pencereye geçsin
+    pip.inPip.addListener(_pipChanged);
+    pip.onClosedInPip = () {
+      if (mounted) Navigator.of(context).maybePop(); // küçük pencere X ile kapandı
+    };
     _open();
+  }
+
+  void _pipChanged() {
+    if (mounted) setState(() {});
   }
 
   /// Kanal listemdeki sıra: aynı kategorideki kanallar. Listede yoksa (dizinde deneme) boş.
@@ -641,6 +652,9 @@ class _TvPlayerPageState extends State<TvPlayerPage> {
   @override
   void dispose() {
     _gen++;
+    pip.inPip.removeListener(_pipChanged);
+    pip.onClosedInPip = tvPop.close;
+    pip.want(false);
     try {
       WakelockPlus.disable();
     } catch (_) {}
@@ -687,7 +701,7 @@ class _TvPlayerPageState extends State<TvPlayerPage> {
                         )
                       : const CircularProgressIndicator(),
             ),
-            if (_ui)
+            if (_ui && !pip.inPip.value)
               SafeArea(
                 child: Align(
                   alignment: Alignment.topCenter,
@@ -707,6 +721,12 @@ class _TvPlayerPageState extends State<TvPlayerPage> {
                       ),
                       IconButton(
                         color: Colors.white,
+                        tooltip: tx('Küçük pencere'),
+                        icon: const Icon(Icons.picture_in_picture_alt_rounded),
+                        onPressed: () => pip.enter(),
+                      ),
+                      IconButton(
+                        color: Colors.white,
                         tooltip: tx('Yatay / dikey'),
                         icon: Icon(_land
                             ? Icons.stay_current_portrait_rounded
@@ -717,7 +737,7 @@ class _TvPlayerPageState extends State<TvPlayerPage> {
                   ),
                 ),
               ),
-            if (_ui)
+            if (_ui && !pip.inPip.value)
               Align(
                 alignment: Alignment.bottomCenter,
                 child: SafeArea(
