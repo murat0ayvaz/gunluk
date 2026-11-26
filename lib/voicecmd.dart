@@ -2029,6 +2029,15 @@ class _VoiceStatus extends StatelessWidget {
                     voiceListener.engineChanged();
                   },
                 ),
+              if (w.ready)
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: Text(tx('Yalnız uyandırma kelimesini dinle')),
+                  subtitle: Text(tx('Kelimeyi daha doğru bulur. Kelimeden sonra komutu söylersin. Uygulamayı yeniden açınca geçerli olur.')),
+                  value: store.pBool('vgram', true),
+                  onChanged: (v) => store.setProf('vgram', v),
+                ),
             ],
           ),
         );

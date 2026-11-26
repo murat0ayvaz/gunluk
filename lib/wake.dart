@@ -32,6 +32,23 @@ class WakeEngine extends ChangeNotifier {
 
   bool get enabled => store.pBool('vosk', true);
 
+  // ---- Gramer: motor yalnız uyandırma kelimesini ve "bilinmeyen ses"i ayırt eder ----
+  // Serbest konuşma tanıma kısa kelimeleri sık yanlış yazar; sınırlı seçenekte karar çok daha doğrudur.
+  // Kelimeden sonraki komut ayrı dinlenir (kelime tek başına duyulunca komut ekranı açılır).
+  // Ayar: store.prof['vgram'] (varsayılan açık); kapatınca uygulama yeniden açılınca serbest tanıma döner.
+  bool _gramOn = false; // bu motor gramerle kuruldu
+  String _gramKey = '';
+
+  bool get gram => store.pBool('vgram', true);
+
+  /// Türkçe harflere uygun küçük harf (İ -> i, I -> ı)
+  String _lower(String s) => s.replaceAll('İ', 'i').replaceAll('I', 'ı').toLowerCase();
+
+  List<String> _gramList() {
+    final w = _lower(store.voiceWake).trim().replaceAll(RegExp(r'\s+'), ' ');
+    return [if (w.isNotEmpty) w, '[unk]'];
+  }
+
   /// Bir önceki native adım uygulamayı çökerttiyse motor kalıcı olarak devre dışıdır
   bool get bad => store.pBool('voskbad', false);
 
@@ -108,7 +125,13 @@ class WakeEngine extends ChangeNotifier {
     await _mark(); // bundan sonrası yerel kod: çökerse işaret kalır
     final vosk = VoskFlutterPlugin.instance();
     _model = await vosk.createModel(path);
-    _rec = await vosk.createRecognizer(model: _model!, sampleRate: 16000);
+    _gramOn = gram;
+    final gl = _gramList();
+    _gramKey = gl.join('|');
+    _rec = _gramOn && gl.length > 1
+        ? await vosk.createRecognizer(model: _model!, sampleRate: 16000, grammar: gl)
+        : await vosk.createRecognizer(model: _model!, sampleRate: 16000);
+    if (!(_gramOn && gl.length > 1)) _gramOn = false;
     _svc = await vosk.initSpeechService(_rec!);
     await _unmark();
     store.setProf('voskok', true);
@@ -130,6 +153,17 @@ class WakeEngine extends ChangeNotifier {
         final t = _text(s, 'text');
         if (t.isNotEmpty) onFinal(t);
       });
+      if (_gramOn) {
+        // uyandırma kelimesi değiştiyse yeni kelimeyle gramer güncellenir
+        final gl = _gramList();
+        final key = gl.join('|');
+        if (gl.length > 1 && key != _gramKey) {
+          try {
+            await _rec!.setGrammar(gl);
+            _gramKey = key;
+          } catch (_) {}
+        }
+      }
       if (!_startOk) await _mark(); // ilk mikrofon başlatması da yerel kod
       await _svc!.start();
       if (!_startOk) {
@@ -164,7 +198,10 @@ class WakeEngine extends ChangeNotifier {
   String _text(String raw, String key) {
     try {
       final m = jsonDecode(raw);
-      return (m[key] ?? '').toString().trim();
+      final t = (m[key] ?? '').toString();
+      if (!_gramOn) return t.trim();
+      // gramerde bilinmeyen sesler "[unk]" olarak gelir; komut metni sanılmasın diye atılır
+      return t.replaceAll('[unk]', ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
     } catch (_) {
       return '';
     }

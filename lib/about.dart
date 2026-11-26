@@ -11,13 +11,9 @@ import 'version.dart';
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
       tx('Verilerin korundu.'),
-      tx('Müzik ve Radyo sayfası artık Medya (yeni simge). Müzik sekmesinde Listelerim, Online ve İsteklerim bir arada; Online ayrı sekme olmaktan çıktı.'),
-      tx('Ana ekran şeridi yeniden düzenlendi: solda ⌄ ve oynat/duraklat, sağda ✕. ✕ çalanı durdurur, şeridi kaldırır ve "Geri al" sunar.'),
-      tx('Çalmıyorken şeritteki ▶: Haber\'de sesli okumayı, Podcast\'te kaldığın bölümü, Müzik\'te son şarkıyı (online dahil) başlatır.'),
-      tx('Ana ekran radyo paneli bütünleşik: tekrar eden ad ve şarkı yazısı yok, tek kontrol satırı var.'),
-      tx('Söz ve ipucu artık alttaki bildirim alanının en üstünde kart olarak görünür; dokununca kapanır, saat başı ve her açılışta yenilenir.'),
-      tx('TV pop-up\'ında dokununca düğmeler çıkar ve 3 sn sonra gizlenir; çift dokunuş büyütür/küçültür.'),
-      tx('Medya bildirimi (kilit ekranı düğmeleri) için düzeltme denendi; radyo bildirimi "Sanatçı - Şarkı" gösterir (Ayarlar\'dan kapanır).'),
+      tx('TV rehberinde "Sadece çalışanlar" anahtarı: adresi yanıt vermeyen kanallar listeden çıkar (önce ülke ya da tür seç; çok kanal varsa uyarır).'),
+      tx('Uyandırma kelimesi artık yalnız kelimeyi dinler (gramer): daha doğru bulur. Kelimeden sonra komut ayrıca söylenir. Sesli komut kartından kapatılabilir.'),
+      tx('Ana ekran aracı (widget): hava, radyo, TV ve rutinler. Bildirim sesi ve yuvarlak bildirim düğmeleri düzeltmeleri de var.'),
     ];
 
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {

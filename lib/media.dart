@@ -40,9 +40,9 @@ Future<void> initAudio() async {
       androidNotificationChannelId: 'com.example.gunluk.audio',
       androidNotificationChannelName: 'Daily Routine müzik',
       androidNotificationOngoing: false,
-      // true: çalar durdurulunca / ✕ ile kapatılınca servis ve telefon bildirimi tamamen kalkar
-      // (false iken boşta durumunda bile bildirim ekranda kalıyordu). Duraklatılmış bildirim kaydırılıp kapatılabilir.
-      androidStopForegroundOnPause: true,
+      // false: duraklatınca bildirim yerinde kalır, tekrar başlatınca yeni bildirim sesi çıkmaz.
+      // ✕ ile durdurulunca çalar kapatıldığı için (stop) bildirim yine tamamen kalkar.
+      androidStopForegroundOnPause: false,
     ).timeout(const Duration(seconds: 5));
   } catch (_) {
     // başlatılamazsa çalar yine çalışır, sadece bildirim kontrolü olmaz
@@ -93,7 +93,7 @@ class MediaCtl extends ChangeNotifier {
   /// Paket başlığı yalnız kaynakla birlikte değiştirebildiği için yayın kısa süre yeniden bağlanır
   /// (Ayarlar'dan kapatılabilir: prof 'ntitle').
   Future<void> _retag() async {
-    if (!isRadio || nowId == null || _retagBusy) return;
+    if (!isRadio || nowId == null || _retagBusy || loading) return;
     if (!store.pBool('ntitle', true)) return;
     final t = icyTitle;
     final u = _radioUrl == null ? null : Uri.tryParse(_radioUrl!);
@@ -115,8 +115,12 @@ class MediaCtl extends ChangeNotifier {
       _guarded = true;
       _tagged = t;
       if (wasPlaying) player.play();
-    } catch (_) {
-      if (my == _srcGen) _guarded = true;
+    } catch (e) {
+      if (my == _srcGen) {
+        _guarded = true;
+        icyDiag = 'bildirim: ${_msg(e)}'; // teşhis için küçük satırda görünür
+        notifyListeners();
+      }
     } finally {
       _retagBusy = false;
     }
@@ -321,6 +325,7 @@ class MediaCtl extends ChangeNotifier {
     nowTitle = title;
     loading = true;
     notifyListeners();
+    var my = _srcGen;
     try {
       final real = AudioSource.uri(uri,
           tag: MediaItem(
@@ -329,7 +334,7 @@ class MediaCtl extends ChangeNotifier {
               album: album,
               artist: 'Daily Routine',
               artUri: (art == null || art.isEmpty) ? null : Uri.tryParse(art)));
-      _srcGen++;
+      my = ++_srcGen;
       _realPos = start ?? Duration.zero;
       _realDur = null;
       if (kind == _kVoice) {
@@ -353,6 +358,9 @@ class MediaCtl extends ChangeNotifier {
       }
       player.play(); // çalma bitene kadar tamamlanmaz, beklenmez
     } catch (e) {
+      // Daha yeni bir yükleme (başka istasyon ya da başlık yenileme) bu yüklemeyi iptal ettiyse
+      // "Connection aborted" hatası yalancıdır; gösterilmez.
+      if (my != _srcGen) return;
       loading = false;
       error = tx('Çalınamadı: {0}', [_msg(e)]);
       notifyListeners();

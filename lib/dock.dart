@@ -297,7 +297,7 @@ class _HomeDockState extends State<HomeDock> {
   bool _hasFav(String id) => id == 'radio' || id == 'tv';
 
   Widget _arrow(Pal p, String id, bool show) {
-    if (!show) return const SizedBox(width: 12);
+    if (!show) return const SizedBox(width: 40, height: 40); // ok olmayan satırlarda aynı boşluk
     final open = _open == id;
     return IconButton(
       tooltip: open ? tx('Kapat') : tx('Aç'),
@@ -390,7 +390,6 @@ class _HomeDockState extends State<HomeDock> {
             child: SizedBox(
               height: 40,
               child: Row(children: [
-                _arrow(p, id, true),
                 media.loading
                     ? const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 10),
@@ -407,15 +406,19 @@ class _HomeDockState extends State<HomeDock> {
                             media.playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
                             color: p.ink),
                       ),
-                const SizedBox(width: 2),
+                _arrow(p, id, true),
                 Icon(dockTab(id).$1, size: 18, color: tone),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(media.playing ? title : '${tx('Duraklatıldı')} · $title',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w600, color: p.ink)),
+                  child: Row(children: [
+                    Expanded(
+                      child: Text(title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w600, color: p.ink)),
+                    ),
+                  ]),
                 ),
                 _closeBtn(context, p, id, true),
               ]),
@@ -448,7 +451,6 @@ class _HomeDockState extends State<HomeDock> {
             child: SizedBox(
               height: 40,
               child: Row(children: [
-                _arrow(p, id, _hasFav(id)),
                 if (popping)
                   IconButton(
                     tooltip: tx('Durdur'),
@@ -463,7 +465,7 @@ class _HomeDockState extends State<HomeDock> {
                     onPressed: () => dockLaunch(context, id),
                     icon: Icon(Icons.play_arrow_rounded, color: p.ink),
                   ),
-                const SizedBox(width: 2),
+                _arrow(p, id, _hasFav(id)),
                 Icon(dockTab(id).$1, size: 18, color: p.accent),
                 const SizedBox(width: 8),
                 Expanded(

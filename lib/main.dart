@@ -12,6 +12,7 @@ import 'strings.dart';
 import 'theme.dart';
 import 'timing.dart';
 import 'ui.dart';
+import 'widget.dart';
 
 // ---------------------------------------------------------------
 // DAILY ROUTINE - günlük rutin, hedef, yapılacaklar ve günlük (not) uygulaması
@@ -140,6 +141,8 @@ class _GateState extends State<Gate> with WidgetsBindingObserver {
     // Hatırlatıcı bildirimlerini yeniden planla (arka planda, takılmaz)
     Notifier.init().then((_) => Notifier.rescheduleAll()).catchError((_) {});
     if (mounted) setState(() => _ready = true);
+    widgetSvc.init(); // ana ekran aracına bilgi gönder
+    Future<void>.delayed(const Duration(milliseconds: 900), widgetSvc.takeAction);
     // Bildirime dokunarak açıldıysa (uygulama kapalıydı) başlatıcıyı çalıştır
     final cold = await Notifier.coldStartPayload();
     final pending = Notifier.tapped.value;
@@ -158,6 +161,7 @@ class _GateState extends State<Gate> with WidgetsBindingObserver {
     if (state == AppLifecycleState.paused) {
       _pausedAt = DateTime.now();
     } else if (state == AppLifecycleState.resumed) {
+      widgetSvc.takeAction(); // araçtan gelen radyo / TV isteği
       final t = _pausedAt;
       _pausedAt = null;
       if (t != null &&

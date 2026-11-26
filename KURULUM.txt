@@ -1,16 +1,37 @@
-DAILY ROUTINE v1.25.33 - TAM PAKET
+DAILY ROUTINE v1.25.36 - TAM PAKET
 
 Bu zipte projenin TAMAMI var: .github, assets, lib, debug.keystore, pubspec.yaml.
 1) Zipi çıkar. GitHub'da "gunluk" reposunun ANA sayfasında: Add file > Upload files.
 2) Çıkan klasörlerin ve dosyaların HEPSİNİ (.github, assets, lib, debug.keystore, pubspec.yaml) sürükle-bırak > Commit changes.
-   (Degisenler: build.yml, dock, media, music, nowsong, tips, home, links, settings, strings, vb.)
+   (Degisenler: tv, wake, voicecmd, about, strings, version.)
 3) Actions > yeşil tik > Artifacts > gunluk-apk indir, telefona kur (veriler kalır).
 Derleme hatası olursa Actions'taki kırmızı satırları gönder.
+
+v1.25.36 yenilikleri:
+- TV rehberinde "Sadece calisanlar": adresi yanit vermeyen kanallar listeden cikar (once ulke/tur sec).
+- Uyandirma kelimesi yalniz kelimeyi dinler (gramer): daha dogru bulur. Komut kelimeden sonra soylenir. Sesli komut kartindan kapanir (uygulamayi yeniden acinca gecerli).
+- GitHub'da DEGISIKLIK YOK: build.yml / .github ayni (1.25.35'teki widget dosyalari duruyor).
+
+
+v1.25.35 yenilikleri:
+- YENI: ana ekran araci (widget). Ana ekranda bos yere uzun bas > Araclar > Daily Routine. Hava, radyo (onceki / oynat-duraklat / sonraki dogrudan), TV (dokununca uygulama acilir, TV kucuk pop-up baslar), bugunku rutinler.
+- Radyo calmiyorken aractaki oynat uygulamayi acip son radyoyu calar.
+- GitHub'da DEGISIKLIK VAR: .github/workflows/build.yml (yeni adim) ve YENI klasor .github/widget (7 xml, GunlukWidget.kt, apply.py). .github klasorunun TAMAMINI yukle.
+
+
+v1.25.34 yenilikleri:
+- Bildirimden radyoyu durdur/baslat ve istasyon degistirme artik bildirim sesi cikarmaz.
+- Bildirim dugmeleri yuvarlatilmis yeni simgeler. Radyoda bildirim basligi sarki adi, alt satir istasyon adi.
+- Yalanci "Calinamadi: Connection aborted" uyarisi ve bildirimde yanlis istasyon adi duzeltildi.
+- Seritte oynat en solda, ok yaninda.
+- GitHub'da DEGISIKLIK VAR: .github/workflows/build.yml (bildirim simgeleri eklendi). .github klasorunu yukle.
 
 v1.25.33 yenilikleri:
 - Muzik ve Radyo sayfasi "Medya" oldu (yeni simge). Muzik sekmesinde Listelerim / Online / Isteklerim bir arada.
 - Ana ekran seridi: solda ok ve oynat, sagda X (durdurur, kaldirir, "Geri al"). Calmiyorken oynat: Haber okur, Podcast kaldigi yerden, Muzik son sarkiyi acar.
 - Radyo paneli butunlesik; soz/ipucu karti alt bildirim alaninin ustunde; TV pop-up'inda dokununca dugmeler cikar, cift dokunus buyutur.
+- Radyoda yalanci "Calinamadi: Connection aborted" uyarisi duzeltildi.
+- Seritte oynat en solda, ok yaninda; satirlar ayni hizada.
 - Medya bildirimi: ProGuard kurallari eklendi, oynatici tembel olusturuluyor, radyo bildirimi "Sanatci - Sarki" yazar (Ayarlar'dan kapanir).
 - GitHub'da DEGISIKLIK VAR: .github/workflows/build.yml (3 satir ProGuard kurali). .github klasorunu da yukle.
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
@@ -778,6 +780,40 @@ class TvFound {
 
 final Map<String, List<TvFound>> _tvDirCache = {};
 
+/// Kanal yayın adresi denemesi: adres -> çalışıyor mu (uygulama açık kaldıkça saklanır)
+final Map<String, bool> _tvAlive = {};
+
+/// Yayın adresine kısa bir istek atar. Başarılı yanıt ve (m3u8 ise) "#EXTM3U" başlığı varsa çalışıyor sayılır.
+/// Görüntü gelip gelmediğini bilemez; yalnızca adresin yanıt verip vermediğini gösterir.
+Future<bool> _tvProbe(String url) async {
+  final c = _tvAlive[url];
+  if (c != null) return c;
+  var ok = false;
+  final cl = HttpClient()..connectionTimeout = const Duration(seconds: 5);
+  try {
+    final req = await cl.getUrl(Uri.parse(url)).timeout(const Duration(seconds: 6));
+    req.headers.set('User-Agent', 'Mozilla/5.0 (Linux; Android 13)');
+    final res = await req.close().timeout(const Duration(seconds: 7));
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      final first = await res.first.timeout(const Duration(seconds: 6));
+      if (first.isNotEmpty) {
+        if (url.toLowerCase().contains('.m3u8')) {
+          final head = String.fromCharCodes(first.take(24)).trimLeft();
+          ok = head.startsWith('#EXTM3U');
+        } else {
+          ok = true;
+        }
+      }
+    }
+  } catch (_) {
+    ok = false;
+  } finally {
+    cl.close(force: true);
+  }
+  _tvAlive[url] = ok;
+  return ok;
+}
+
 Future<List<TvFound>> tvDirectory(String cc) async {
   final key = cc.toLowerCase();
   final c = _tvDirCache[key];
@@ -857,6 +893,11 @@ class _TvBrowserPageState extends State<TvBrowserPage> {
   String _ccName = '';
   String _tag = ''; // seçili tür ('' = hepsi)
   bool _sortAz = false; // ada göre sırala
+  bool _onlyOk = false; // sadece çalışanlar (adresi yanıt verenler)
+  bool _probing = false;
+  int _probeDone = 0, _probeTotal = 0, _probeGen = 0;
+  String? _probeNote;
+  Timer? _probeT;
   List<TvFound> _all = [];
   bool _loading = false;
   String? _err;
@@ -870,8 +911,65 @@ class _TvBrowserPageState extends State<TvBrowserPage> {
 
   @override
   void dispose() {
+    _probeGen++;
+    _probeT?.cancel();
     _q.dispose();
     super.dispose();
+  }
+
+  /// Şu anki ülke / tür / arama süzgecinden geçen kanallar
+  List<TvFound> _filtered() {
+    final q = _q.text.trim().toLowerCase();
+    return [
+      for (final f in _all)
+        if (_hasTag(f) &&
+            (q.isEmpty ||
+                f.name.toLowerCase().contains(q) ||
+                f.group.toLowerCase().contains(q)))
+          f
+    ];
+  }
+
+  void _probeSoon() {
+    _probeT?.cancel();
+    if (!_onlyOk) return;
+    _probeT = Timer(const Duration(milliseconds: 700), _maybeProbe);
+  }
+
+  /// "Sadece çalışanlar" açıkken görünen listedeki denenmemiş kanalları dener (10 eş zamanlı)
+  Future<void> _maybeProbe() async {
+    if (!_onlyOk || !mounted) return;
+    final gen = ++_probeGen;
+    final todo = [
+      for (final f in _filtered())
+        if (!_tvAlive.containsKey(f.url)) f
+    ];
+    if (todo.length > 400) {
+      setState(() {
+        _probing = false;
+        _probeNote = tx('Çok fazla kanal var ({0}). Önce ülke ya da tür seçerek daralt.', ['${todo.length}']);
+      });
+      return;
+    }
+    setState(() {
+      _probeNote = null;
+      _probing = todo.isNotEmpty;
+      _probeDone = 0;
+      _probeTotal = todo.length;
+    });
+    var i = 0;
+    Future<void> worker() async {
+      while (gen == _probeGen && mounted && i < todo.length) {
+        final f = todo[i++];
+        await _tvProbe(f.url);
+        if (gen != _probeGen || !mounted) return;
+        _probeDone++;
+        if (_probeDone % 4 == 0) setState(() {});
+      }
+    }
+
+    await Future.wait([for (var k = 0; k < 10; k++) worker()]);
+    if (gen == _probeGen && mounted) setState(() => _probing = false);
   }
 
   Future<void> _load() async {
@@ -886,6 +984,7 @@ class _TvBrowserPageState extends State<TvBrowserPage> {
         _all = r;
         _loading = false;
       });
+      _probeSoon();
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -935,6 +1034,7 @@ class _TvBrowserPageState extends State<TvBrowserPage> {
     );
     if (picked == null) return;
     setState(() => _tag = picked);
+    _probeSoon();
   }
 
   String _tagName() {
@@ -969,14 +1069,9 @@ class _TvBrowserPageState extends State<TvBrowserPage> {
     return ListenableBuilder(
       listenable: store,
       builder: (context, _) {
-        final q = _q.text.trim().toLowerCase();
         final list = [
-          for (final f in _all)
-            if (_hasTag(f) &&
-                (q.isEmpty ||
-                    f.name.toLowerCase().contains(q) ||
-                    f.group.toLowerCase().contains(q)))
-              f
+          for (final f in _filtered())
+            if (!_onlyOk || _tvAlive[f.url] == true) f
         ];
         if (_sortAz) {
           list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
@@ -996,7 +1091,10 @@ class _TvBrowserPageState extends State<TvBrowserPage> {
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
                 child: TextField(
                   controller: _q,
-                  onChanged: (_) => setState(() {}),
+                  onChanged: (_) {
+                    setState(() {});
+                    _probeSoon();
+                  },
                   decoration: InputDecoration(
                       hintText: tx('Kanal ya da tür ara'),
                       prefixIcon: const Icon(Icons.search_rounded),
@@ -1029,18 +1127,51 @@ class _TvBrowserPageState extends State<TvBrowserPage> {
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 2, 16, 0),
-                child: Row(children: [
+                child: Wrap(spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
                   FilterChip(
                     label: Text(tx('A-Z sırala')),
                     selected: _sortAz,
                     onSelected: (v) => setState(() => _sortAz = v),
                   ),
-                  const SizedBox(width: 8),
+                  FilterChip(
+                    label: Text(tx('Sadece çalışanlar')),
+                    selected: _onlyOk,
+                    onSelected: (v) {
+                      setState(() {
+                        _onlyOk = v;
+                        if (!v) {
+                          _probeGen++; // denemeyi bırak
+                          _probing = false;
+                          _probeNote = null;
+                        }
+                      });
+                      if (v) _maybeProbe();
+                    },
+                  ),
                   if (!_loading && _err == null)
-                    Text(tx('{0} kanal', ['${_all.length}']),
-                        style: TextStyle(color: p.soft, fontSize: 12)),
+                    Text(
+                          _onlyOk
+                              ? tx('{0} kanal', ['${list.length}'])
+                              : tx('{0} kanal', ['${_all.length}']),
+                          style: TextStyle(color: p.soft, fontSize: 12)),
                 ]),
               ),
+              if (_onlyOk && _probing)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    LinearProgressIndicator(
+                        value: _probeTotal == 0 ? null : _probeDone / _probeTotal),
+                    const SizedBox(height: 2),
+                    Text(tx('Deneniyor {0}/{1}', ['$_probeDone', '$_probeTotal']),
+                        style: TextStyle(color: p.soft, fontSize: 12)),
+                  ]),
+                ),
+              if (_onlyOk && _probeNote != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                  child: Text(_probeNote!, style: TextStyle(color: p.soft, fontSize: 12)),
+                ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
                 child: Text(
