@@ -2328,4 +2328,5 @@ const _en = <String, String>{
   'Sadece çalışanlar': 'Working only',
   'Yalnız uyandırma kelimesini dinle': 'Listen for the wake word only',
   'Çok fazla kanal var ({0}). Önce ülke ya da tür seçerek daralt.': 'Too many channels ({0}). Narrow it down by picking a country or genre first.',
+  'Ana ekran aracı (widget) derleme dosyasına gömüldü; artık Ana ekran > Araçlar\'da Daily Routine olarak görünür.': 'The home screen widget is now embedded in the build file; it shows up as Daily Routine under Home screen > Widgets.',
 };

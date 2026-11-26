@@ -11,9 +11,7 @@ import 'version.dart';
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
       tx('Verilerin korundu.'),
-      tx('TV rehberinde "Sadece çalışanlar" anahtarı: adresi yanıt vermeyen kanallar listeden çıkar (önce ülke ya da tür seç; çok kanal varsa uyarır).'),
-      tx('Uyandırma kelimesi artık yalnız kelimeyi dinler (gramer): daha doğru bulur. Kelimeden sonra komut ayrıca söylenir. Sesli komut kartından kapatılabilir.'),
-      tx('Ana ekran aracı (widget): hava, radyo, TV ve rutinler. Bildirim sesi ve yuvarlak bildirim düğmeleri düzeltmeleri de var.'),
+      tx('Ana ekran aracı (widget) derleme dosyasına gömüldü; artık Ana ekran > Araçlar\'da Daily Routine olarak görünür.'),
     ];
 
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {

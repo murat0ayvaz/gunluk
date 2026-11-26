@@ -1,11 +1,16 @@
-DAILY ROUTINE v1.25.36 - TAM PAKET
+DAILY ROUTINE v1.25.37 - TAM PAKET
 
 Bu zipte projenin TAMAMI var: .github, assets, lib, debug.keystore, pubspec.yaml.
 1) Zipi çıkar. GitHub'da "gunluk" reposunun ANA sayfasında: Add file > Upload files.
 2) Çıkan klasörlerin ve dosyaların HEPSİNİ (.github, assets, lib, debug.keystore, pubspec.yaml) sürükle-bırak > Commit changes.
-   (Degisenler: tv, wake, voicecmd, about, strings, version.)
+   (Degisenler: build.yml, about, strings, version.)
 3) Actions > yeşil tik > Artifacts > gunluk-apk indir, telefona kur (veriler kalır).
 Derleme hatası olursa Actions'taki kırmızı satırları gönder.
+
+v1.25.37 yenilikleri:
+- Ana ekran araci (widget) dosyalari artik build.yml'nin ICINE gomulu; .github/widget klasoru gerekmez.
+- GitHub'da DEGISIKLIK VAR: sadece .github/workflows/build.yml (tum dosyayi yapistir ya da yukle).
+
 
 v1.25.36 yenilikleri:
 - TV rehberinde "Sadece calisanlar": adresi yanit vermeyen kanallar listeden cikar (once ulke/tur sec).
