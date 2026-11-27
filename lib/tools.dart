@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'ambient.dart';
 import 'data.dart';
+import 'diary.dart' show DiaryCalendarPage;
+import 'holidays.dart';
+import 'memo.dart';
 import 'notify.dart';
 import 'prayer.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -13,7 +16,7 @@ import 'package:just_audio/just_audio.dart' show LoopMode;
 import 'media.dart';
 import 'online.dart';
 import 'podcast.dart';
-import 'reminders.dart' show dtLabel, permissionMessage;
+import 'reminders.dart' show dtLabel, permissionMessage, RemindersPage;
 import 'theme.dart' show Pal;
 import 'strings.dart';
 import 'timing.dart';
@@ -50,12 +53,14 @@ String _groupTitle(String g) {
       return tx('Para');
     case 'din':
       return tx('Dini');
+    case 'kisisel':
+      return tx('Kişisel');
     default:
       return tx('Hava durumu');
   }
 }
 
-const _defaultGroupOrder = ['health', 'time', 'weather', 'para', 'din'];
+const _defaultGroupOrder = ['kisisel', 'health', 'time', 'weather', 'para', 'din'];
 
 IconData _groupIcon(String g) {
   switch (g) {
@@ -67,6 +72,8 @@ IconData _groupIcon(String g) {
       return Icons.account_balance_wallet_rounded;
     case 'din':
       return Icons.mosque_rounded;
+    case 'kisisel':
+      return Icons.person_outline_rounded;
     default:
       return Icons.wb_sunny_outlined;
   }
@@ -113,6 +120,18 @@ List<_ToolInfo> _allTools() => [
       _ToolInfo('wallet', Icons.account_balance_wallet_rounded, tx('Cüzdan'),
           const Color(0xFF2E9E6B), () => const WalletPage(),
           group: 'para'),
+      _ToolInfo('memo', Icons.sticky_note_2_outlined, tx('Notlar'),
+          const Color(0xFFE0B341), () => const MemoPage(),
+          group: 'kisisel'),
+      _ToolInfo('remtool', Icons.notifications_active_outlined,
+          tx('Hatırlatıcı'), const Color(0xFFF08A3C), () => const RemindersPage(),
+          group: 'kisisel'),
+      _ToolInfo('diarytool', Icons.menu_book_rounded, tx('Günlük'),
+          const Color(0xFF9A6BF0), () => const DiaryCalendarPage(),
+          group: 'kisisel'),
+      _ToolInfo('holidays', Icons.event_available_rounded,
+          tx('Önemli günler'), const Color(0xFFD64545), () => const HolidaysPage(),
+          group: 'kisisel'),
     ];
 
 /// Bir aracın sayfası (rutine bağlamak için); araç yoksa null
@@ -2184,8 +2203,135 @@ class _Snd {
 
 final _Snd _snd = _Snd();
 
+/// Meditasyon frekans sesleri (assets/freq): binaural ritimler (kulaklık gerekir), saf frekanslar ve
+/// gürültüler. Kesintisiz döngü olarak çalar; başlarken yükselir, bitince alçalıp durur.
+/// Seçim: prof 'medfreq' (boş = kapalı), ses seviyesi: prof 'medfv'. Rahatlama amaçlıdır; sağlık iddiası yoktur.
+const _freqList = <(String, String, String)>[
+  // (dosya, başlık, açıklama)
+  ('bin_delta', 'Delta 2 Hz', 'derin dinlenme · kulaklık'),
+  ('bin_theta', 'Theta 6 Hz', 'meditasyon · kulaklık'),
+  ('bin_alpha', 'Alfa 10 Hz', 'sakin odak · kulaklık'),
+  ('bin_beta', 'Beta 18 Hz', 'uyanık odak · kulaklık'),
+  ('bin_gamma', 'Gama 40 Hz', 'dikkat · kulaklık'),
+  ('hz_174', '174 Hz', 'saf frekans'),
+  ('hz_285', '285 Hz', 'saf frekans'),
+  ('hz_396', '396 Hz', 'saf frekans'),
+  ('hz_432', '432 Hz', 'saf frekans'),
+  ('hz_528', '528 Hz', 'saf frekans'),
+  ('hz_639', '639 Hz', 'saf frekans'),
+  ('hz_741', '741 Hz', 'saf frekans'),
+  ('hz_852', '852 Hz', 'saf frekans'),
+  ('hz_963', '963 Hz', 'saf frekans'),
+  ('noise_pink', 'Pembe gürültü', 'odak ve uyku'),
+  ('noise_brown', 'Kahverengi gürültü', 'derin, yumuşak'),
+  ('noise_white', 'Beyaz gürültü', 'dış sesleri bastırır'),
+];
+
+class _Freq extends ChangeNotifier {
+  final AudioPlayer _p = AudioPlayer();
+  bool _ready = false;
+  bool playing = false;
+  Timer? _fade;
+  int _gen = 0;
+
+  String get sel => store.pStr('medfreq');
+  double get vol => (double.tryParse(store.pStr('medfv', '0.35')) ?? 0.35).clamp(0.05, 1.0).toDouble();
+
+  String label(String id) {
+    for (final f in _freqList) {
+      if (f.$1 == id) return tx(f.$2);
+    }
+    return '';
+  }
+
+  Future<void> _init() async {
+    if (_ready) return;
+    _ready = true;
+    try {
+      // Ses odağı istenmez: çalan podcast / müzik duraklamasın
+      await _p.setAudioContext(AudioContext(
+          android: AudioContextAndroid(audioFocus: AndroidAudioFocus.none)));
+      await _p.setReleaseMode(ReleaseMode.loop);
+    } catch (_) {}
+  }
+
+  void select(String id) {
+    store.setProf('medfreq', id);
+    if (playing) {
+      if (id.isEmpty) {
+        stop();
+      } else {
+        play();
+      }
+    }
+    notifyListeners();
+  }
+
+  void setVol(double v) {
+    store.setProf('medfv', v.toStringAsFixed(2));
+    if (playing) {
+      try {
+        _p.setVolume(v);
+      } catch (_) {}
+    }
+    notifyListeners();
+  }
+
+  void _ramp(double from, double to, int ms, {VoidCallback? done}) {
+    _fade?.cancel();
+    const step = 100;
+    final n = (ms / step).ceil().clamp(1, 100);
+    var i = 0;
+    _fade = Timer.periodic(const Duration(milliseconds: step), (t) {
+      i++;
+      final v = from + (to - from) * (i / n);
+      try {
+        _p.setVolume(v.clamp(0.0, 1.0).toDouble());
+      } catch (_) {}
+      if (i >= n) {
+        t.cancel();
+        done?.call();
+      }
+    });
+  }
+
+  Future<void> play() async {
+    final id = sel;
+    if (id.isEmpty) return;
+    final g = ++_gen;
+    await _init();
+    try {
+      await _p.setVolume(0);
+      await _p.play(AssetSource('freq/$id.wav'));
+      if (g != _gen) return;
+      playing = true;
+      _ramp(0, vol, 3000);
+      notifyListeners();
+    } catch (_) {
+      playing = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> stop() async {
+    if (!playing) return;
+    final g = ++_gen;
+    playing = false;
+    notifyListeners();
+    _ramp(vol, 0, 1200, done: () async {
+      if (g != _gen) return;
+      try {
+        await _p.stop();
+      } catch (_) {}
+    });
+  }
+}
+
+final _Freq _freq = _Freq();
+
 /// Seans bitince (sayfa açık olmasa da): gong, arka plan sesini kapat, kayda yaz
 void _medFinished() {
+  _freq.stop();
   if (store.medSound) _snd.gong();
   _medEndSound();
   final min = double.parse((_medCtl.total / 60).toStringAsFixed(1));
@@ -2292,6 +2438,7 @@ class _MeditatePageState extends State<MeditatePage>
     // Sayfadan çıkınca seans duraklar (geri dönünce devam edilebilir)
     _medCtl.pause();
     _snd.stopAll();
+    _freq.stop();
     if (_medHasSound) media.player.pause();
     super.dispose();
   }
@@ -2392,6 +2539,7 @@ class _MeditatePageState extends State<MeditatePage>
     } else {
       _br.repeat();
     }
+    _freq.play(); // seçili frekans sesi (varsa)
     if (_medHasSound) media.player.play();
   }
 
@@ -2400,6 +2548,7 @@ class _MeditatePageState extends State<MeditatePage>
     _medCtl.pause();
     _br.stop();
     _snd.stopAll();
+    _freq.stop();
     if (_medHasSound) media.player.pause();
   }
 
@@ -2410,6 +2559,96 @@ class _MeditatePageState extends State<MeditatePage>
     _medMin = v.round().clamp(1, 600);
     _medCtl.set(_medMin * 60);
     _medLoggedSec = 0;
+  }
+
+  /// Frekans sesi seçimi: liste, ses seviyesi ve "Sadece dinle" (seans başlatmadan)
+  Future<void> _freqMenu() async {
+    final p = palOf(context);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: p.card,
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.8,
+        maxChildSize: 0.95,
+        builder: (ctx, sc) => ListenableBuilder(
+          listenable: _freq,
+          builder: (ctx, _) => Column(
+            children: [
+              Expanded(
+                child: ListView(
+                  controller: sc,
+                  padding: const EdgeInsets.only(top: 8),
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.volume_off_rounded),
+                      title: Text(tx('Frekans sesi yok')),
+                      trailing: _freq.sel.isEmpty ? Icon(Icons.check_rounded, color: p.accent) : null,
+                      onTap: () => _freq.select(''),
+                    ),
+                    for (final f in _freqList)
+                      ListTile(
+                        dense: true,
+                        leading: Icon(
+                            f.$1.startsWith('bin_')
+                                ? Icons.headphones_rounded
+                                : (f.$1.startsWith('noise_')
+                                    ? Icons.grain_rounded
+                                    : Icons.graphic_eq_rounded),
+                            color: p.soft),
+                        title: Text(tx(f.$2)),
+                        subtitle: Text(tx(f.$3)),
+                        trailing: _freq.sel == f.$1 ? Icon(Icons.check_rounded, color: p.accent) : null,
+                        onTap: () => _freq.select(f.$1),
+                      ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: Row(children: [
+                  Icon(Icons.volume_down_rounded, color: p.soft),
+                  Expanded(
+                    child: Slider(
+                      value: _freq.vol,
+                      min: 0.05,
+                      max: 1.0,
+                      onChanged: _freq.setVol,
+                    ),
+                  ),
+                  Icon(Icons.volume_up_rounded, color: p.soft),
+                ]),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                child: Text(
+                  tx('Rahatlama amaçlıdır; sağlık iddiası yoktur. Binaural ritimler için kulaklık kullan.'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 11.5, color: p.soft, height: 1.3),
+                ),
+              ),
+              SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _freq.sel.isEmpty
+                          ? null
+                          : (_freq.playing ? _freq.stop : _freq.play),
+                      icon: Icon(_freq.playing ? Icons.stop_rounded : Icons.play_arrow_rounded),
+                      label: Text(_freq.playing ? tx('Durdur') : tx('Sadece frekans dinle')),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _soundMenu() async {
@@ -2772,6 +3011,17 @@ class _MeditatePageState extends State<MeditatePage>
                     label: Text(tx('Titreşim')),
                     selected: store.medVibe,
                     onSelected: store.setMedVibe,
+                  ),
+                  ListenableBuilder(
+                    listenable: _freq,
+                    builder: (context, _) => FilterChip(
+                      avatar: const Icon(Icons.graphic_eq_rounded, size: 18),
+                      label: Text(_freq.sel.isEmpty
+                          ? tx('Frekans sesi')
+                          : _freq.label(_freq.sel)),
+                      selected: _freq.sel.isNotEmpty,
+                      onSelected: (_) => _freqMenu(),
+                    ),
                   ),
                 ],
               ),

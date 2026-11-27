@@ -46,6 +46,7 @@ class WidgetSvc {
 
   /// Çok sık değişikliklerde yükü azaltmak için 1,5 sn bekleyip gönderir
   void _soon() {
+    if (_pending != null) _tryPending();
     _t?.cancel();
     _t = Timer(const Duration(milliseconds: 1500), push);
   }
@@ -93,6 +94,62 @@ class WidgetSvc {
     return (met, total, open);
   }
 
+  /// Rutinler + Yapılacaklar listesi (kaydırılabilir araç için): [tür, yazı, tamam]
+  /// tür: "h" başlık, "r" rutin, "t" yapılacak
+  List<List<Object>> _listItems() {
+    final now = DateTime.now();
+    final date = dKey(now);
+    final out = <List<Object>>[];
+    var met = 0, total = 0;
+    final rows = <List<Object>>[];
+    for (final c in store.cats) {
+      for (final sb in c.subs) {
+        if (!sb.scheduledOn(now)) continue;
+        total++;
+        final e = store.entryFor(sb.id, date);
+        final ok = e != null && goalMet(sb, e.value);
+        if (ok) met++;
+        if (rows.length < 60) rows.add(['r', sb.name, ok]);
+      }
+    }
+    out.add(['h', '${tx('Rutinler')} $met/$total', false]);
+    if (rows.isEmpty) out.add(['r', tx('Bugün için rutin yok'), false]);
+    out.addAll(rows);
+    final todos = store.todosFor(date);
+    final open = todos.where((t) => !t.done).length;
+    out.add(['h', '${tx('Yapılacaklar')}${open > 0 ? ' $open' : ''}', false]);
+    if (todos.isEmpty) out.add(['t', tx('Bugün için yapılacak yok'), false]);
+    for (final t in todos.take(40)) {
+      out.add(['t', t.text, t.done]);
+    }
+    return out;
+  }
+
+  /// Bildirimler aracı: hava, ikazlar, yaklaşan namaz vakti
+  List<String> _noteLines() {
+    final out = <String>[];
+    final w = wxSummaryNow();
+    if (w.isNotEmpty) out.add(w);
+    final d = weather.data;
+    if (store.wxOn && d != null) {
+      final al = wxAlertLine(wxAlerts(d), 0);
+      if (al.isNotEmpty) out.add(al);
+    }
+    final pr = prayerNextText();
+    if (pr.isNotEmpty) out.add(pr);
+    return out;
+  }
+
+  String _mediaTitle(String kind) {
+    final active = media.nowId != null;
+    final isKind = active &&
+        ((kind == 'radio' && media.isRadio) ||
+            (kind == 'podcast' && media.isPod) ||
+            (kind == 'music' && (media.isSong || media.isOnline)));
+    if (isKind) return media.nowTitle;
+    return dockLastTitle(kind);
+  }
+
   /// Araçta hangi bölümler görünsün (Ayarlar > Ana ekran > Ana ekran aracı bölümleri)
   static const sections = <(String, String)>[
     ('radio', 'Radyo'),
@@ -134,6 +191,28 @@ class WidgetSvc {
       final wd = weather.data;
       final json = jsonEncode({
         'dark': _dark(),
+        'mkind': !active
+            ? ''
+            : (media.isRadio
+                ? 'radio'
+                : (media.isPod
+                    ? 'podcast'
+                    : ((media.isSong || media.isOnline) ? 'music' : ''))),
+        'mplay': active && media.playing,
+        'm_radio': _mediaTitle('radio'),
+        'm_music': _mediaTitle('music'),
+        'm_podcast': _mediaTitle('podcast'),
+        'm_tv': dockLastTitle('tv'),
+        'mt_radio': tx('Radyo'),
+        'mt_tv': tx('TV'),
+        'mt_podcast': tx('Podcast'),
+        'mt_music': tx('Müzik'),
+        'rl': _listItems(),
+        'nl': _noteLines(),
+        'wxsum': wxSummaryNow(),
+        'wxhead': tx('Hava durumu'),
+        'nlhead': tx('Bildirimler'),
+        'nlnone': tx('Şimdilik bildirim yok'),
         for (final sc in sections) 's_${sc.$1}': store.pBool('wg_${sc.$1}', true),
         'pray': prayerNextText(),
         'tttodo': tx('Yapılacaklar'),
@@ -182,27 +261,58 @@ class WidgetSvc {
   }
 
   /// Ana ekrana widget eklemeyi ister (telefon onay penceresi gösterir); desteklenmiyorsa false
-  Future<bool> pin() async {
+  Future<bool> pin([String kind = 'all']) async {
     try {
-      return (await _ch.invokeMethod<bool>('pin')) ?? false;
+      return (await _ch.invokeMethod<bool>('pin', {'kind': kind})) ?? false;
     } catch (_) {
       return false;
     }
   }
 
-  /// Araçtan gelen istek: "radio" (hiçbir şey çalmıyordu) ya da "tv"
+  String? _pending; // araçtan gelen ama henüz işlenmemiş istek (uygulama açılırken kaybolmasın)
+  Timer? _retry;
+
+  /// Araçtan gelen istek: "radio" / "music" / "podcast" (hiçbir şey çalmıyordu) ya da "tv".
+  /// Uygulama soğuk açılıyorsa ekran / kilit hazır olana kadar istek saklanır ve tekrar denenir.
   Future<void> takeAction() async {
     try {
       final a = await _ch.invokeMethod<String>('take');
-      if (a == null || a.isEmpty) return;
-      final ctx = navKey.currentContext;
-      if (ctx == null || store.locked) return;
+      if (a != null && a.isNotEmpty) _pending = a;
+    } catch (_) {}
+    if (_pending == null) return;
+    _tryPending();
+    var n = 0;
+    _retry?.cancel();
+    _retry = Timer.periodic(const Duration(seconds: 1), (t) {
+      n++;
+      if (_pending == null || n > 60) {
+        t.cancel();
+        return;
+      }
+      _tryPending();
+    });
+  }
+
+  void _tryPending() {
+    final a = _pending;
+    if (a == null) return;
+    final ctx = navKey.currentContext;
+    if (ctx == null || store.locked) return; // hazır değil: istek saklı kalır
+    _pending = null;
+    _retry?.cancel();
+    _run(ctx, a);
+  }
+
+  Future<void> _run(BuildContext ctx, String a) async {
+    try {
       if (a == 'radio') {
-        if (media.nowId == null) {
+        if (media.nowId == null || !media.isRadio) {
           await dockLaunch(ctx, 'radio');
         } else {
           media.toggle();
         }
+      } else if (a == 'music' || a == 'podcast') {
+        await dockLaunch(ctx, a);
       } else if (a == 'tv') {
         await dockLaunch(ctx, 'tv');
         // araçtan başlatılan TV: uygulama ekranı görünmeden hemen küçük pencereye geç
@@ -277,27 +387,50 @@ class _WidgetSetupTileState extends State<WidgetSetupTile> {
     });
   }
 
+  Future<void> _add(String kind) async {
+    final m = ScaffoldMessenger.of(context);
+    final ok = await widgetSvc.pin(kind);
+    widgetSvc.push();
+    m.clearSnackBars();
+    m.showSnackBar(SnackBar(
+        content: Text(ok
+            ? tx('Telefon onay isterse "Ekle"ye dokun.')
+            : tx('Telefon eklemeyi desteklemiyor ya da izin kapalı. Uygulama izinlerinde "Ana ekrana kısayol oluştur"u aç ya da ana ekranda boş yere uzun basıp Widget\'lar\'dan ekle.'))));
+    _load();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: const Icon(Icons.widgets_outlined),
-      title: Text(tx('Ana ekran aracı (widget)')),
-      subtitle: Text(_st),
-      trailing: TextButton(
-        onPressed: () async {
-          final m = ScaffoldMessenger.of(context);
-          final ok = await widgetSvc.pin();
-          widgetSvc.push();
-          m.clearSnackBars();
-          m.showSnackBar(SnackBar(
-              content: Text(ok
-                  ? tx('Telefon onay isterse "Ekle"ye dokun.')
-                  : tx('Telefon eklemeyi desteklemiyor ya da izin kapalı. Uygulama izinlerinde "Ana ekrana kısayol oluştur"u aç ya da ana ekranda boş yere uzun basıp Widget\'lar\'dan ekle.'))));
-          _load();
-        },
-        child: Text(tx('Ana ekrana ekle')),
-      ),
+    const kinds = <(String, String)>[
+      ('all', 'Hepsi bir arada'),
+      ('media', 'Medya'),
+      ('list', 'Rutin ve yapılacaklar'),
+      ('wx', 'Hava ve imsak'),
+      ('notes', 'Bildirimler'),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.widgets_outlined),
+          title: Text(tx('Ana ekran araçları (widget)')),
+          subtitle: Text(_st),
+        ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 0,
+          children: [
+            for (final k in kinds)
+              ActionChip(
+                avatar: const Icon(Icons.add_rounded, size: 18),
+                label: Text(tx(k.$2)),
+                onPressed: () => _add(k.$1),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+      ],
     );
   }
 }

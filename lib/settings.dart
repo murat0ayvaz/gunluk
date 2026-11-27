@@ -16,7 +16,7 @@ import 'profile.dart' show ProfilePage;
 import 'media.dart' show slideFromRight;
 import 'strings.dart';
 import 'theme.dart';
-import 'tips.dart' show tipsOn;
+import 'tips.dart' show tipsOn, quotesOn;
 import 'ui.dart';
 import 'voicecmd.dart' show voiceListener, VoiceCommandsPage;
 import 'version.dart';
@@ -173,10 +173,18 @@ class SettingsPage extends StatelessWidget {
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   secondary: const Icon(Icons.tips_and_updates_outlined),
-                  title: Text(tx('Söz ve ipucu satırı')),
-                  subtitle: Text(tx('Alt bildirim alanında özlü sözler ve uygulama ipuçları kart olarak görünür.')),
+                  title: Text(tx('İpucu kartı')),
+                  subtitle: Text(tx('Alt bildirim alanında uygulama ipuçları kart olarak görünür. Sağa kaydır: gizle, sola kaydır: yenisi.')),
                   value: tipsOn(),
                   onChanged: (v) => store.setProf('tipson', v),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: const Icon(Icons.format_quote_rounded),
+                  title: Text(tx('Söz kartı')),
+                  subtitle: Text(tx('Alt bildirim alanında özlü sözler ayrı bir kart olarak görünür.')),
+                  value: quotesOn(),
+                  onChanged: (v) => store.setProf('quoteon', v),
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,

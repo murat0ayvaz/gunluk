@@ -4,6 +4,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 import 'data.dart';
+import 'holidays.dart' show syncHolidays;
 import 'strings.dart';
 import 'prayer.dart' show prayerTimesNow;
 import 'profile.dart' show entryRemSync;
@@ -333,6 +334,10 @@ class Notifier {
       for (final d in store.wdebts) {
         if (d.remind && !d.done) await syncDebt(d);
       }
+      for (final m in store.memos) {
+        if (m.nid != 0 && m.remindMs > 0) await syncMemo(m);
+      }
+      await syncHolidays();
       await syncPrayer(prayerTimesNow());
       await entryRemSync(); // rutin giriş ve spor hatırlatmaları
     } catch (_) {}
@@ -392,6 +397,26 @@ class Notifier {
           await scheduleOnce(_prayBase + d * 6 + i, body, when);
         }
       }
+    } catch (_) {}
+  }
+
+  /// Not hatırlatması: nid*100 numarasıyla tek bildirim
+  static Future<void> syncMemo(MemoItem m) async {
+    try {
+      await cancelOnce(m.nid * 100);
+      if (m.nid == 0 || m.remindMs <= DateTime.now().millisecondsSinceEpoch) return;
+      var body = m.title.trim();
+      if (body.isEmpty) {
+        for (final l in m.text.split('\n')) {
+          if (l.trim().isNotEmpty) {
+            body = l.trim();
+            break;
+          }
+        }
+      }
+      if (body.isEmpty) body = tx('Not hatırlatması');
+      await scheduleOnce(m.nid * 100, body,
+          DateTime.fromMillisecondsSinceEpoch(m.remindMs));
     } catch (_) {}
   }
 

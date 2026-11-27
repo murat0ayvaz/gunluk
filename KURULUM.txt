@@ -1,11 +1,32 @@
-DAILY ROUTINE v1.25.42 - TAM PAKET
+DAILY ROUTINE v1.25.44 - TAM PAKET
 
 Bu zipte projenin TAMAMI var: .github, assets, lib, debug.keystore, pubspec.yaml.
 1) Zipi çıkar. GitHub'da "gunluk" reposunun ANA sayfasında: Add file > Upload files.
 2) Çıkan klasörlerin ve dosyaların HEPSİNİ (.github, assets, lib, debug.keystore, pubspec.yaml) sürükle-bırak > Commit changes.
-   (Degisenler: build.yml, pip, tvpop, tv, widget, settings, about, strings, version.)
+   (Degisenler: memo (yeni), holidays (yeni), data, tools, home, tips, diary, reminders, notify, layoutpage, about, strings, version.)
 3) Actions > yeşil tik > Artifacts > gunluk-apk indir, telefona kur (veriler kalır).
 Derleme hatası olursa Actions'taki kırmızı satırları gönder.
+
+v1.25.44 yenilikleri:
+- Notlar (Araçlar > Kişisel): MIUI Notlar gibi iki sütunlu kartlar, etiket / klasör çubuğu, arama, sabitleme, isteğe bağlı fotoğraf, kontrol listesi ve hatırlatma.
+- Google Keep (Takeout zip / json) ve Mi Notlar / metin dosyalarından içe aktarma: Notlar > ⋮ > İçe aktar.
+- Araçlar'a Kişisel grubu: Notlar, Hatırlatıcı, Günlük ve Önemli günler.
+- Rutinler, Yapılacaklar, Günlük, Hatırlatıcı ve Notlar ana ekrana eklenip çıkarılabilir (Ayarlar > Ana ekran düzeni ve araç sayfalarındaki anahtar).
+- Önemli günler: milli ve dini günler (bayram, kandil...) takvimde işaretlenir; 1 hafta önce ve gününde bildirim gelir, ana ekranın altında da görünür.
+- GitHub'da DEGISIKLIK YOK: build.yml degismedi. Tum dosyalari TEK commit ile yukle.
+
+
+v1.25.43 yenilikleri:
+- Ana ekran araçları çoğaldı: Medya (radyo, TV, podcast, müzik), Rutin ve yapılacaklar (kaydırılabilir liste), Hava ve imsak, Bildirimler ve Hepsi bir arada. Ayarlar > Ana ekran'dan her biri eklenir.
+- Araçtaki radyo uygulama kapalıyken de başlar.
+- Meditasyona frekans sesleri: binaural ritimler (kulaklık), saf frekanslar ve gürültüler; ayrıca "Sadece frekans dinle".
+- Söz ve ipucu ayrı kartlar: sağa kaydır gizle, sola kaydır yenisi gelsin; Ayarlar'da ayrı anahtarlar.
+- Hava satırında en yakın yağışın günü ("En yakın yağış 2 gün sonra").
+- Favori radyo ve TV düğmelerinde ad en fazla 2 kelime.
+- Açılış ekranı: "Geç" düğmesi görselin hemen altında, ipucu tam görünür, ana sayfa gibi arka plan.
+- Ekle metinleri düzeltildi (artık ⊕ düğmesi anlatılıyor).
+- GitHub'da DEGISIKLIK VAR: build.yml degisti (yeni widget'lar). assets/freq klasoru yeni. Once build.yml'yi yapistir, sonra tum dosyalari TEK commit ile yukle.
+
 
 v1.25.42 yenilikleri:
 - TV küçük pencerede devam eder: TV açıkken Ana ekran tuşuna basınca ya da başka uygulamaya geçince TV telefonun üstünde küçük yüzen pencereye geçer (sürüklenir, çift dokunuşla büyür).

@@ -194,7 +194,44 @@ String _precipText(WeatherData d, String date, String desc) {
     if (h.rain >= 0) return tx('{0}, {1} {2} %{3}', [desc, at, kind, h.rain]);
     return tx('{0}, {1} {2} ({3} mm)', [desc, at, kind, h.mm.toStringAsFixed(1)]);
   }
+  return _noRainNear(d, desc);
+}
+
+/// 24 saatte yağış yok: tahmindeki günlerde en yakın yağışlı günü söyler
+/// ("parçalı bulutlu, yağış yok. En yakın yağış 2 gün sonra (Pazar): yağmur %60")
+String _noRainNear(WeatherData d, String desc) {
+  final now = DateTime.now();
+  var future = 0;
+  for (var i = 1; i <= 14; i++) {
+    final dt = now.add(Duration(days: i));
+    final day = d.days[dKey(dt)];
+    if (day == null) continue;
+    future++;
+    final snow = (day.code >= 71 && day.code <= 77) || day.code == 85 || day.code == 86;
+    final wet = (day.code >= 51 && day.code <= 67) || (day.code >= 80 && day.code <= 86);
+    final storm = day.code >= 95;
+    final strong = day.rain < 0 || day.rain >= 40;
+    if (!(storm || (wet && strong))) continue;
+    final kind = storm ? tx('fırtına') : (snow ? tx('kar') : tx('yağmur'));
+    final what = day.rain >= 0 ? '$kind %${day.rain}' : kind;
+    final when = i == 1 ? tx('yarın') : tx('{0} gün sonra', [i]);
+    return tx('{0}, yağış yok. En yakın yağış {1} ({2}): {3}',
+        [desc, when, wdName(dt.weekday), what]);
+  }
+  if (future >= 1) {
+    return tx('{0}, yağış yok. Önümüzdeki {1} gün yağış görünmüyor.', [desc, future]);
+  }
   return tx('{0}, yağış yok', [desc]);
+}
+
+/// Bugünün hava yazısı (ana ekran aracı için); veri yoksa boş
+String wxSummaryNow() {
+  final d = weather.data;
+  if (!store.wxOn || d == null) return '';
+  final date = dKey(DateTime.now());
+  final code = d.nowCode ?? d.days[date]?.code;
+  if (code == null) return '';
+  return _precipText(d, date, wxText(code));
 }
 
 /// WMO hava kodu -> kısa Türkçe açıklama ("açık", "yağmurlu" gibi)

@@ -13,6 +13,7 @@ import 'fireworks.dart';
 import 'tools.dart';
 import 'manage.dart' show editSubCategory;
 import 'media.dart';
+import 'memo.dart';
 import 'drawer.dart';
 import 'notes.dart';
 import 'notify.dart';
@@ -39,7 +40,7 @@ import 'weather.dart';
 //  - Satıra 2 saniye basılı tut: sıralama modu (sürükleyip bırak, "Bitti")
 //  - Rutinlerin altında açılır başlıklar: Yapılacaklar (güne özel), Günlük,
 //    Hatırlatıcı
-//  - Sağ altta yuvarlak DR düğmesi: dokununca Ekle paneli düğmeden büyüyerek açılır
+//  - Her bölüm başlığındaki ⊕ düğmesi: dokununca Ekle paneli düğmeden büyüyerek açılır
 //  - Sağ üstteki ok simgesi: sıralama modu (2 sn basılı tutmaya alternatif)
 //  - Boş yere sağa / sola kaydır: önceki / sonraki gün
 // ---------------------------------------------------------------
@@ -609,7 +610,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
         // Rutinler ve Diğer kayıtlar: açılır başlıklar (açılışta kapalı)
         final secW = <String, Widget>{
-          if (!_hidden.contains('routine')) 'routine': _HomeSection(
+          if (store.homeOn('routine') && !_hidden.contains('routine')) 'routine': _HomeSection(
               key: const ValueKey('sec_routine'),
               onSwipe: (l) => _swipeSec('routine', l),
               onAdd: _openAdd,
@@ -648,7 +649,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 child: section(others),
               ),
             ),
-                    if (!store.appHidden('todo') && !_hidden.contains('todo')) 'todo': _HomeSection(
+                    if (store.homeOn('todo') && !store.appHidden('todo') && !_hidden.contains('todo')) 'todo': _HomeSection(
                       key: const ValueKey('sec_todo'),
                       onSwipe: (l) => _swipeSec('todo', l),
                       icon: Icons.task_alt_rounded,
@@ -671,7 +672,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           : _openSec.add('todo')),
                       child: TodosBody(date: date),
                     ),
-                    if (!store.appHidden('diary') && !_hidden.contains('note')) 'note': _HomeSection(
+                    if (store.homeOn('note') && !store.appHidden('diary') && !_hidden.contains('note')) 'note': _HomeSection(
                       key: const ValueKey('sec_note'),
                       onSwipe: (l) => _swipeSec('note', l),
                       icon: Icons.menu_book_rounded,
@@ -690,7 +691,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             title: _label()),
                       ),
                     ),
-                    if (!store.appHidden('rem') && !_hidden.contains('rem')) 'rem': _HomeSection(
+                    if (store.homeOn('rem') && !store.appHidden('rem') && !_hidden.contains('rem')) 'rem': _HomeSection(
                       key: const ValueKey('sec_rem'),
                       onSwipe: (l) => _swipeSec('rem', l),
                       icon: Icons.notifications_active_outlined,
@@ -708,6 +709,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           ? _openSec.remove('rem')
                           : _openSec.add('rem')),
                       child: const RemindersBody(),
+                    ),
+                    if (store.homeOn('memo') && !_hidden.contains('memo')) 'memo': _HomeSection(
+                      key: const ValueKey('sec_memo'),
+                      onSwipe: (l) => _swipeSec('memo', l),
+                      icon: Icons.sticky_note_2_outlined,
+                      title: tx('Notlar'),
+                      tone: const Color(0xFFE0B341),
+                      onAdd: (o) async {
+                        await openMemoEditor(context);
+                        if (mounted) setState(() => _openSec.add('memo'));
+                      },
+                      badge: store.memos.isEmpty ? '' : '${store.memos.length}',
+                      open: _openSec.contains('memo'),
+                      onToggle: () => setState(() => _openSec.contains('memo')
+                          ? _openSec.remove('memo')
+                          : _openSec.add('memo')),
+                      child: const MemoHomeBody(),
                     ),
         };
         // Bölüm sırası Ayarlar > Ana ekran > Ana ekran düzeni'nden gelir
@@ -740,7 +758,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
                         child: Text(
-                          tx('Bu gün için kayıt yok.\nSağ alttaki DR düğmesine dokunarak rutin veya kayıt ekleyebilirsin.'),
+                          tx('Bu gün için kayıt yok.\nBir bölüm başlığındaki ⊕ düğmesine dokunarak rutin veya kayıt ekleyebilirsin. Bölümler görünmüyorsa ekranı aşağı çek.'),
                           textAlign: TextAlign.center,
                           style: TextStyle(color: p.soft, height: 1.4),
                         ),
@@ -910,7 +928,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             // Klavyesi olan bölümlerden biri (Rutinler, Yapılacaklar, Günlük, Hatırlatıcı)
             // açıkken hava ve namaz satırları gizlenir; hepsi kapanınca geri gelir.
             final kbSection = _openSec.any(
-                (k) => k == 'routine' || k == 'todo' || k == 'note' || k == 'rem');
+                (k) => k == 'routine' || k == 'todo' || k == 'note' || k == 'rem' || k == 'memo');
             final lines = store.linesOn && !kbSection;
             final wxLine = (lines && store.wxOn && !_hidden.contains('wx'))
                 ? WxLine(
@@ -961,7 +979,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               final firstWx = reversed ? !wxFirst : wxFirst;
               final l = [
                 // söz / ipucu kartı: alt bildirim alanının en üstünde
-                if (tipsOn() && !kbSection) const HomeTipCard(key: ValueKey('tipcard')),
+                if ((tipsOn() || quotesOn() || holidayBanner().isNotEmpty) && !kbSection) const HomeTipCard(key: ValueKey('tipcard')),
                 if (erLine != null) _bar('er', erLine),
                 if (bkLine != null) _bar('bk', bkLine),
                 ...(firstWx ? [...wx, ...pr] : [...pr, ...wx]),
@@ -1710,38 +1728,6 @@ class _FreeRowTile extends StatelessWidget {
           child: FxShine(radius: 14, phase: index, child: content),
         ),
       ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------
-// KÖŞE DÜĞMESİ: sağ altta yuvarlak DR (Daily Routine)
-// ---------------------------------------------------------------
-class _CornerBtn extends StatelessWidget {
-  final String letter;
-  final String tooltip;
-  final bool active;
-  final VoidCallback onTap;
-  const _CornerBtn(
-      {required this.letter,
-      required this.tooltip,
-      required this.onTap,
-      this.active = false});
-
-  @override
-  Widget build(BuildContext context) {
-    final p = palOf(context);
-    return FloatingActionButton(
-      heroTag: null,
-      tooltip: tooltip,
-      onPressed: onTap,
-      backgroundColor: p.accent,
-      foregroundColor: p.onAccent,
-      shape: const CircleBorder(),
-      elevation: active ? 1 : 4,
-      child: Text(letter,
-          style: const TextStyle(
-              fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
     );
   }
 }

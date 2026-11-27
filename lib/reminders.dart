@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'ambient.dart';
 import 'data.dart';
 import 'fx.dart';
 import 'notify.dart';
@@ -120,6 +121,46 @@ String _summary(Reminder r) {
 // ===============================================================
 // Liste
 // ===============================================================
+/// Araçlar > Kişisel > Hatırlatıcı: liste sayfası (ana ekrana bölüm olarak da eklenebilir)
+class RemindersPage extends StatelessWidget {
+  const RemindersPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palOf(context);
+    return ListenableBuilder(
+      listenable: store,
+      builder: (context, _) => AmbScaffold(
+        kind: 'settings',
+        backgroundColor: ambBg(p),
+        appBar: AppBar(
+          backgroundColor: ambBg(p),
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          title: Text(tx('Hatırlatıcı')),
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () => showReminderSheet(context),
+          child: const Icon(Icons.add_rounded),
+        ),
+        body: ListView(
+          padding: const EdgeInsets.only(bottom: 90),
+          children: [
+            SwitchListTile(
+              dense: true,
+              secondary: const Icon(Icons.home_rounded),
+              title: Text(tx('Ana ekrana ekle')),
+              value: store.homeOn('rem'),
+              onChanged: (v) => store.setHomeOn('rem', v),
+            ),
+            const RemindersBody(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class RemindersBody extends StatefulWidget {
   const RemindersBody({super.key});
 

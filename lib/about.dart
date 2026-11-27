@@ -10,10 +10,11 @@ import 'version.dart';
 // Her sürümde aşağıdaki liste yeni sürümün maddeleriyle değiştirilir.
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
-      tx('TV küçük pencerede devam eder: TV açıkken Ana ekran tuşuna basınca ya da başka uygulamaya geçince TV telefonun üstünde küçük yüzen pencereye geçer (sürüklenir, çift dokunuşla büyür).'),
-      tx('Widget\'taki TV düğmesi TV\'yi başlatır ve hemen küçük pencereye geçer.'),
-      tx('TV pop-up\'ında ve tam ekran TV sayfasında "Küçük pencere" düğmesi; Ayarlar > Ana ekran\'da açma/kapama anahtarı.'),
-      tx('Telefon ayarlarında uygulama için "Resim içinde resim" izni açık olmalı (Xiaomi\'de kapalı olabilir).'),
+      tx('Notlar (Araçlar > Kişisel): MIUI Notlar gibi iki sütunlu kartlar, etiket / klasör çubuğu, arama, sabitleme, isteğe bağlı fotoğraf, kontrol listesi ve hatırlatma.'),
+      tx('Google Keep (Takeout zip / json) ve Mi Notlar / metin dosyalarından içe aktarma: Notlar > ⋮ > İçe aktar.'),
+      tx('Araçlar\'a Kişisel grubu: Notlar, Hatırlatıcı, Günlük ve Önemli günler.'),
+      tx('Rutinler, Yapılacaklar, Günlük, Hatırlatıcı ve Notlar ana ekrana eklenip çıkarılabilir (Ayarlar > Ana ekran düzeni ve araç sayfalarındaki anahtar).'),
+      tx('Önemli günler: milli ve dini günler (bayram, kandil...) takvimde işaretlenir; 1 hafta önce ve gününde bildirim gelir, ana ekranın altında da görünür.'),
     ];
 
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {

@@ -744,6 +744,86 @@ class Entry {
       );
 }
 
+/// Notlar: kontrol listesi maddesi
+class MemoCheck {
+  String t;
+  bool d;
+  MemoCheck(this.t, this.d);
+  Map<String, dynamic> toJson() => {'t': t, 'd': d};
+  factory MemoCheck.fromJson(Map<String, dynamic> j) =>
+      MemoCheck((j['t'] ?? '').toString(), j['d'] == true);
+}
+
+/// Bir not (Araçlar > Kişisel > Notlar): başlık, metin ya da kontrol listesi, etiket, fotoğraflar, hatırlatma
+class MemoItem {
+  final String id;
+  String title;
+  String text;
+  String tag; // etiket / klasör adı (boş = etiketsiz)
+  bool pinned;
+  int created; // ms
+  int updated; // ms
+  List<String> images; // fotoğraf dosya adları (voice/ klasöründe, "memo_" ile başlar)
+  List<MemoCheck> checks;
+  bool isList; // kontrol listesi notu mu
+  int remindMs; // hatırlatma zamanı (0 = yok)
+  int nid; // bildirim numarası (0 = yok)
+  MemoItem(this.id,
+      {this.title = '',
+      this.text = '',
+      this.tag = '',
+      this.pinned = false,
+      int? created,
+      int? updated,
+      List<String>? images,
+      List<MemoCheck>? checks,
+      this.isList = false,
+      this.remindMs = 0,
+      this.nid = 0})
+      : created = created ?? DateTime.now().millisecondsSinceEpoch,
+        updated = updated ?? DateTime.now().millisecondsSinceEpoch,
+        images = images ?? [],
+        checks = checks ?? [];
+
+  bool get isEmpty =>
+      title.trim().isEmpty &&
+      text.trim().isEmpty &&
+      images.isEmpty &&
+      checks.every((c) => c.t.trim().isEmpty);
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'ti': title,
+        'tx': text,
+        'tg': tag,
+        'pin': pinned,
+        'cr': created,
+        'up': updated,
+        'im': images,
+        'ck': checks.map((c) => c.toJson()).toList(),
+        'ls': isList,
+        'rm': remindMs,
+        'nid': nid,
+      };
+
+  factory MemoItem.fromJson(Map<String, dynamic> j) => MemoItem(
+        (j['id'] ?? '').toString(),
+        title: (j['ti'] ?? '').toString(),
+        text: (j['tx'] ?? '').toString(),
+        tag: (j['tg'] ?? '').toString(),
+        pinned: j['pin'] == true,
+        created: (j['cr'] as num?)?.toInt(),
+        updated: (j['up'] as num?)?.toInt(),
+        images: [for (final x in ((j['im'] as List?) ?? [])) x.toString()],
+        checks: ((j['ck'] as List?) ?? [])
+            .map((e) => MemoCheck.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        isList: j['ls'] == true,
+        remindMs: (j['rm'] as num?)?.toInt() ?? 0,
+        nid: (j['nid'] as num?)?.toInt() ?? 0,
+      );
+}
+
 /// Yapılacaklar listesindeki bir madde
 class Todo {
   final String id;
@@ -2249,6 +2329,10 @@ class AppStore extends ChangeNotifier {
     entries = ((j['entries'] as List?) ?? [])
         .map((e) => Entry.fromJson(e as Map<String, dynamic>))
         .toList();
+    memos = ((j['memos'] as List?) ?? [])
+        .map((e) => MemoItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+    memoTags = [for (final x in ((j['mtags'] as List?) ?? [])) x.toString()];
     todos = ((j['todos'] as List?) ?? [])
         .map((e) => Todo.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -2690,6 +2774,8 @@ class AppStore extends ChangeNotifier {
         'cats': cats.map((c) => c.toJson()).toList(),
         'entries': entries.map((e) => e.toJson()).toList(),
         'todos': todos.map((t) => t.toJson()).toList(),
+        'memos': memos.map((m) => m.toJson()).toList(),
+        'mtags': memoTags,
         'reminders': reminders.map((r) => r.toJson()).toList(),
         'free': freeRows.map((f) => f.toJson()).toList(),
         'nextNid': nextNid,
@@ -3198,6 +3284,83 @@ class AppStore extends ChangeNotifier {
   }
 
   bool evtCat = false; // 'Etkinlikler' haber kategorisi bir kez kuruldu mu
+  // ----- Notlar (Araçlar > Kişisel > Notlar) -----
+  List<MemoItem> memos = [];
+  List<String> memoTags = []; // etiket / klasör adları
+
+  /// Notlar: sabitlenenler önde, sonra son değişen önde
+  List<MemoItem> memosSorted([String tag = '']) {
+    final l = [for (final m in memos) if (tag.isEmpty || m.tag == tag) m];
+    l.sort((a, b) {
+      if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
+      return b.updated.compareTo(a.updated);
+    });
+    return l;
+  }
+
+  MemoItem? memoById(String id) {
+    for (final m in memos) {
+      if (m.id == id) return m;
+    }
+    return null;
+  }
+
+  /// Notu ekler ya da günceller; boş not kaydedilmez (varsa silinir)
+  void memoSave(MemoItem m, {bool touch = true}) {
+    if (touch) m.updated = DateTime.now().millisecondsSinceEpoch;
+    final i = memos.indexWhere((x) => x.id == m.id);
+    if (m.isEmpty) {
+      if (i >= 0) memos.removeAt(i);
+    } else if (i >= 0) {
+      memos[i] = m;
+    } else {
+      memos.add(m);
+    }
+    if (m.tag.isNotEmpty && !memoTags.contains(m.tag)) memoTags.add(m.tag);
+    _commit();
+  }
+
+  void memoDelete(String id) {
+    memos.removeWhere((x) => x.id == id);
+    _commit();
+  }
+
+  /// "Geri al": silinen notu eski sırasıyla geri koyar
+  void memoRestore(MemoItem m) {
+    if (memos.any((x) => x.id == m.id)) return;
+    memos.add(m);
+    _commit();
+  }
+
+  void memoAddTag(String name) {
+    final t = name.trim();
+    if (t.isEmpty || memoTags.contains(t)) return;
+    memoTags.add(t);
+    _commit();
+  }
+
+  /// Etiketi siler; o etiketli notlar etiketsiz kalır (silinmez)
+  void memoRemoveTag(String name) {
+    memoTags.remove(name);
+    for (final m in memos) {
+      if (m.tag == name) m.tag = '';
+    }
+    _commit();
+  }
+
+  /// Fotoğrafı notlar için saklar ve dosya adını döner (yedeğe ses kayıtlarıyla birlikte girer)
+  Future<String?> memoSaveImage(List<int> bytes, String ext) async {
+    try {
+      final d = await voiceDir();
+      final e = ext.isEmpty ? 'jpg' : ext.toLowerCase().replaceAll('.', '');
+      final name = 'memo_${DateTime.now().microsecondsSinceEpoch}_${_seq++}.$e';
+      await File('${d.path}/$name').writeAsBytes(bytes);
+      return name;
+    } catch (_) {
+      return null;
+    }
+  }
+
   // Ayarlar > Uygulamalar: kapatılan bölümler (veriler silinmez)
   Set<String> hiddenApps = {};
   bool appHidden(String id) => hiddenApps.contains(id);
@@ -3461,7 +3624,18 @@ class AppStore extends ChangeNotifier {
   }
 
   // ---- Ana ekran düzeni: bölüm sırası ve üst bar simgeleri ----
-  static const kHomeOrder = ['wx', 'pr', 'routine', 'todo', 'note', 'rem', 'other'];
+  static const kHomeOrder = ['wx', 'pr', 'routine', 'todo', 'note', 'rem', 'memo', 'other'];
+
+  /// Bölüm ana ekranda gösteriliyor mu (Notlar varsayılan kapalı; diğerleri açık)
+  bool homeOn(String id) =>
+      id == 'memo' ? pBool('memohome', false) : !pBool('hoff_$id', false);
+  void setHomeOn(String id, bool on) {
+    if (id == 'memo') {
+      setProf('memohome', on);
+    } else {
+      setProf('hoff_$id', !on);
+    }
+  }
   static const kIconOrder = ['menu', 'study', 'short', 'mic', 'tools', 'media'];
   List<String> secOrder = List.of(kHomeOrder);
   List<String> iconOrder = List.of(kIconOrder);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'ambient.dart';
 import 'data.dart';
+import 'holidays.dart';
 import 'notes.dart';
 import 'strings.dart';
 import 'theme.dart';
@@ -63,6 +64,22 @@ class _DiaryCalendarPageState extends State<DiaryCalendarPage> {
                   fontWeight: hasNote ? FontWeight.w700 : FontWeight.w400,
                 ),
               ),
+              // Önemli gün: sağ üstte küçük renkli nokta
+              if (holidaysOn(d).isNotEmpty)
+                Positioned(
+                  top: 3,
+                  right: 5,
+                  child: Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: holidaysOn(d).any((h) => h.religious)
+                          ? const Color(0xFF2E9E8F)
+                          : const Color(0xFFD64545),
+                    ),
+                  ),
+                ),
               // Notu olan günün altında küçük nokta
               if (hasNote)
                 Positioned(
@@ -171,6 +188,22 @@ class _DiaryCalendarPageState extends State<DiaryCalendarPage> {
               ),
               const SizedBox(height: 6),
               ...rows,
+              for (final h in holidaysOn(_sel))
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Row(children: [
+                    Icon(h.religious ? Icons.mosque_rounded : Icons.flag_rounded,
+                        size: 18,
+                        color: h.religious
+                            ? const Color(0xFF2E9E8F)
+                            : const Color(0xFFD64545)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                        child: Text(tx(h.name),
+                            style: TextStyle(
+                                color: p.ink, fontWeight: FontWeight.w600))),
+                  ]),
+                ),
               const SizedBox(height: 16),
               // Seçili günün notu
               Container(

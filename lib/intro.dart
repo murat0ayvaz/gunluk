@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'ambient.dart';
 import 'data.dart';
 import 'fireworks.dart';
 import 'quotes.dart';
@@ -42,7 +43,7 @@ Widget _bookImage(double h) => SizedBox(
 // kullanım ipucu (tooltip) çıkar, her açılışta farklı bir ipucu.
 // ---------------------------------------------------------------
 List<String> _tips() => [
-      tx('Ekle için sağ alttaki DR düğmesine dokun.'),
+      tx('Ekle için bölüm başlığındaki ⊕ düğmesine dokun.'),
       tx('Bir satırı sağa kaydırınca düzenlenir; sola kaydırınca rutin o gün kalkar. Tüm günlerden kaldırmak için düzenlemede “Rutin olsun” anahtarını kapat.'),
       tx('Satırın solundaki ≡ simgesinden sürükleyerek rutinlerini sıralayabilirsin.'),
       tx('Boş yere sağa veya sola kaydırarak günler arasında geçebilirsin.'),
@@ -133,10 +134,41 @@ class _SplashPageState extends State<SplashPage> {
           final imgH = _imageHeight(c.maxWidth, c.maxHeight, 340);
           return Stack(
             children: [
+              if (ambienceOn() && Theme.of(context).brightness == Brightness.light)
+                Positioned.fill(
+                  top: imgH - 30,
+                  child: ShaderMask(
+                    blendMode: BlendMode.dstIn,
+                    shaderCallback: (r) => const LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0x00FFFFFF), Color(0xFFFFFFFF)],
+                      stops: [0.0, 0.12],
+                    ).createShader(r),
+                    child: const AmbientBg(),
+                  ),
+                ),
               Positioned(top: 0, left: 0, right: 0, child: _bookImage(imgH)),
-              // Görselin altındaki alan: yüzde, açıklama, motivasyon sözü, ipucu
+              // "Geç" düğmesi (ya da veri okunurken dönen halka): görselin hemen altında
               Positioned(
-                top: imgH + 4,
+                top: imgH + 6,
+                left: 24,
+                right: 24,
+                height: 50,
+                child: widget.ready
+                    ? FilledButton(
+                        onPressed: widget.onGo,
+                        child: Text(tx('Geç')),
+                      )
+                    : const Center(
+                        child: SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2.5))),
+              ),
+              // Düğmenin altındaki alan: yüzde, açıklama, motivasyon sözü
+              Positioned(
+                top: imgH + 62,
                 left: 24,
                 right: 24,
                 bottom: 96,
@@ -180,7 +212,7 @@ class _SplashPageState extends State<SplashPage> {
                   ),
                 ),
               ),
-              // Altta: "Geç" düğmesi ve küçük ipucu
+              // Altta: ipucu (tamamı görünür, kesilmez)
               Positioned(
                 left: 24,
                 right: 24,
@@ -189,34 +221,11 @@ class _SplashPageState extends State<SplashPage> {
                   top: false,
                   child: Padding(
                     padding: const EdgeInsets.only(bottom: 20),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: widget.ready
-                              ? FilledButton(
-                                  onPressed: widget.onGo,
-                                  child: Text(tx('Geç')),
-                                )
-                              : const Center(
-                                  child: SizedBox(
-                                      width: 22,
-                                      height: 22,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2.5))),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _tip,
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              color: _soft, fontSize: 12.5, height: 1.3),
-                        ),
-                      ],
+                    child: Text(
+                      _tip,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          color: _soft, fontSize: 12.5, height: 1.3),
                     ),
                   ),
                 ),
@@ -249,7 +258,7 @@ List<_Pg> _pages() => [
       ),
       _Pg(
         tx('Rutin oluştur, hedef koy'),
-        tx('Sağ alttaki DR düğmesine dokun; kategori ve alt kategori seç, “Rutin olsun” anahtarını aç ve günlük hedefini yaz. Hedefe ulaşınca satır yeşile döner. Satırı sağa kaydırarak düzenle; sola kaydırarak rutini o gün için kaldır (tüm günlerden kaldırmak için düzenlemede “Rutin olsun” anahtarını kapat); ≡ ile sürükleyip sırala. Boş yere sağa veya sola kaydırarak günler arasında geçebilirsin.'),
+        tx('Rutinler başlığındaki ⊕ düğmesine dokun; kategori ve alt kategori seç, “Rutin olsun” anahtarını aç ve günlük hedefini yaz. Hedefe ulaşınca satır yeşile döner. Satırı sağa kaydırarak düzenle; sola kaydırarak rutini o gün için kaldır (tüm günlerden kaldırmak için düzenlemede “Rutin olsun” anahtarını kapat); ≡ ile sürükleyip sırala. Boş yere sağa veya sola kaydırarak günler arasında geçebilirsin.'),
       ),
       _Pg(
         tx('İstatistikler soldaki menüde'),

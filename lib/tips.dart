@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'data.dart';
+import 'holidays.dart';
 import 'strings.dart';
 import 'theme.dart';
 import 'ui.dart';
@@ -17,6 +18,9 @@ import 'voicecmd.dart' show voiceListener;
 //    açılışta yenilenir. Ayarlar > Ana ekran'dan kapatılır.
 // ---------------------------------------------------------------
 bool tipsOn() => store.pBool('tipson', true);
+
+/// Söz kartı (ipucu kartından ayrı açılıp kapatılır; ilk değeri eski ortak ayardan gelir)
+bool quotesOn() => store.pBool('quoteon', store.pBool('tipson', true));
 
 const _tips = <String>[
   'İpucu: Mikrofona uzun basınca sürekli dinleme açılır.',
@@ -41,44 +45,58 @@ const _tips = <String>[
 /// Söz / ipucu seçimi: uygulama genelinde tek yerde tutulur (sayfa yenilense de aynı kalır).
 /// Yenilenme: program açıkken saat başı; program kapalıyken her açılışta; arka plandan 1 dakikadan
 /// uzun süre sonra dönüşte. Sözler ve ipuçları sırayla (söz, ipucu, söz...) gelir.
-class _TipBrain extends ChangeNotifier with WidgetsBindingObserver {
+/// İki ayrı kart: İPUCU ve SÖZ. Her biri kendi başına saatte bir (ve uygulama açılıp geri gelince)
+/// yenilenir; sağa kaydırınca gizlenir (bir sonraki yenilenmede geri gelir), sola kaydırınca yenisi gelir.
+class _Slot extends ChangeNotifier {
+  final bool quote;
   final _rnd = Random();
-  Timer? _t;
   String text = '';
-  bool isQuote = false;
-  bool dismissed = false; // karta dokununca kapanır; yenisi gelene kadar görünmez
-  DateTime _at = DateTime.fromMillisecondsSinceEpoch(0);
-  DateTime? _paused;
-  int _n = 0;
-
-  void start() {
-    if (_t != null) return;
-    WidgetsBinding.instance.addObserver(this);
-    _t = Timer.periodic(const Duration(minutes: 1), (_) {
-      if (DateTime.now().difference(_at) >= const Duration(hours: 1)) next();
-    });
-    next(); // uygulama her açıldığında yeni söz / ipucu
-  }
+  bool dismissed = false;
+  int serial = 0; // her değişimde artar: kaydırılan kartın anahtarı yenilensin
+  DateTime at = DateTime.fromMillisecondsSinceEpoch(0);
+  _Slot(this.quote);
 
   void next() {
-    _n++;
-    _at = DateTime.now();
+    serial++;
+    at = DateTime.now();
     dismissed = false;
-    final pool = store.quotePool();
-    if (_n.isOdd || pool.isEmpty) {
-      isQuote = false;
-      text = tx(_tips[_rnd.nextInt(_tips.length)]);
+    if (quote) {
+      final pool = store.quotePool();
+      if (pool.isEmpty) {
+        text = '';
+      } else {
+        final q = pool[_rnd.nextInt(pool.length)];
+        text = q.ref.isEmpty ? '“${q.text}”' : '“${q.text}” · ${q.ref}';
+      }
     } else {
-      isQuote = true;
-      final q = pool[_rnd.nextInt(pool.length)];
-      text = q.ref.isEmpty ? '“${q.text}”' : '“${q.text}” · ${q.ref}';
+      text = tx(_tips[_rnd.nextInt(_tips.length)]);
     }
     notifyListeners();
   }
 
   void dismiss() {
+    serial++;
     dismissed = true;
     notifyListeners();
+  }
+}
+
+class _TipBrain with WidgetsBindingObserver {
+  final tip = _Slot(false);
+  final quote = _Slot(true);
+  Timer? _t;
+  DateTime? _paused;
+
+  void start() {
+    if (_t != null) return;
+    WidgetsBinding.instance.addObserver(this);
+    _t = Timer.periodic(const Duration(minutes: 1), (_) {
+      for (final sl in [tip, quote]) {
+        if (DateTime.now().difference(sl.at) >= const Duration(hours: 1)) sl.next();
+      }
+    });
+    tip.next(); // uygulama her açıldığında yeni ipucu ve söz
+    quote.next();
   }
 
   @override
@@ -88,14 +106,17 @@ class _TipBrain extends ChangeNotifier with WidgetsBindingObserver {
     } else if (s == AppLifecycleState.resumed) {
       final p = _paused;
       _paused = null;
-      if (p != null && DateTime.now().difference(p) >= const Duration(minutes: 1)) next();
+      if (p != null && DateTime.now().difference(p) >= const Duration(minutes: 1)) {
+        tip.next();
+        quote.next();
+      }
     }
   }
 }
 
 final _tipBrain = _TipBrain();
 
-/// Ana ekranın alt bildirim alanında (hava, namaz kartlarıyla birlikte) en üstte görünen söz / ipucu kartı
+/// Ana ekranın alt bildirim alanında en üstte görünen iki ayrı kart: ipucu ve söz.
 class HomeTipCard extends StatefulWidget {
   const HomeTipCard({super.key});
 
@@ -110,49 +131,100 @@ class _HomeTipCardState extends State<HomeTipCard> {
     _tipBrain.start();
   }
 
+  Widget _card(Pal p, _Slot sl, bool on) {
+    if (!on || sl.dismissed || sl.text.isEmpty) return const SizedBox.shrink();
+    Widget bg(IconData i, Alignment al) => Container(
+          alignment: al,
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          decoration: BoxDecoration(
+              color: p.editBg, borderRadius: BorderRadius.circular(16)),
+          child: Icon(i, color: p.soft),
+        );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+      child: Dismissible(
+        key: ValueKey('${sl.quote ? 'q' : 't'}${sl.serial}'),
+        // sağa kaydır: gizle, sola kaydır: yenisi gelsin
+        background: bg(Icons.visibility_off_outlined, Alignment.centerLeft),
+        secondaryBackground: bg(Icons.refresh_rounded, Alignment.centerRight),
+        onDismissed: (d) {
+          if (d == DismissDirection.startToEnd) {
+            sl.dismiss();
+          } else {
+            sl.next();
+          }
+        },
+        child: Material(
+          color: p.card,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: p.line),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+            child: Row(children: [
+              Icon(
+                  sl.quote
+                      ? Icons.format_quote_rounded
+                      : Icons.lightbulb_outline_rounded,
+                  size: 22,
+                  color: p.accent),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(sl.text,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12.5, height: 1.3, color: p.ink)),
+              ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = palOf(context);
     return ListenableBuilder(
-      listenable: Listenable.merge([_tipBrain, store]),
-      builder: (context, _) {
-        if (!tipsOn() || _tipBrain.dismissed || _tipBrain.text.isEmpty) {
-          return const SizedBox.shrink();
-        }
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
-          child: Material(
-            color: p.card,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: p.line),
-            ),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTap: _tipBrain.dismiss,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-                child: Row(children: [
-                  Icon(
-                      _tipBrain.isQuote
-                          ? Icons.format_quote_rounded
-                          : Icons.lightbulb_outline_rounded,
-                      size: 22,
-                      color: p.accent),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(_tipBrain.text,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            fontSize: 12.5, height: 1.3, color: p.ink)),
+      listenable: Listenable.merge([_tipBrain.tip, _tipBrain.quote, store]),
+      builder: (context, _) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (holidayBanner().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+              child: Material(
+                color: p.card,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: p.line),
+                ),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(builder: (_) => const HolidaysPage())),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+                    child: Row(children: [
+                      Icon(Icons.event_available_rounded, size: 22, color: p.accent),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(holidayBanner(),
+                            style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600,
+                                color: p.ink)),
+                      ),
+                    ]),
                   ),
-                ]),
+                ),
               ),
             ),
-          ),
-        );
-      },
+          _card(p, _tipBrain.tip, tipsOn()),
+          _card(p, _tipBrain.quote, quotesOn()),
+        ],
+      ),
     );
   }
 }

@@ -212,6 +212,17 @@ class DockSwitch extends StatelessWidget {
   }
 }
 
+/// Favori düğmelerinde kanal adı en fazla 2 kelime: "Radyo", "FM", "TV" gibi genel kelimeler atlanır
+/// ("Power Türk FM" -> "Power Türk", "SomaFM Secret Agent" -> "SomaFM Secret", "TRT Haber" -> "TRT Haber")
+String favShort(String name) {
+  final w = name.trim().split(RegExp(r'\s+')).where((x) => x.isNotEmpty).toList();
+  if (w.length <= 2) return name.trim();
+  const generic = {'radyo', 'radio', 'fm', 'tv', 'canlı', 'yayın', 'live', 'hd', 'kanalı', 'kanal'};
+  final rest = w.where((x) => !generic.contains(x.toLowerCase())).toList();
+  final use = rest.length >= 2 ? rest : w;
+  return use.take(2).join(' ');
+}
+
 /// ⌄ panelinin altındaki favori satırı (radyo istasyonları / TV kanalları)
 class _FavRow extends StatelessWidget {
   final String id;
@@ -228,7 +239,7 @@ class _FavRow extends StatelessWidget {
           chips.add(Padding(
             padding: const EdgeInsets.only(right: 6),
             child: ChoiceChip(
-              label: Text(st.name, maxLines: 1),
+              label: Text(favShort(st.name), maxLines: 1),
               selected: media.isRadio && media.nowId == st.id,
               onSelected: (_) {
                 tvPop.close();
@@ -244,7 +255,7 @@ class _FavRow extends StatelessWidget {
         chips.add(Padding(
           padding: const EdgeInsets.only(right: 6),
           child: ChoiceChip(
-            label: Text(c.name, maxLines: 1),
+            label: Text(favShort(c.name), maxLines: 1),
             selected: tvPop.chan?.id == c.id,
             onSelected: (_) => tvPop.show(c),
           ),

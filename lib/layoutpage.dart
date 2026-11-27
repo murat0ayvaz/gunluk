@@ -18,6 +18,7 @@ const _secNames = {
   'todo': ('Yapılacaklar', Icons.task_alt_rounded),
   'note': ('Günlük', Icons.menu_book_rounded),
   'rem': ('Hatırlatıcı', Icons.notifications_active_outlined),
+  'memo': ('Notlar', Icons.sticky_note_2_outlined),
   'other': ('Diğer kayıtlar', Icons.more_horiz_rounded),
 };
 
@@ -109,6 +110,12 @@ class HomeLayoutPage extends StatelessWidget {
                     child: ListTile(
                       leading: Icon(_secNames[id]!.$2),
                       title: Text(tx(_secNames[id]!.$1)),
+                      trailing: (id == 'wx' || id == 'pr' || id == 'other')
+                          ? null
+                          : Switch(
+                              value: store.homeOn(id),
+                              onChanged: (v) => store.setHomeOn(id, v),
+                            ),
                     ),
                   ),
               ],
@@ -116,7 +123,7 @@ class HomeLayoutPage extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                  tx('Tutup sürükleyerek sırala. Hava ve namaz satırları sabit çubuktur: yalnız kendi aralarındaki sırası değişir (Tema 3\'te altta).'),
+                  tx('Anahtar: bölümü ana ekranda göster / gizle (veriler silinmez). Tutup sürükleyerek sırala. Hava ve namaz satırları sabit çubuktur: yalnız kendi aralarındaki sırası değişir (Tema 3\'te altta).'),
                   style: TextStyle(color: p.soft, fontSize: 12.5, height: 1.35)),
             ),
           ],
