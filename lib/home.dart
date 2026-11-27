@@ -13,6 +13,7 @@ import 'fireworks.dart';
 import 'tools.dart';
 import 'manage.dart' show editSubCategory;
 import 'media.dart';
+import 'holidays.dart' show holidayBanner;
 import 'memo.dart';
 import 'drawer.dart';
 import 'notes.dart';

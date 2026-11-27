@@ -1,10 +1,10 @@
-import 'dart:math' show ceil;
 import 'package:flutter/material.dart';
 import 'ambient.dart';
 import 'data.dart';
 import 'notify.dart';
 import 'strings.dart';
 import 'theme.dart';
+import 'ui.dart';
 
 // ---------------------------------------------------------------
 // ÖNEMLİ GÜNLER: milli günler + dini günler (bayram, kandil...).
@@ -51,7 +51,7 @@ final List<Holiday> _diyanet = [
 /// Hicri (yıl, ay, gün) -> miladi (tablolu hesap; Diyanet'e göre 1 gün düzeltilir)
 DateTime _hijri(int y, int m, int d) {
   final jd = d +
-      ceil(29.5 * (m - 1)) +
+      (29.5 * (m - 1)).ceil() +
       (y - 1) * 354 +
       ((3 + 11 * y) ~/ 30) +
       1948439.5 -

@@ -23,7 +23,7 @@ String _memoDir = ''; // fotoğrafların klasörü (ilk açılışta bulunur)
 Future<void> _ensureDir() async {
   if (_memoDir.isNotEmpty) return;
   try {
-    _memoDir = (await voiceDir()).path;
+    _memoDir = (await store.voiceDir()).path;
   } catch (_) {}
 }
 
