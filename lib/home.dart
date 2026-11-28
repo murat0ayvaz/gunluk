@@ -95,7 +95,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       );
   void _swipeSec(String id, bool left) {
     if (left) {
-      setState(() => _hidden.add(id));
+      if (id == 'routine' || id == 'todo' || id == 'note' || id == 'rem' || id == 'memo') {
+        // sola itilen bölüm kalıcı olarak ana ekrandan kalkar; geri eklemek: Araçlar > Kişisel ya da Ayarlar > Ana ekran düzeni
+        store.setHomeOn(id, false);
+      } else {
+        setState(() => _hidden.add(id));
+      }
     } else {
       _shift(-1); // sağa itme: önceki gün (boş ekrandaki gibi)
     }

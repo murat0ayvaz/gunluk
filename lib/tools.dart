@@ -7,6 +7,7 @@ import 'ambient.dart';
 import 'data.dart';
 import 'diary.dart' show DiaryCalendarPage;
 import 'holidays.dart';
+import 'kisisel.dart';
 import 'memo.dart';
 import 'notify.dart';
 import 'prayer.dart';
@@ -120,6 +121,12 @@ List<_ToolInfo> _allTools() => [
       _ToolInfo('wallet', Icons.account_balance_wallet_rounded, tx('Cüzdan'),
           const Color(0xFF2E9E6B), () => const WalletPage(),
           group: 'para'),
+      _ToolInfo('routinetool', Icons.checklist_rounded, tx('Rutinler'),
+          const Color(0xFF4F8EF7), () => const RoutinesPage(),
+          group: 'kisisel'),
+      _ToolInfo('todotool', Icons.task_alt_rounded, tx('Yapılacaklar'),
+          const Color(0xFF2FB38A), () => const TodosPage(),
+          group: 'kisisel'),
       _ToolInfo('memo', Icons.sticky_note_2_outlined, tx('Notlar'),
           const Color(0xFFE0B341), () => const MemoPage(),
           group: 'kisisel'),

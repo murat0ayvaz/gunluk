@@ -1,11 +1,20 @@
-DAILY ROUTINE v1.25.44 - TAM PAKET
+DAILY ROUTINE v1.25.45 - TAM PAKET
 
 Bu zipte projenin TAMAMI var: .github, assets, lib, debug.keystore, pubspec.yaml.
 1) Zipi çıkar. GitHub'da "gunluk" reposunun ANA sayfasında: Add file > Upload files.
 2) Çıkan klasörlerin ve dosyaların HEPSİNİ (.github, assets, lib, debug.keystore, pubspec.yaml) sürükle-bırak > Commit changes.
-   (Degisenler: memo (yeni), holidays (yeni), data, tools, home, tips, diary, reminders, notify, layoutpage, about, strings, version.)
+   (Degisenler: build.yml (widget'lar), kisisel (yeni), widget, home, tools, data, diary, layoutpage, about, strings, version.), holidays (yeni), data, tools, home, tips, diary, reminders, notify, layoutpage, about, strings, version.)
 3) Actions > yeşil tik > Artifacts > gunluk-apk indir, telefona kur (veriler kalır).
 Derleme hatası olursa Actions'taki kırmızı satırları gönder.
+
+v1.25.45 yenilikleri:
+- Ana ekranda varsayılan olarak yalnız Rutinler görünür. Yapılacaklar, Günlük, Hatırlatıcı ve Notlar isteğe bağlı eklenir; sola çekince kalıcı gizlenir.
+- Araçlar > Kişisel altında Rutinler, Yapılacaklar, Günlük, Hatırlatıcı, Notlar ve Önemli günler; her birinde "Ana ekrana ekle" anahtarı.
+- Hava ve namaz widget'ı yenilendi: 48 saatlik saatlik hava şeridi (yağışlı saatler mavi), tek metin hava satırı, sıradaki vakitten başlayan namaz şeridi ve tek satır bildirim. Şeritler ‹ › oklarıyla kayar.
+- Medya widget'ı: favori radyo ve TV kanalları kutu kutu (kısa adlarla), oklarla kayar; podcast ve müzik düğmeleri altta.
+- Widget'lar artık enine de daraltılabilir (yaklaşık 2 hücreye kadar). Daralınca ekrandaki kutu sayısı azalır.
+- GitHub'da DEGISIKLIK VAR: build.yml degisti (widget'lar). ONCE build.yml'yi yapistir, SONRA tum dosyalari TEK commit ile yukle.
+
 
 v1.25.44 yenilikleri:
 - Notlar (Araçlar > Kişisel): MIUI Notlar gibi iki sütunlu kartlar, etiket / klasör çubuğu, arama, sabitleme, isteğe bağlı fotoğraf, kontrol listesi ve hatırlatma.

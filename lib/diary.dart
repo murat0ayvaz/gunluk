@@ -150,6 +150,14 @@ class _DiaryCalendarPageState extends State<DiaryCalendarPage> {
           body: ListView(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
             children: [
+              SwitchListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                secondary: const Icon(Icons.home_rounded),
+                title: Text(tx('Ana ekrana ekle')),
+                value: store.homeOn('note'),
+                onChanged: (v) => store.setHomeOn('note', v),
+              ),
               // Ay başlığı ve önceki / sonraki ay
               Row(
                 children: [

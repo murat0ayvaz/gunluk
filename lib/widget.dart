@@ -1,13 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
+import 'net.dart' show HourW;
+import 'holidays.dart' show holidayBanner;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'data.dart';
-import 'dock.dart' show dockLaunch, dockLastTitle;
+import 'dock.dart' show dockLaunch, dockLastTitle, favShort;
 import 'main.dart' show navKey;
 import 'media.dart';
 import 'pip.dart';
-import 'prayer.dart' show prayer, prayerNextText;
+import 'prayer.dart' show prayer, prayerNames, prayerNextText;
 import 'tvpop.dart' show tvPop;
 import 'strings.dart';
 import 'weather.dart';
@@ -175,6 +177,98 @@ class WidgetSvc {
     }
   }
 
+  bool _wetCode(int c) =>
+      (c >= 51 && c <= 67) || (c >= 71 && c <= 77) || (c >= 80 && c <= 86) || c >= 95;
+
+  /// Saatlik şerit: önümüzdeki 48 saat. [ms, "HH:00", gün kısaltması, simge, sıcaklık, yağış %, yağışlı mı]
+  List<List<Object>> _hourly() {
+    final d = weather.data;
+    if (!store.wxOn || d == null) return [];
+    final now = DateTime.now();
+    final out = <List<Object>>[];
+    for (var k = 0; k < 3; k++) {
+      final day = DateTime(now.year, now.month, now.day).add(Duration(days: k));
+      final hs = d.hours[dKey(day)] ?? const <HourW>[];
+      for (final h in hs) {
+        final t = DateTime(day.year, day.month, day.day, h.hour);
+        if (t.isBefore(DateTime(now.year, now.month, now.day, now.hour))) continue;
+        if (t.difference(now).inHours >= 48) break;
+        final pop = h.rain >= 0 ? h.rain : (h.mm > 0 ? 100 : 0);
+        final wet = _wetCode(h.code) && (h.rain < 0 || h.rain >= 30);
+        out.add([
+          t.millisecondsSinceEpoch,
+          '${h.hour.toString().padLeft(2, '0')}:00',
+          wdShort(t.weekday),
+          _wxEmoji(h.code, h.hour < 6 || h.hour >= 20),
+          '${h.temp.round()}°',
+          pop,
+          wet,
+        ]);
+      }
+    }
+    return out;
+  }
+
+  /// Namaz vakitleri şeridi: bugün, yarın ve ertesi gün. [ms, ad, "HH:mm", gün adı]
+  List<List<Object>> _prayerStrip() {
+    if (!store.prayOn) return [];
+    final now = DateTime.now();
+    final out = <List<Object>>[];
+    for (var k = 0; k < 3; k++) {
+      final day = DateTime(now.year, now.month, now.day).add(Duration(days: k));
+      final t = k == 0 ? prayer.times : prayer.timesFor(day);
+      if (t == null || t.length < 6) continue;
+      for (var i = 0; i < 6; i++) {
+        final p = t[i].split(':');
+        if (p.length < 2) continue;
+        final at = DateTime(day.year, day.month, day.day, int.tryParse(p[0]) ?? 0, int.tryParse(p[1]) ?? 0);
+        out.add([
+          at.millisecondsSinceEpoch,
+          tx(prayerNames[i]),
+          t[i],
+          k == 0 ? '' : (k == 1 ? tx('Yarın') : wdShort(day.weekday)),
+        ]);
+      }
+    }
+    return out;
+  }
+
+  /// Hava satırı tek metin: "☁️ 15° bulutlu, yağış yok. En yakın yağış yarın (Pazar): yağmur %95"
+  String _wxFull() {
+    final d = weather.data;
+    if (!store.wxOn || d == null || d.nowTemp == null) return '';
+    final hr = DateTime.now().hour;
+    final sum = wxSummaryNow();
+    final head = '${_wxEmoji(d.nowCode, hr < 6 || hr >= 20)} ${d.nowTemp!.round()}°';
+    return sum.isEmpty ? _wxLine() : '$head $sum';
+  }
+
+  /// Tek satır bildirim: hava uyarısı, yoksa önemli gün
+  String _oneNote() {
+    final d = weather.data;
+    if (store.wxOn && d != null) {
+      final al = wxAlertLine(wxAlerts(d), 0);
+      if (al.isNotEmpty) return al;
+    }
+    return holidayBanner();
+  }
+
+  List<List<String>> _favs(bool radio) {
+    final out = <List<String>>[];
+    if (radio) {
+      for (final c in store.radCats) {
+        for (final st in c.stations) {
+          if (st.fav) out.add([st.id, favShort(st.name)]);
+        }
+      }
+    } else {
+      for (final c in store.tvChans) {
+        if (c.fav) out.add([c.id, favShort(c.name)]);
+      }
+    }
+    return out;
+  }
+
   Future<void> push() async {
     try {
       final active = media.nowId != null;
@@ -210,6 +304,14 @@ class WidgetSvc {
         'rl': _listItems(),
         'nl': _noteLines(),
         'wxsum': wxSummaryNow(),
+        'wxl': _wxFull(),
+        'hr': _hourly(),
+        'prl': _prayerStrip(),
+        'wnote': _oneNote(),
+        'rfav': _favs(true),
+        'tfav': _favs(false),
+        'mid': active ? (media.nowId ?? '') : '',
+        'tvid': tvPop.chan?.id ?? '',
         'wxhead': tx('Hava durumu'),
         'nlhead': tx('Bildirimler'),
         'nlnone': tx('Şimdilik bildirim yok'),
@@ -310,6 +412,29 @@ class WidgetSvc {
           await dockLaunch(ctx, 'radio');
         } else {
           media.toggle();
+        }
+      } else if (a.startsWith('radio:')) {
+        final id = a.substring(6);
+        for (final c in store.radCats) {
+          for (final st in c.stations) {
+            if (st.id == id) {
+              tvPop.close();
+              await media.playStation(st);
+              return;
+            }
+          }
+        }
+      } else if (a.startsWith('tv:')) {
+        final id = a.substring(3);
+        for (final c in store.tvChans) {
+          if (c.id == id) {
+            tvPop.show(c);
+            if (pip.enabled) {
+              await Future.delayed(const Duration(milliseconds: 1200));
+              if (tvPop.chan != null) pip.enter();
+            }
+            return;
+          }
         }
       } else if (a == 'music' || a == 'podcast') {
         await dockLaunch(ctx, a);

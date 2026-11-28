@@ -3627,13 +3627,21 @@ class AppStore extends ChangeNotifier {
   static const kHomeOrder = ['wx', 'pr', 'routine', 'todo', 'note', 'rem', 'memo', 'other'];
 
   /// Bölüm ana ekranda gösteriliyor mu (Notlar varsayılan kapalı; diğerleri açık)
-  bool homeOn(String id) =>
-      id == 'memo' ? pBool('memohome', false) : !pBool('hoff_$id', false);
+  bool homeOn(String id) {
+    if (id == 'memo') return pBool('memohome', false);
+    if (id == 'routine') return !pBool('hoff_routine', false);
+    // Yapılacaklar, Günlük, Hatırlatıcı: varsayılan kapalı (ana ekranda yalnız Rutinler); anahtarla eklenir
+    return pBool('hon_$id', false);
+  }
   void setHomeOn(String id, bool on) {
     if (id == 'memo') {
       setProf('memohome', on);
     } else {
-      setProf('hoff_$id', !on);
+      if (id == 'routine') {
+        setProf('hoff_routine', !on);
+      } else {
+        setProf('hon_$id', on);
+      }
     }
   }
   static const kIconOrder = ['menu', 'study', 'short', 'mic', 'tools', 'media'];

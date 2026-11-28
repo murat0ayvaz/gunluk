@@ -10,11 +10,11 @@ import 'version.dart';
 // Her sürümde aşağıdaki liste yeni sürümün maddeleriyle değiştirilir.
 // ---------------------------------------------------------------
 List<String> whatsNew() => [
-      tx('Notlar (Araçlar > Kişisel): MIUI Notlar gibi iki sütunlu kartlar, etiket / klasör çubuğu, arama, sabitleme, isteğe bağlı fotoğraf, kontrol listesi ve hatırlatma.'),
-      tx('Google Keep (Takeout zip / json) ve Mi Notlar / metin dosyalarından içe aktarma: Notlar > ⋮ > İçe aktar.'),
-      tx('Araçlar\'a Kişisel grubu: Notlar, Hatırlatıcı, Günlük ve Önemli günler.'),
-      tx('Rutinler, Yapılacaklar, Günlük, Hatırlatıcı ve Notlar ana ekrana eklenip çıkarılabilir (Ayarlar > Ana ekran düzeni ve araç sayfalarındaki anahtar).'),
-      tx('Önemli günler: milli ve dini günler (bayram, kandil...) takvimde işaretlenir; 1 hafta önce ve gününde bildirim gelir, ana ekranın altında da görünür.'),
+      tx('Ana ekranda varsayılan olarak yalnız Rutinler görünür. Yapılacaklar, Günlük, Hatırlatıcı ve Notlar isteğe bağlı eklenir; sola çekince kalıcı gizlenir.'),
+      tx('Araçlar > Kişisel altında Rutinler, Yapılacaklar, Günlük, Hatırlatıcı, Notlar ve Önemli günler; her birinde "Ana ekrana ekle" anahtarı.'),
+      tx('Hava ve namaz widget\'ı yenilendi: 48 saatlik saatlik hava şeridi (yağışlı saatler mavi), tek metin hava satırı, sıradaki vakitten başlayan namaz şeridi ve tek satır bildirim. Şeritler ‹ › oklarıyla kayar.'),
+      tx('Medya widget\'ı: favori radyo ve TV kanalları kutu kutu (kısa adlarla), oklarla kayar; podcast ve müzik düğmeleri altta.'),
+      tx('Widget\'lar artık enine de daraltılabilir (yaklaşık 2 hücreye kadar). Daralınca ekrandaki kutu sayısı azalır.'),
     ];
 
 Future<void> showWhatsNew(BuildContext context, {bool updated = false}) {
